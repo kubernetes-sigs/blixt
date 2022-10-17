@@ -6,4 +6,15 @@ plugins:
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: blixt
 repo: github.com/kong/blixt
+resources:
+- controller: true
+  domain: networking.k8s.io
+  group: gateway
+  kind: Gateway
+  version: v1beta1
+- controller: true
+  domain: networking.k8s.io
+  group: gateway
+  kind: GatewayClass
+  version: v1beta1
 version: "3"
