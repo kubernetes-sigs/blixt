@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dataplane
+  namespace: system
+  labels:
+    app: dataplane
+spec:
+  selector:
+    matchLabels:
+      app: dataplane
+  template:
+    metadata:
+      labels:
+        app: dataplane
+    spec:
+      hostNetwork: true
+      containers:
+      - name: dataplane
+        image: ghcr.io/kong/blixt-dataplane:latest
+        securityContext:
+          privileged: true
+        args: ["eth0"]
+        imagePullPolicy: Always
