@@ -105,4 +105,5 @@ func main() {
 	}
 
 	// Just a test comment
+	// Another test comment
 }
