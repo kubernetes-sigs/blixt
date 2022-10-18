@@ -88,7 +88,7 @@ jobs:
     - name: Docker build - Data Plane
       uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
       with:
-        context: .
+        context: dataplane
         cache-from: type=gha
         cache-to: type=gha,mode=max
         tags: kong/blixt-dataplane:pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
