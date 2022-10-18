@@ -2,6 +2,7 @@
 FROM golang:1.19 as builder
 
 LABEL org.opencontainers.image.source=https://github.com/kong/blixt
+LABEL org.opencontainers.image.licenses=Apache-2.0
 
 WORKDIR /workspace
 # Copy the Go Modules manifests

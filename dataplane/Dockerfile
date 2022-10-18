@@ -1,6 +1,9 @@
 FROM archlinux as builder
 
 LABEL org.opencontainers.image.source=https://github.com/kong/blixt
+LABEL org.opencontainers.image.description=\"An experimental layer 4 load-balancer built using eBPF/XDP with ebpf-go \
+for use in Kubernetes via the Kubernetes Gateway API"
+LABEL org.opencontainers.image.licenses=GPL-2.0-only
 
 RUN pacman -Syu --noconfirm
 RUN pacman -S base-devel bpf git make go clang llvm linux-headers --noconfirm
