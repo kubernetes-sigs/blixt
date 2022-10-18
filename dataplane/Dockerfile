@@ -1,6 +1,6 @@
 FROM archlinux as builder
 
-LABEL org.opencontainers.image.source https://github.com/kong/blixt
+LABEL org.opencontainers.image.source=https://github.com/kong/blixt
 
 RUN pacman -Syu --noconfirm
 RUN pacman -S base-devel bpf git make go clang llvm linux-headers --noconfirm

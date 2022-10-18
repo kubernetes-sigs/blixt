@@ -9,28 +9,62 @@ on:
     - main
 
 jobs:
-#  get-changed-files:
-#    name: Get Changed Files
-#    runs-on: ubuntu-20.04
-#    outputs:
-#      changed-files: ${{ steps.changed-files.outputs.all_changed_and_modified_files }}
-#    steps:
-#    - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
-#      with:
-#        fetch-depth: 0
-#    - name: Get list of all changes
-#      uses: tj-actions/changed-files@v32.1.0
-#      id: changed-files
-#    - name: List all changed files
-#      run: |
-#        for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-#          echo "$file"
-#        done
+  get-changed-files:
+    name: Get Changed Files
+    runs-on: ubuntu-20.04
+    outputs:
+      changed-files: ${{ steps.changed-files.outputs.all_changed_and_modified_files }}
+      control-plane-changed: ${{ steps.control-plane-changed.outputs.any_modified }}
+      dataplane-changed: ${{ steps.dataplane-changed.outputs.any_modified }}
+      workflow-changed: ${{ steps.workflow-changed.outputs.any_modified }}
+    steps:
+    - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
+      with:
+        fetch-depth: 0
+    - name: Get list of all changes
+      uses: tj-actions/changed-files@1d6e210c970d01a876fbc6155212d068e79ca584
+      id: changed-files
+    - name: Check if any files related to the building of the control plane image have changed (see the Dockerfiles)
+      uses: tj-actions/changed-files@1d6e210c970d01a876fbc6155212d068e79ca584
+      id: control-plane-changed
+      with:
+        files: |
+          Dockerfile
+          go.mod
+          go.sum
+          main.go
+          controllers/
+    - name: Check if any files related to the building of the dataplane image have changed (see the Dockerfiles)
+      uses: tj-actions/changed-files@1d6e210c970d01a876fbc6155212d068e79ca584
+      id: dataplane-changed
+      with:
+        files: |
+          dataplane/Dockerfile
+          dataplane/go.mod
+          dataplane/go.sum
+          dataplane/main.go
+          dataplane/xdp.c
+          dataplane/Makefile
+    - name: Check if any of the workflow files have changed
+      uses: tj-actions/changed-files@1d6e210c970d01a876fbc6155212d068e79ca584
+      id: workflow-changed
+      with:
+        files: |
+          .github/workflows/
+    - name: List all changed files
+      run: |
+        for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+          echo "$file"
+        done
 
   pr-docker-build:
-    name: PR Docker build - Control Plane
-#    needs: [ get-changed-files ]
-    if: github.event_name == 'pull_request'
+    name: PR Docker build
+    needs: [ get-changed-files ]
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.get-changed-files.outputs.control-plane-changed == 'true' ||
+      needs.get-changed-files.outputs.dataplane-changed == 'true' ||
+      needs.get-changed-files.outputs.workflow-changed == 'true'
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
@@ -38,7 +72,7 @@ jobs:
       uses: docker/setup-buildx-action@c74574e6c82eeedc46366be1b0d287eff9085eb6
       with:
         install: true
-    - name: Docker build
+    - name: Docker build - Control Plane
       uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
       with:
         context: .
@@ -51,3 +85,16 @@ jobs:
       with:
         name: blixt-control-plane
         path: /tmp/blixt-control-plane.tar
+    - name: Docker build - Data Plane
+      uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
+      with:
+        context: .
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        tags: kong/blixt-dataplane:pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+        outputs: type=docker,dest=/tmp/blixt-dataplane.tar
+    - name: Upload Image Artifact
+      uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8
+      with:
+        name: blixt-dataplane
+        path: /tmp/blixt-dataplane.tar
