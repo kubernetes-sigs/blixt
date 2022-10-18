@@ -63,10 +63,12 @@ jobs:
     name: PR Docker build
     needs: [ get-changed-files ]
     if: >-
-      github.event_name == 'pull_request' &&
-      (needs.get-changed-files.outputs.control-plane-changed == 'true' ||
-      needs.get-changed-files.outputs.dataplane-changed == 'true' ||
-      needs.get-changed-files.outputs.workflow-changed == 'true')
+      github.event_name == 'pull_request' 
+      && (
+        needs.get-changed-files.outputs.control-plane-changed == 'true'
+        || needs.get-changed-files.outputs.dataplane-changed == 'true'
+        || needs.get-changed-files.outputs.workflow-changed == 'true'
+      )
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
@@ -105,10 +107,12 @@ jobs:
     name: Main branch Docker build
     needs: [ get-changed-files ]
     if: >-
-      github.event_name == 'push' &&
-      (needs.get-changed-files.outputs.control-plane-changed == 'true' ||
-      needs.get-changed-files.outputs.dataplane-changed == 'true' ||
-      needs.get-changed-files.outputs.workflow-changed == 'true')
+      github.event_name == 'push' 
+      && (
+        needs.get-changed-files.outputs.control-plane-changed == 'true'
+        || needs.get-changed-files.outputs.dataplane-changed == 'true'
+        || needs.get-changed-files.outputs.workflow-changed == 'true'
+      )
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
