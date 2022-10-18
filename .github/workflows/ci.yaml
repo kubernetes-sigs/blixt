@@ -130,7 +130,6 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         tags: ghcr.io/kong/blixt-control-plane:latest
-        outputs: type=docker,dest=/tmp/blixt-control-plane.tar
     - name: Docker build - Data Plane
       uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
       with:
@@ -139,4 +138,3 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         tags: ghcr.io/kong/blixt-dataplane:latest
-        outputs: type=docker,dest=/tmp/blixt-dataplane.tar
