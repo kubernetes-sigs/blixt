@@ -34,6 +34,7 @@ jobs:
           go.sum
           main.go
           controllers/
+          LICENSE
     - name: Check if any files related to the building of the dataplane image have changed (see the Dockerfiles)
       uses: tj-actions/changed-files@1d6e210c970d01a876fbc6155212d068e79ca584
       id: dataplane-changed
@@ -45,6 +46,7 @@ jobs:
           dataplane/main.go
           dataplane/xdp.c
           dataplane/Makefile
+          dataplane/LICENCE
     - name: Check if any of the workflow files have changed
       uses: tj-actions/changed-files@1d6e210c970d01a876fbc6155212d068e79ca584
       id: workflow-changed
@@ -78,23 +80,63 @@ jobs:
         context: .
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        tags: kong/blixt-control-plane:pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+        tags: ghcr.io/kong/blixt-control-plane:pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
         outputs: type=docker,dest=/tmp/blixt-control-plane.tar
-    - name: Upload Image Artifact
+    - name: Upload Image Artifact - Control Plane
       uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8
       with:
         name: blixt-control-plane
         path: /tmp/blixt-control-plane.tar
-    - name: Docker build - Data Plane
+    - name: Docker build - Dataplane
       uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
       with:
         context: dataplane
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        tags: kong/blixt-dataplane:pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+        tags: ghcr.io/kong/blixt-dataplane:pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
         outputs: type=docker,dest=/tmp/blixt-dataplane.tar
-    - name: Upload Image Artifact
+    - name: Upload Image Artifact - Dataplane
       uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8
       with:
         name: blixt-dataplane
         path: /tmp/blixt-dataplane.tar
+
+  main-docker-build:
+    name: Main branch Docker build
+    needs: [ get-changed-files ]
+    if: >-
+      github.event_name == 'push' &&
+      needs.get-changed-files.outputs.control-plane-changed == 'true' ||
+      needs.get-changed-files.outputs.dataplane-changed == 'true' ||
+      needs.get-changed-files.outputs.workflow-changed == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@c74574e6c82eeedc46366be1b0d287eff9085eb6
+      with:
+        install: true
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Docker build - Control Plane
+      uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
+      with:
+        context: .
+        push: true
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        tags: ghcr.io/kong/blixt-control-plane:latest
+        outputs: type=docker,dest=/tmp/blixt-control-plane.tar
+    - name: Docker build - Data Plane
+      uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
+      with:
+        context: dataplane
+        push: true
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        tags: ghcr.io/kong/blixt-dataplane:latest
+        outputs: type=docker,dest=/tmp/blixt-dataplane.tar
