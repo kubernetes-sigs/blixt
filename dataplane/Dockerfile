@@ -1,6 +1,6 @@
 FROM archlinux as builder
 
-LABEL org.opencontainers.image.source=https://github.com/kong/blixt
+LABEL org.opencontainers.image.source=https://github.com/kong/blixt-dataplane-test
 LABEL org.opencontainers.image.licenses=GPL-2.0-only
 
 RUN pacman -Syu --noconfirm
