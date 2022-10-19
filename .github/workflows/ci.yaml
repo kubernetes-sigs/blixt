@@ -7,6 +7,7 @@ on:
   push:
     branches:
     - main
+    - chore/add-ci-system
 permissions: write-all
 
 jobs:
@@ -134,7 +135,7 @@ jobs:
         push: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        tags: kong/blixt-control-plane-test:test
+        tags: ghcr.io/kong/blixt-control-plane-test:test
     - name: Docker build - Data Plane
       uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
       with:
@@ -142,4 +143,4 @@ jobs:
         push: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        tags: kong/blixt-dataplane-test:test
+        tags: ghcr.io/kong/blixt-dataplane-test:test
