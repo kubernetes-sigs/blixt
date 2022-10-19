@@ -106,6 +106,8 @@ jobs:
   main-docker-build:
     name: Main branch Docker build
     needs: [ get-changed-files ]
+    permissions:
+      packages: write
     if: >-
       github.event_name == 'push' 
       && (
