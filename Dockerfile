@@ -1,7 +1,7 @@
 # Build the manager binary
 FROM golang:1.19 as builder
 
-LABEL org.opencontainers.image.source=https://github.com/kong/blixt-workflow-test
+LABEL org.opencontainers.image.source=https://github.com/kong/blixt
 LABEL org.opencontainers.image.description="An experimental layer 4 load-balancer built using eBPF/XDP with ebpf-go \
 for use in Kubernetes via the Kubernetes Gateway API"
 LABEL org.opencontainers.image.licenses=Apache-2.0
