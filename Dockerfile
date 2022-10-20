@@ -1,7 +1,10 @@
 # Build the manager binary
 FROM golang:1.19 as builder
 
-LABEL org.opencontainers.image.source https://github.com/kong/blixt
+LABEL org.opencontainers.image.source=https://github.com/kong/blixt
+LABEL org.opencontainers.image.description="An experimental layer 4 load-balancer built using eBPF/XDP with ebpf-go \
+for use in Kubernetes via the Kubernetes Gateway API"
+LABEL org.opencontainers.image.licenses=Apache-2.0
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -23,6 +26,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
+COPY LICENSE /workspace/LICENSE
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]
