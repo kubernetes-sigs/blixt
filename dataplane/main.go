@@ -58,8 +58,51 @@ func main() {
 	log.Printf("Attached XDP program to iface %q (index %d)", iface.Name, iface.Index)
 	log.Printf("Press Ctrl-C to exit and remove the program")
 
-	// TODO: routing
+	b := backend{
+		saddr:   ip2int("172.18.0.1"),
+		daddr:   ip2int("10.244.0.6"),
+		hwaddr:  hwaddr2bytes("9a:fb:6d:e6:a1:26"),
+		ifindex: 6,
+	}
+
+	if err := objs.Backends.Update(ip2int("172.18.0.100"), b, ebpf.UpdateAny); err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
 
 	for {
 	}
+}
+
+type backend struct {
+	saddr   uint32
+	daddr   uint32
+	hwaddr  [6]uint8
+	ifindex uint16
+}
+
+func ip2int(ip string) uint32 {
+	ipaddr := net.ParseIP(ip)
+	return binary.LittleEndian.Uint32(ipaddr.To4())
+}
+
+func hwaddr2bytes(hwaddr string) [6]byte {
+	parts := strings.Split(hwaddr, ":")
+	if len(parts) != 6 {
+		panic("invalid hwaddr")
+	}
+
+	var hwaddrB [6]byte
+	for i, hexPart := range parts {
+		bs, err := hex.DecodeString(hexPart)
+		if err != nil {
+			panic(err)
+		}
+		if len(bs) != 1 {
+			panic("invalid hwaddr part")
+		}
+		hwaddrB[i] = bs[0]
+	}
+
+	return hwaddrB
 }
