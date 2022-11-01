@@ -25,6 +25,10 @@ FROM archlinux
 
 WORKDIR /
 
+RUN pacman -Sy
+
+RUN pacman -S bpf ethtool xdp-tools bpftrace --noconfirm
+
 COPY --from=builder /workspace/blixt-dataplane .
 COPY LICENSE /workspace/LICENSE
 
