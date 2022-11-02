@@ -68,7 +68,7 @@ static __always_inline __u16 udp_checksum(struct iphdr *ip, struct udphdr * udp,
     // The number of nibbles in the UDP header + Payload
     unsigned int udp_packet_nibbles = UDP_PAYLOAD_SIZE(udp->len);
 
-    // Here we only want to iterate through payload 
+    // Here we only want to iterate through payload
     // NOT trailing bits
     for (int i = 0; i <= MAX_UDP_LENGTH; i += 2) {
         if (i > udp_packet_nibbles) {
@@ -107,8 +107,8 @@ struct backend {
 };
 
 
-struct vip_key { 
-    __u32 vip; 
+struct vip_key {
+    __u32 vip;
     __u16 port;
     __u8 pad[2];
 };
@@ -161,8 +161,8 @@ int xdp_prog_func(struct xdp_md *ctx) {
   // Routing
   // ---------------------------------------------------------------------------
 
-  struct vip_key key = { 
-    .vip = ip->daddr, 
+  struct vip_key key = {
+    .vip = ip->daddr,
     .port = bpf_ntohs(udp->dest)
   };
 
@@ -185,7 +185,7 @@ int xdp_prog_func(struct xdp_md *ctx) {
   bpf_printk_ip(ip->saddr);
   bpf_printk("updated daddr to:");
   bpf_printk_ip(ip->daddr);
-  
+
   if (udp->dest != bpf_ntohs(bk->dport)) {
     udp->dest = bpf_ntohs(bk->dport);
     bpf_printk("updated dport to: %d", bk->dport);
@@ -205,11 +205,11 @@ int xdp_prog_func(struct xdp_md *ctx) {
   }
 
   bpf_printk("destination interface index %d", bk->ifindex);
-  
+
   int action = bpf_redirect(bk->ifindex, 0);
 
   bpf_printk("redirect action: %d", action);
-  
+
   return action;
 }
 
