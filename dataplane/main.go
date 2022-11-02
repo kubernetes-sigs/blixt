@@ -58,27 +58,32 @@ func main() {
 	log.Printf("Attached XDP program to iface %q (index %d)", iface.Name, iface.Index)
 	log.Printf("Press Ctrl-C to exit and remove the program")
 
-	b := backend{
-		saddr:   ip2int("172.18.0.1"),
-		daddr:   ip2int("10.244.0.6"),
-		hwaddr:  hwaddr2bytes("9a:fb:6d:e6:a1:26"),
-		ifindex: 6,
+	// TODO(astoycos) Shouldn't be hardcoded
+	b := bpfBackend{
+		Saddr: ip2int("10.8.125.12"),
+		Daddr: ip2int("192.168.10.2"),
+		Dport: 9875,
+		// Host-Side Veth Mac
+		Shwaddr: hwaddr2bytes("06:56:87:ec:fd:1f"),
+		// Container-Side Veth Mac
+		Dhwaddr: hwaddr2bytes("86:ad:33:29:ff:5e"),
+		Nocksum: 1,
+		Ifindex: 8,
 	}
 
-	if err := objs.Backends.Update(ip2int("172.18.0.100"), b, ebpf.UpdateAny); err != nil {
+	// TODO(astoycos) Shouldn't be hardcoded
+	key := bpfVipKey{
+		Vip:  ip2int("10.8.125.12"),
+		Port: 8888,
+	}
+
+	if err := objs.Backends.Update(key, b, ebpf.UpdateAny); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
 	for {
 	}
-}
-
-type backend struct {
-	saddr   uint32
-	daddr   uint32
-	hwaddr  [6]uint8
-	ifindex uint16
 }
 
 func ip2int(ip string) uint32 {
