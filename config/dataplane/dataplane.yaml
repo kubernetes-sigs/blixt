@@ -14,6 +14,7 @@ spec:
       labels:
         app: dataplane
     spec:
+      serviceAccountName: udproute-manager
       hostNetwork: true
       containers:
       - name: dataplane
@@ -21,4 +22,4 @@ spec:
         securityContext:
           privileged: true
         args: ["eth0"]
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent

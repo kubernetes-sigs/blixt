@@ -1,5 +1,2 @@
 resources:
 - dataplane.yaml
-
-generatorOptions:
-  disableNameSuffixHash: true
