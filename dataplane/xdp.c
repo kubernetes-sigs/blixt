@@ -18,6 +18,8 @@ char __license[] SEC("license") = "GPL";
 #define MAX_BACKENDS 128
 #define MAX_UDP_LENGTH 1480
 
+#define UDP_PAYLOAD_SIZE(x) (unsigned int)(((bpf_htons(x) - sizeof(struct udphdr)) * 8 ) / 4)
+
 static __always_inline void ip_from_int(__u32 *buf, __be32 ip) {
     buf[0] = (ip >> 0 ) & 0xFF;
     buf[1] = (ip >> 8 ) & 0xFF;
@@ -51,27 +53,41 @@ static __always_inline __u16 iph_csum(struct iphdr *iph) {
 static __always_inline __u16 udp_checksum(struct iphdr *ip, struct udphdr * udp, void * data_end) {
     udp->check = 0;
 
-    __u16 csum = 0;
-    __u16 *buf = (__u16*)udp;
+    // So we can overflow a bit make this __u32
+    __u32 csum_total = 0;
+    __u16 csum;
+    __u16 *buf = (void *)udp;
 
-    csum += ip->saddr;
-    csum += ip->saddr >> 16;
-    csum += ip->daddr;
-    csum += ip->daddr >> 16;
-    csum += (__u16)ip->protocol << 8;
-    csum += udp->len;
+    csum_total += (__u16)ip->saddr;
+    csum_total += (__u16)(ip->saddr >> 16);
+    csum_total += (__u16)ip->daddr;
+    csum_total += (__u16)(ip->daddr >> 16);
+    csum_total += (__u16)(ip->protocol << 8);
+    csum_total += udp->len;
 
-    for (int i = 0; i < MAX_UDP_LENGTH; i += 2) {
+    // The number of nibbles in the UDP header + Payload
+    unsigned int udp_packet_nibbles = UDP_PAYLOAD_SIZE(udp->len);
+
+    // Here we only want to iterate through payload 
+    // NOT trailing bits
+    for (int i = 0; i <= MAX_UDP_LENGTH; i += 2) {
+        if (i > udp_packet_nibbles) {
+            break;
+        }
+
         if ((void *)(buf + 1) > data_end) {
             break;
         }
-        csum += *buf;
+        csum_total += *buf;
         buf++;
     }
 
     if ((void *)buf + 1 <= data_end) {
-        csum += *(__u8 *)buf;
+        csum_total += (*(__u8 *)buf);
     }
+
+   // Add any cksum overflow back into __u16
+   csum = (__u16)csum_total + (__u16)(csum_total >> 16);
 
    csum = ~csum;
    return csum;
@@ -80,14 +96,27 @@ static __always_inline __u16 udp_checksum(struct iphdr *ip, struct udphdr * udp,
 struct backend {
     __u32 saddr;
     __u32 daddr;
-    __u8 hwaddr[6];
+    __u16 dport;
+    __u8 shwaddr[6];
+    __u8 dhwaddr[6];
     __u16 ifindex;
+    // Cksum isn't required for UDP see:
+    // https://en.wikipedia.org/wiki/User_Datagram_Protocol
+    __u8 nocksum;
+    __u8 pad[3];
+};
+
+
+struct vip_key { 
+    __u32 vip; 
+    __u16 port;
+    __u8 pad[2];
 };
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, MAX_BACKENDS);
-    __type(key, __u32);
+    __type(key, struct vip_key);
     __type(value, struct backend);
 } backends SEC(".maps");
 
@@ -132,12 +161,15 @@ int xdp_prog_func(struct xdp_md *ctx) {
   // Routing
   // ---------------------------------------------------------------------------
 
-  __u32 original_dest_ip = ip->daddr;
+  struct vip_key key = { 
+    .vip = ip->daddr, 
+    .port = bpf_ntohs(udp->dest)
+  };
 
   struct backend *bk;
-  bk = bpf_map_lookup_elem(&backends, &original_dest_ip);
+  bk = bpf_map_lookup_elem(&backends, &key);
   if (!bk) {
-      bpf_printk("no backends for ip %x", original_dest_ip);
+      bpf_printk("no backends for ip %x:%x", key.vip, key.port);
       return XDP_PASS;
   }
 
@@ -153,19 +185,32 @@ int xdp_prog_func(struct xdp_md *ctx) {
   bpf_printk_ip(ip->saddr);
   bpf_printk("updated daddr to:");
   bpf_printk_ip(ip->daddr);
+  
+  if (udp->dest != bpf_ntohs(bk->dport)) {
+    udp->dest = bpf_ntohs(bk->dport);
+    bpf_printk("updated dport to: %d", bk->dport);
+  }
 
-  memcpy(eth->h_source, eth->h_dest, sizeof(eth->h_source));
+  memcpy(eth->h_source, bk->shwaddr, sizeof(eth->h_source));
   bpf_printk("new source hwaddr %x:%x:%x:%x:%x:%x", eth->h_source[0], eth->h_source[1], eth->h_source[2], eth->h_source[3], eth->h_source[4], eth->h_source[5]);
 
-  memcpy(eth->h_dest, bk->hwaddr, sizeof(eth->h_dest));
+  memcpy(eth->h_dest, bk->dhwaddr, sizeof(eth->h_dest));
   bpf_printk("new dest hwaddr %x:%x:%x:%x:%x:%x", eth->h_dest[0], eth->h_dest[1], eth->h_dest[2], eth->h_dest[3], eth->h_dest[4], eth->h_dest[5]);
 
   ip->check = iph_csum(ip);
-  udp->check = udp_checksum(ip, udp, data_end);
+  udp->check = 0;
+
+  if (!bk->nocksum){
+    udp->check = udp_checksum(ip, udp, data_end);
+  }
 
   bpf_printk("destination interface index %d", bk->ifindex);
+  
+  int action = bpf_redirect(bk->ifindex, 0);
 
-  return bpf_redirect(bk->ifindex, 0);
+  bpf_printk("redirect action: %d", action);
+  
+  return action;
 }
 
 SEC("xdp")
