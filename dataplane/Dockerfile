@@ -16,6 +16,11 @@ COPY go.sum go.sum
 RUN go mod download
 
 COPY main.go main.go
+COPY xdploader.go xdploader.go
+COPY router.go router.go
+COPY utils.go utils.go
+COPY udproute_controller.go udproute_controller.go
+COPY pod_controller.go pod_controller.go
 COPY xdp.c xdp.c
 COPY Makefile Makefile
 

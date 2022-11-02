@@ -1,99 +1,77 @@
 package main
 
 import (
-	"encoding/binary"
-	"encoding/hex"
-	"fmt"
+	"context"
 	"log"
-	"net"
-	"os"
-	"strings"
 
-	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/link"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	gwcl "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -cflags $BPF_CFLAGS bpf xdp.c -- -I../headers
 
+var (
+	objs   *bpfObjects
+	router *RoutingData
+	cfg    *rest.Config
+	gwc    *gwcl.Clientset
+	k8s    *kubernetes.Clientset
+)
+
+func init() {
+	router = NewRouter()
+
+	var err error
+	cfg, err = rest.InClusterConfig()
+	if err != nil {
+		log.Fatalf("could not find kubernetes config: %s", err)
+	}
+
+	k8s, err = kubernetes.NewForConfig(cfg)
+	if err != nil {
+		log.Fatalf("could not create kubernetes client: %s", err)
+	}
+
+	gwc, err = gwcl.NewForConfig(cfg)
+	if err != nil {
+		log.Fatalf("could not create Gateway API kubernetes client: %s", err)
+	}
+}
+
 func main() {
-	if len(os.Args) < 2 {
-		log.Fatalf("Please specify a network interface")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := startPodController(ctx); err != nil {
+		log.Fatalf("ERROR: could not start Pod controller: %s", err)
 	}
 
-	ifaceName := os.Args[1]
-	iface, err := net.InterfaceByName(ifaceName)
+	if err := startUDPRouteController(ctx); err != nil {
+		log.Fatalf("ERROR: could not start UDPRoute controller: %s", err)
+	}
+
+	var err error
+	objs, err = startXDPLoader(ctx)
 	if err != nil {
-		log.Fatalf("lookup network iface %q: %s", ifaceName, err)
+		log.Fatalf("ERROR: could not load XDP programs: %s", err)
 	}
 
-	objs := bpfObjects{}
-	if err := loadBpfObjects(&objs, nil); err != nil {
-		log.Fatalf("loading objects: %s", err)
+	// FIXME: temporary hack for demo
+	sourceADDR, err := hwaddr2bytes("92:d1:b5:2b:dd:50")
+	if err != nil {
+		log.Fatalf(err.Error())
 	}
-	defer objs.Close()
-
-	l, err := link.AttachXDP(link.XDPOptions{
-		Program:   objs.XdpProgFunc,
-		Interface: iface.Index,
+	destADDR, err := hwaddr2bytes("4e:93:77:36:1a:04")
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+	router.AddInterface(ip2int("10.244.0.8"), BackendInterface{
+		InterfaceIndex:   8,
+		SrcHardwareAddr:  sourceADDR,
+		DestHardwareAddr: destADDR,
 	})
-	if err != nil {
-		log.Fatalf("could not attach XDP program: %s", err)
-	}
-	defer l.Close()
-
-	log.Printf("Attached XDP program to iface %q (index %d)", iface.Name, iface.Index)
-	log.Printf("Press Ctrl-C to exit and remove the program")
-
-	// TODO(astoycos) Shouldn't be hardcoded
-	b := bpfBackend{
-		Saddr: ip2int("10.8.125.12"),
-		Daddr: ip2int("192.168.10.2"),
-		Dport: 9875,
-		// Host-Side Veth Mac
-		Shwaddr: hwaddr2bytes("06:56:87:ec:fd:1f"),
-		// Container-Side Veth Mac
-		Dhwaddr: hwaddr2bytes("86:ad:33:29:ff:5e"),
-		Nocksum: 1,
-		Ifindex: 8,
-	}
-
-	// TODO(astoycos) Shouldn't be hardcoded
-	key := bpfVipKey{
-		Vip:  ip2int("10.8.125.12"),
-		Port: 8888,
-	}
-
-	if err := objs.Backends.Update(key, b, ebpf.UpdateAny); err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
 
 	for {
 	}
-}
-
-func ip2int(ip string) uint32 {
-	ipaddr := net.ParseIP(ip)
-	return binary.LittleEndian.Uint32(ipaddr.To4())
-}
-
-func hwaddr2bytes(hwaddr string) [6]byte {
-	parts := strings.Split(hwaddr, ":")
-	if len(parts) != 6 {
-		panic("invalid hwaddr")
-	}
-
-	var hwaddrB [6]byte
-	for i, hexPart := range parts {
-		bs, err := hex.DecodeString(hexPart)
-		if err != nil {
-			panic(err)
-		}
-		if len(bs) != 1 {
-			panic("invalid hwaddr part")
-		}
-		hwaddrB[i] = bs[0]
-	}
-
-	return hwaddrB
 }
