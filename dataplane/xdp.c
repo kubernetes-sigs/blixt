@@ -212,9 +212,3 @@ int xdp_prog_func(struct xdp_md *ctx) {
 
   return action;
 }
-
-SEC("xdp")
-int bpf_redirect_placeholder(struct xdp_md *ctx) {
-    bpf_printk("received a packet on dest interface");
-    return XDP_PASS;
-}

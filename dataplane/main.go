@@ -16,19 +16,14 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc $BPF_CLANG -cflags $BPF_CFLAGS bpf xdp.c -- -I../headers
 
 func main() {
-	if len(os.Args) < 3 {
-		log.Fatalf("Please specify a main and destination network interface")
+	if len(os.Args) < 2 {
+		log.Fatalf("Please specify a network interface")
 	}
 
 	ifaceName := os.Args[1]
 	iface, err := net.InterfaceByName(ifaceName)
 	if err != nil {
 		log.Fatalf("lookup network iface %q: %s", ifaceName, err)
-	}
-	ifaceName2 := os.Args[2]
-	iface2, err := net.InterfaceByName(ifaceName2)
-	if err != nil {
-		log.Fatalf("lookup network iface %s: %s", ifaceName, err)
 	}
 
 	objs := bpfObjects{}
@@ -45,15 +40,6 @@ func main() {
 		log.Fatalf("could not attach XDP program: %s", err)
 	}
 	defer l.Close()
-
-	l2, err := link.AttachXDP(link.XDPOptions{
-		Program:   objs.BpfRedirectPlaceholder,
-		Interface: iface2.Index,
-	})
-	if err != nil {
-		log.Fatalf("could not attach XDP program: %s", err)
-	}
-	defer l2.Close()
 
 	log.Printf("Attached XDP program to iface %q (index %d)", iface.Name, iface.Index)
 	log.Printf("Press Ctrl-C to exit and remove the program")
