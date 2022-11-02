@@ -46,7 +46,7 @@ should be considered only a fun experiment, and used for nothing more.
 Deploy [Gateway API][gwapi] [CRDs][crds]:
 
 ```console
-$ kubectl kustomize https://github.com/kubernetes-sigs/gateway-api/config/crd | kubectl apply -f -
+$ kubectl kustomize https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental | kubectl apply -f -
 ```
 
 Deploy:
