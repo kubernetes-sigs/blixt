@@ -29,11 +29,17 @@ proof-of-concept which achieves the following:
 After these goals are achieved, further goals will be decided. Until then this
 should be considered only a fun experiment, and used for nothing more.
 
+> **Note**: There is an open question as to whether the data-plane should be
+> implemented standalone behind the `Gateway` resources, or if it might make
+> any sense or be advantageous to implement it as a backend for [KPNG][kpng].
+> This is something the maintainers intend to determine before a `v1` release.
+
 [gw]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.Gateway
 [gwc]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.GatewayClass
 [udproute]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.UDPRoute
 [tcproute]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.TCPRoute
 [tlsroute]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.TLSRoute
+[kpng]:https://github.com/kubernetes-sigs/kpng
 
 ## Usage
 
