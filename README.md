@@ -29,6 +29,11 @@ proof-of-concept which achieves the following:
 After these goals are achieved, further goals will be decided. Until then this
 should be considered only a fun experiment, and used for nothing more.
 
+> **Note**: The initial proof of concept was written as an XDP program, but
+> with more features (including access to ip conntrack in newer kernels)
+> available in TC, the maintainers are most likely going to be converting
+> this to a TC program soon.
+
 > **Note**: There is an open question as to whether the data-plane should be
 > implemented standalone behind the `Gateway` resources, or if it might make
 > any sense or be advantageous to implement it as a backend for [KPNG][kpng].
