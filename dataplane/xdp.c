@@ -165,7 +165,9 @@ int xdp_prog_func(struct xdp_md *ctx) {
   struct backend *bk;
   bk = bpf_map_lookup_elem(&backends, &key);
   if (!bk) {
-      bpf_printk("no backends for ip %x:%x", key.vip, key.port);
+      bpf_printk("no backends for ip");
+      bpf_printk_ip(key.vip);
+      bpf_printk("port: %d", key.port);
       return XDP_PASS;
   }
 

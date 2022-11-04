@@ -9,7 +9,6 @@ kind: Gateway
 apiVersion: gateway.networking.k8s.io/v1beta1
 metadata:
   name: blixt
-  namespace: default
 spec:
   gatewayClassName: blixt
   listeners:
