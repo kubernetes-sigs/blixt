@@ -18,8 +18,6 @@ char __license[] SEC("license") = "GPL";
 #define MAX_BACKENDS 128
 #define MAX_UDP_LENGTH 1480
 
-#define UDP_PAYLOAD_SIZE(x) (unsigned int)(((bpf_htons(x) - sizeof(struct udphdr)) * 8 ) / 4)
-
 static __always_inline void ip_from_int(__u32 *buf, __be32 ip) {
     buf[0] = (ip >> 0 ) & 0xFF;
     buf[1] = (ip >> 8 ) & 0xFF;
@@ -51,11 +49,9 @@ static __always_inline __u16 iph_csum(struct iphdr *iph) {
 }
 
 static __always_inline __u16 udp_checksum(struct iphdr *ip, struct udphdr * udp, void * data_end) {
-    udp->check = 0;
-
     // So we can overflow a bit make this __u32
-    __u32 csum_total = 0;
-    __u16 csum;
+    __u64 csum_total = 0;
+
     __u16 *buf = (void *)udp;
 
     csum_total += (__u16)ip->saddr;
@@ -65,32 +61,33 @@ static __always_inline __u16 udp_checksum(struct iphdr *ip, struct udphdr * udp,
     csum_total += (__u16)(ip->protocol << 8);
     csum_total += udp->len;
 
-    // The number of nibbles in the UDP header + Payload
-    unsigned int udp_packet_nibbles = UDP_PAYLOAD_SIZE(udp->len);
+    int udp_len = bpf_ntohs(udp->len);
+    
+    // Verifier fails without this check
+    if (udp_len >= MAX_UDP_LENGTH) { 
+       return 1;
+    }
 
-    // Here we only want to iterate through payload
+    // Here we only want to iterate through payload 
     // NOT trailing bits
-    for (int i = 0; i <= MAX_UDP_LENGTH; i += 2) {
-        if (i > udp_packet_nibbles) {
-            break;
-        }
-
+    for (int i = 0; i < udp_len; i += 2) {
+        // Verifier Fails without this check
         if ((void *)(buf + 1) > data_end) {
             break;
         }
-        csum_total += *buf;
-        buf++;
+
+        // Last byte
+        if (i + 1 == udp_len) {
+          csum_total += (*(__u8 *)buf);
+          // Verifier fails without this print statement, I have no Idea why :/
+          bpf_printk("Adding last byte %X to csum", (*(__u8 *)buf));
+        } else { 
+          csum_total += *buf;
+        }
+        buf+=1;
     }
 
-    if ((void *)buf + 1 <= data_end) {
-        csum_total += (*(__u8 *)buf);
-    }
-
-   // Add any cksum overflow back into __u16
-   csum = (__u16)csum_total + (__u16)(csum_total >> 16);
-
-   csum = ~csum;
-   return csum;
+    return csum_fold_helper(csum_total);
 }
 
 struct backend {
@@ -106,9 +103,8 @@ struct backend {
     __u8 pad[3];
 };
 
-
-struct vip_key {
-    __u32 vip;
+struct vip_key { 
+    __u32 vip; 
     __u16 port;
     __u8 pad[2];
 };
@@ -198,8 +194,8 @@ int xdp_prog_func(struct xdp_md *ctx) {
   bpf_printk("new dest hwaddr %x:%x:%x:%x:%x:%x", eth->h_dest[0], eth->h_dest[1], eth->h_dest[2], eth->h_dest[3], eth->h_dest[4], eth->h_dest[5]);
 
   ip->check = iph_csum(ip);
+  
   udp->check = 0;
-
   if (!bk->nocksum){
     udp->check = udp_checksum(ip, udp, data_end);
   }
