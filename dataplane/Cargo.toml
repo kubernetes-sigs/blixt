@@ -1,2 +1,2 @@
 [workspace]
-members = ["loader", "common", "xtask"]
+members = ["controllers/udproute", "loader", "common", "xtask"]
