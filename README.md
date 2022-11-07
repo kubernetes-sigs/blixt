@@ -18,16 +18,18 @@ API][gwapi].
 
 ## Current Status
 
-This is presently a work-in-progress. The intention for now is to create a
-proof-of-concept which achieves the following:
+This is presently a work-in-progress. The project goals are currently:
 
-- [ ] can support the specification of [Gateway][gw]/[GatewayClass][gwc]
-- [ ] can support the full specification of [UDPRoute][udproute]
-- [ ] can support the full specification of [TCPRoute][tcproute]
-- [ ] (MAYBE?) support the full specification of [TLSRoute][tlsroute]
+- [ ] support [Gateway][gw]/[GatewayClass][gwc]
+- [ ] support [UDPRoute][udproute]
+- [ ] support [TCPRoute][tcproute]
+- [ ] use this as a basis for adding/improving [Gateway API Conformance Tests][gwcnf]
+- [ ] plug this into [Gateway API][gwapi] CI to run conformance tests on PRs
 
-After these goals are achieved, further goals will be decided. Until then this
-should be considered only a fun experiment, and used for nothing more.
+After these goals are achieved, further goals will be decided.
+
+> **Note**: [TLSRoute][tlsroute] support may be on the table, but we're looking
+> for someone from the community to champion this.
 
 > **Note**: The initial proof of concept was written as an XDP program, but
 > with more features (including access to ip conntrack in newer kernels)
@@ -43,6 +45,8 @@ should be considered only a fun experiment, and used for nothing more.
 [gwc]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.GatewayClass
 [udproute]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.UDPRoute
 [tcproute]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.TCPRoute
+[gwcnf]:https://github.com/kubernetes-sigs/gateway-api/tree/main/conformance
+[gwapi]:https://gateway-api.sigs.k8s.io
 [tlsroute]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.TLSRoute
 [kpng]:https://github.com/kubernetes-sigs/kpng
 
