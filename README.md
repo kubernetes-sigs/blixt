@@ -4,17 +4,22 @@
 
 # Blixt
 
-An experimental [layer 4][osi] load-balancer built using [eBPF][ebpf] with
-[ebpf-go][ebpf-go] for use in [Kubernetes][k8s] via the [Kubernetes Gateway
-API][gwapi].
+An experimental [layer 4][osi] load-balancer for [Kubernetes][k8s] with a
+control-plane built on [Gateway API][gwapi] in [Golang][go] with
+[Operator SDK][osdk]/[Controller Runtime][crn], and an [eBPF][ebpf]-based
+data-plane built in [Rust][rust] using [Aya][aya].
 
 > **Note**: The word "blixt" means "lightning" in Swedish.
 
 [osi]:https://en.wikipedia.org/wiki/OSI_model
-[ebpf]:https://www.tigera.io/learn/guides/ebpf/ebpf-xdp/
-[ebpf-go]:https://github.com/cilium/ebpf
 [k8s]:https://kubernetes.io
-[gwapi]:https://github.com/kubernetes-sigs/gateway-api
+[gwapi]:https://gateway-api.sigs.k8s.io
+[go]:https://go.dev
+[osdk]:https://sdk.operatorframework.io/
+[crn]:https://github.com/kubernetes-sigs/controller-runtime
+[ebpf]:https://www.tigera.io/learn/guides/ebpf/ebpf-xdp/
+[rust]:https://rust-lang.org
+[aya]:https://aya-rs.dev
 
 ## Current Status
 
