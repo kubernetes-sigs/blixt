@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -43,25 +44,28 @@ type GatewayReconciler struct {
 
 func (r *GatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&gatewayv1beta1.Gateway{}).
-		WithEventFilter(predicate.NewPredicateFuncs(func(obj client.Object) bool {
-			gateway, ok := obj.(*gatewayv1beta1.Gateway)
-			if !ok {
-				r.Log.Error(fmt.Errorf("unexpected object type in gateway watch predicates"), "expected", "*gatewayv1beta1.Gateway", "found", reflect.TypeOf(obj))
-				return false
-			}
-			gatewayClass := &gatewayv1beta1.GatewayClass{}
-			if err := r.Client.Get(context.Background(), client.ObjectKey{Name: string(gateway.Spec.GatewayClassName)}, gatewayClass); err != nil {
-				r.Log.Error(err, "could not retrieve gatewayclass", "gatewayclass", gateway.Spec.GatewayClassName)
-				return false
-			}
-			return gatewayClass.Spec.ControllerName != GatewayClassControllerName
-		})).
+		For(&gatewayv1beta1.Gateway{},
+			builder.WithPredicates(predicate.NewPredicateFuncs(r.gatewayHasMatchingGatewayClass)),
+		).
 		Watches(
 			&source.Kind{Type: &corev1.Service{}},
 			handler.EnqueueRequestsFromMapFunc(mapServiceToGateway),
 		).
 		Complete(r)
+}
+
+func (r *GatewayReconciler) gatewayHasMatchingGatewayClass(obj client.Object) bool {
+	gateway, ok := obj.(*gatewayv1beta1.Gateway)
+	if !ok {
+		r.Log.Error(fmt.Errorf("unexpected object type in gateway watch predicates"), "expected", "*gatewayv1beta1.Gateway", "found", reflect.TypeOf(obj))
+		return false
+	}
+	gatewayClass := &gatewayv1beta1.GatewayClass{}
+	if err := r.Client.Get(context.Background(), client.ObjectKey{Name: string(gateway.Spec.GatewayClassName)}, gatewayClass); err != nil {
+		r.Log.Error(err, "could not retrieve gatewayclass", "gatewayclass", gateway.Spec.GatewayClassName)
+		return false
+	}
+	return gatewayClass.Spec.ControllerName != GatewayClassControllerName
 }
 
 func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
