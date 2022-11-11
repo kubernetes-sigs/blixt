@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+	"github.com/kong/blixt/pkg/vars"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,14 +61,18 @@ func (r *GatewayReconciler) gatewayHasMatchingGatewayClass(obj client.Object) bo
 		r.Log.Error(fmt.Errorf("unexpected object type in gateway watch predicates"), "expected", "*gatewayv1beta1.Gateway", "found", reflect.TypeOf(obj))
 		return false
 	}
+
 	gatewayClass := &gatewayv1beta1.GatewayClass{}
 	if err := r.Client.Get(context.Background(), client.ObjectKey{Name: string(gateway.Spec.GatewayClassName)}, gatewayClass); err != nil {
 		if errors.IsNotFound(err) {
 			r.Log.Error(err, "gatewayclass not found", "gatewayclass", gateway.Spec.GatewayClassName)
+			return false
 		}
-		return false
+		r.Log.Error(err, "couldn't retrieve gatewayclass for unknown reason, enqueing gateway anyway to avoid miss", "gatewayclass", gateway.Spec.GatewayClassName)
+		return true
 	}
-	return true // some other problem retrieving the object, enqueue anyway to avoid dropping
+
+	return gatewayClass.Spec.ControllerName == vars.GatewayClassControllerName
 }
 
 func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
