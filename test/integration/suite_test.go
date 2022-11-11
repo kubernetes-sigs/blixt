@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 
 func exitOnErr(err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, err.Error())
+		fmt.Fprint(os.Stderr, err.Error())
 		os.Exit(1)
 	}
 }
