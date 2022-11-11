@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -36,11 +38,25 @@ const gatewayServiceLabel = "konghq.com/owned-by-gateway"
 type GatewayReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Log    logr.Logger
 }
 
 func (r *GatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gatewayv1beta1.Gateway{}).
+		WithEventFilter(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+			gateway, ok := obj.(*gatewayv1beta1.Gateway)
+			if !ok {
+				r.Log.Error(fmt.Errorf("unexpected object type in gateway watch predicates"), "expected", "*gatewayv1beta1.Gateway", "found", reflect.TypeOf(obj))
+				return false
+			}
+			gatewayClass := &gatewayv1beta1.GatewayClass{}
+			if err := r.Client.Get(context.Background(), client.ObjectKey{Name: string(gateway.Spec.GatewayClassName)}, gatewayClass); err != nil {
+				r.Log.Error(err, "could not retrieve gatewayclass", "gatewayclass", gateway.Spec.GatewayClassName)
+				return false
+			}
+			return gatewayClass.Spec.ControllerName != GatewayClassControllerName
+		})).
 		Watches(
 			&source.Kind{Type: &corev1.Service{}},
 			handler.EnqueueRequestsFromMapFunc(mapServiceToGateway),
