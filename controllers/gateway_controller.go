@@ -62,10 +62,12 @@ func (r *GatewayReconciler) gatewayHasMatchingGatewayClass(obj client.Object) bo
 	}
 	gatewayClass := &gatewayv1beta1.GatewayClass{}
 	if err := r.Client.Get(context.Background(), client.ObjectKey{Name: string(gateway.Spec.GatewayClassName)}, gatewayClass); err != nil {
-		r.Log.Error(err, "could not retrieve gatewayclass", "gatewayclass", gateway.Spec.GatewayClassName)
+		if errors.IsNotFound(err) {
+			r.Log.Error(err, "gatewayclass not found", "gatewayclass", gateway.Spec.GatewayClassName)
+		}
 		return false
 	}
-	return gatewayClass.Spec.ControllerName != GatewayClassControllerName
+	return true // some other problem retrieving the object, enqueue anyway to avoid dropping
 }
 
 func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
