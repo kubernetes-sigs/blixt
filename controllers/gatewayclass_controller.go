@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 
+	"github.com/kong/blixt/pkg/vars"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,8 +17,6 @@ import (
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses/finalizers,verbs=update
-
-const GatewayClassControllerName = "konghq.com/blixt"
 
 // GatewayClassReconciler reconciles a GatewayClass object
 type GatewayClassReconciler struct {
@@ -33,7 +32,7 @@ func (r *GatewayClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			if !ok {
 				return false
 			}
-			return gwc.Spec.ControllerName == GatewayClassControllerName // filter out unmanaged GWCs
+			return gwc.Spec.ControllerName == vars.GatewayClassControllerName // filter out unmanaged GWCs
 		})).
 		Complete(r)
 }
@@ -50,7 +49,7 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	if gwc.Spec.ControllerName != GatewayClassControllerName {
+	if gwc.Spec.ControllerName != vars.GatewayClassControllerName {
 		return ctrl.Result{}, nil
 	}
 
