@@ -8,6 +8,7 @@ import (
 	"github.com/go-logr/stdr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -47,7 +48,7 @@ func NewFakeClientWithGatewayClasses(initObjects ...client.Object) (gatewayv1bet
 	}
 
 	scheme := runtime.NewScheme()
-	gatewayv1beta1.AddToScheme(scheme)
+	utilruntime.Must(gatewayv1beta1.AddToScheme(scheme))
 
 	fakeClient := fake.NewClientBuilder().WithObjects(
 		managedGatewayClass,
