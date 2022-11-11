@@ -90,7 +90,7 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	if gwc.Spec.ControllerName != GatewayClassControllerName {
+	if gwc.Spec.ControllerName != vars.GatewayClassControllerName {
 		return ctrl.Result{}, nil
 	}
 
