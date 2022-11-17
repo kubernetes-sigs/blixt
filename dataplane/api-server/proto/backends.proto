@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package backends;
+
+message Vip {
+    uint32 ip = 1;
+    uint32 port = 2;
+}
+
+message Target {
+    uint32 daddr = 1;
+    uint32 dport = 2;
+    uint32 ifindex = 3;
+}
+
+message Targets {
+    Vip vip = 1;
+    Target target = 2;
+}
+
+message Confirmation {
+    string confirmation = 1;
+}
+
+service backends {
+    rpc Update(Targets) returns (Confirmation);
+    rpc Delete(Vip) returns (Confirmation);
+}

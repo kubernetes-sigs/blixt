@@ -1,7 +1,9 @@
-mod build_ebpf;
-mod run;
 // Remember to run `cargo install bindgen-cli`
+
+mod build_ebpf;
 mod codegen;
+mod grpc;
+mod run;
 
 use std::process::exit;
 
@@ -17,16 +19,19 @@ pub struct Options {
 enum Command {
     BuildEbpf(build_ebpf::Options),
     Run(run::Options),
+    GrpcClient(grpc::Options),
     Codegen,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let opts = Options::parse();
 
     use Command::*;
     let ret = match opts.command {
         BuildEbpf(opts) => build_ebpf::build_ebpf(opts),
         Run(opts) => run::run(opts),
+        GrpcClient(opts) => grpc::update(opts).await,
         Codegen => codegen::generate(),
     };
 
