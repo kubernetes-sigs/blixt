@@ -1,2 +1,2 @@
 [workspace]
-members = ["controllers/udproute", "loader", "common", "xtask"]
+members = ["api-server", "loader", "common", "xtask"]
