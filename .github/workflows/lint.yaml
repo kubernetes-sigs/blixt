@@ -36,3 +36,5 @@ jobs:
 
     - name: Run Linters
       uses: golangci/golangci-lint-action@v3
+      with:
+        args: --timeout 3m --verbose
