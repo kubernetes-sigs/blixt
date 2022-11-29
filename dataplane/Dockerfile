@@ -1,5 +1,8 @@
 FROM rust as builder
 
+RUN apt-get update
+RUN apt-get install protobuf-compiler -qq
+
 WORKDIR /workspace
 
 COPY . .
