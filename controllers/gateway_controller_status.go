@@ -43,5 +43,27 @@ func (r *GatewayReconciler) markGatewayReady(ctx context.Context, gw *gatewayv1b
 		Message:            "the gateway is ready to route traffic",
 	}}
 
+	listenersStatus := make([]gatewayv1beta1.ListenerStatus, 0, len(gw.Spec.Listeners))
+	for _, l := range gw.Spec.Listeners {
+		listenersStatus = append(listenersStatus, gatewayv1beta1.ListenerStatus{
+			Name: l.Name,
+			Conditions: []metav1.Condition{
+				{
+					Type:               string(gatewayv1beta1.ListenerConditionReady),
+					Status:             metav1.ConditionTrue,
+					Reason:             string(gatewayv1beta1.ListenerReasonReady),
+					ObservedGeneration: gw.Generation,
+					LastTransitionTime: metav1.Now(),
+					Message:            "the listener is ready to route traffic",
+				},
+			},
+		})
+	}
+	gw.Status.Listeners = listenersStatus
+
 	return r.Status().Patch(ctx, gw, client.MergeFrom(previousGW))
+}
+
+func newGatewayStatus() gatewayv1beta1.GatewayStatus {
+	return gatewayv1beta1.GatewayStatus{}
 }
