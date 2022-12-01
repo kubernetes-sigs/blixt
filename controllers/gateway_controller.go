@@ -96,8 +96,19 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
+	oldGateway := gw.DeepCopy()
+	initGatewayStatus(gw)
+
 	log.Info("checking for Service for Gateway")
 	svc, err := r.getServiceForGateway(ctx, gw)
+	// in both cases when the service does not exist or an error has been triggered, the Gateway
+	// must be not ready. This OR condition is redundant, as (svc != nil AND err == nil)
+	// should never happen, but useful to highlight the purpose.
+	if svc == nil || err != nil {
+		if patchErr := r.patchGatewayStatus(ctx, gw, oldGateway); err != nil {
+			return ctrl.Result{}, patchErr
+		}
+	}
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -108,6 +119,14 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	log.Info("checking Service configuration")
 	needsUpdate, err := r.ensureServiceConfiguration(ctx, svc, gw)
+	// in both cases when the service does not exist or an error has been triggered, the Gateway
+	// must be not ready. This OR condition is redundant, as (needsUpdate == true AND err == nil)
+	// should never happen, but useful to highlight the purpose.
+	if needsUpdate || err != nil {
+		if patchErr := r.patchGatewayStatus(ctx, gw, oldGateway); err != nil {
+			return ctrl.Result{}, patchErr
+		}
+	}
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -120,14 +139,25 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	case corev1.ServiceTypeLoadBalancer:
 		if svc.Spec.ClusterIP == "" || len(svc.Status.LoadBalancer.Ingress) < 1 {
 			log.Info("waiting for Service to be ready")
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{Requeue: true}, r.patchGatewayStatus(ctx, gw, oldGateway)
 		}
 	default:
+		if patchErr := r.patchGatewayStatus(ctx, gw, oldGateway); err != nil {
+			return ctrl.Result{}, patchErr
+		}
 		return ctrl.Result{}, fmt.Errorf("found unsupported Service type: %s (only LoadBalancer type is currently supported)", t)
 	}
 
 	// hack for metallb - https://github.com/metallb/metallb/issues/1640
 	created, err := r.hackEnsureEndpoints(ctx, svc)
+	// in both cases when the service does not exist or an error has been triggered, the Gateway
+	// must be not ready. This OR condition is redundant, as (created == true AND err == nil)
+	// should never happen, but useful to highlight the purpose.
+	if created || err != nil {
+		if patchErr := r.patchGatewayStatus(ctx, gw, oldGateway); patchErr != nil {
+			return ctrl.Result{}, patchErr
+		}
+	}
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -136,5 +166,7 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	log.Info("Service is ready, updating Gateway")
-	return ctrl.Result{}, r.markGatewayReady(ctx, gw, svc)
+	markGatewayReady(ctx, gw, svc)
+
+	return ctrl.Result{}, r.patchGatewayStatus(ctx, gw, oldGateway)
 }
