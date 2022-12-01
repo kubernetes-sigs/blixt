@@ -9,7 +9,7 @@ import (
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-func markGatewayReady(ctx context.Context, gateway *gatewayv1beta1.Gateway, svc *corev1.Service) {
+func updateGatewayStatus(ctx context.Context, gateway *gatewayv1beta1.Gateway, svc *corev1.Service) {
 	gwaddrs := make([]gatewayv1beta1.GatewayAddress, 0, len(svc.Status.LoadBalancer.Ingress))
 	for _, addr := range svc.Status.LoadBalancer.Ingress {
 		if addr.IP != "" {
@@ -26,33 +26,45 @@ func markGatewayReady(ctx context.Context, gateway *gatewayv1beta1.Gateway, svc 
 		}
 	}
 	gateway.Status.Addresses = gwaddrs
-	gateway.Status.Conditions = []metav1.Condition{{
+	newGatewayCondition := metav1.Condition{
 		Type:               string(gatewayv1beta1.GatewayConditionReady),
 		Status:             metav1.ConditionTrue,
 		Reason:             string(gatewayv1beta1.GatewayReasonReady),
 		ObservedGeneration: gateway.Generation,
 		LastTransitionTime: metav1.Now(),
 		Message:            "the gateway is ready to route traffic",
-	}}
-
+	}
 	listenersStatus := make([]gatewayv1beta1.ListenerStatus, 0, len(gateway.Spec.Listeners))
 	for _, l := range gateway.Spec.Listeners {
 		supportedKinds, resolvedRefsCondition := getSupportedKinds(gateway.Generation, l)
+		listenerReadyStatus := corev1.ConditionTrue
+		listenerReadyReason := gatewayv1beta1.ListenerReasonReady
+		if resolvedRefsCondition.Status == metav1.ConditionFalse {
+			listenerReadyStatus = corev1.ConditionStatus(metav1.ConditionFalse)
+			listenerReadyReason = gatewayv1beta1.ListenerReasonResolvedRefs
+		}
 		listenersStatus = append(listenersStatus, gatewayv1beta1.ListenerStatus{
 			Name:           l.Name,
 			SupportedKinds: supportedKinds,
 			Conditions: []metav1.Condition{
 				{
 					Type:               string(gatewayv1beta1.ListenerConditionReady),
-					Status:             metav1.ConditionTrue,
-					Reason:             string(gatewayv1beta1.ListenerReasonReady),
+					Status:             metav1.ConditionStatus(listenerReadyStatus),
+					Reason:             string(listenerReadyReason),
 					ObservedGeneration: gateway.Generation,
 					LastTransitionTime: metav1.Now(),
-					Message:            "the listener is ready to route traffic",
 				},
 				resolvedRefsCondition,
 			},
 		})
+		if resolvedRefsCondition.Status == metav1.ConditionFalse {
+			newGatewayCondition.Status = metav1.ConditionFalse
+			newGatewayCondition.Reason = string(gatewayv1beta1.GatewayReasonListenersNotReady)
+			newGatewayCondition.Message = "the gateway is not ready to route traffic"
+		}
+	}
+	gateway.Status.Conditions = []metav1.Condition{
+		newGatewayCondition,
 	}
 	gateway.Status.Listeners = listenersStatus
 }
@@ -63,7 +75,7 @@ func initGatewayStatus(gateway *gatewayv1beta1.Gateway) {
 			{
 				Type:               string(gatewayv1beta1.GatewayConditionReady),
 				Status:             metav1.ConditionFalse,
-				Reason:             string(gatewayv1beta1.GatewayReasonReady),
+				Reason:             string(gatewayv1beta1.GatewayReasonListenersNotReady),
 				ObservedGeneration: gateway.Generation,
 				LastTransitionTime: metav1.Now(),
 				Message:            "the gateway is not ready to route traffic",
@@ -83,7 +95,6 @@ func initGatewayStatus(gateway *gatewayv1beta1.Gateway) {
 					Reason:             string(gatewayv1beta1.ListenerReasonPending),
 					ObservedGeneration: gateway.Generation,
 					LastTransitionTime: metav1.Now(),
-					Message:            "the listener is not ready to route traffic",
 				},
 				resolvedRefsCondition,
 			},

@@ -166,7 +166,7 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	log.Info("Service is ready, updating Gateway")
-	markGatewayReady(ctx, gw, svc)
+	updateGatewayStatus(ctx, gw, svc)
 
 	return ctrl.Result{}, r.patchGatewayStatus(ctx, gw, oldGateway)
 }
