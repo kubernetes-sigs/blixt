@@ -74,7 +74,7 @@ $ kubectl kustomize config/default | kubectl apply -f -
 
 # License
 
-The Blixt control-plane components are licensed under [Apache License, Version
+The Blixt controlplane components are licensed under [Apache License, Version
 2.0][apache2], which is everything _outside_ of the `dataplane/` directory. The
 data-plane components are licensed under the [General Public License, Version
 2.0 (only)][gplv2], which includes everything _inside_ the `dataplane/`
