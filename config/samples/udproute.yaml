@@ -6,7 +6,7 @@ metadata:
 spec:
   parentRefs:
   - name: blixt
-    namespace: blixt-system
+    # namespace: blixt-system
     port: 9875
   rules:
   - backendRefs:
