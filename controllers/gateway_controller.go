@@ -96,23 +96,21 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
+	gatewayReadyStatus, gatewayReadyStatusIsSet := isGatewayReady(gw)
 	oldGateway := gw.DeepCopy()
 	initGatewayStatus(gw)
+	factorizeStatus(gw, oldGateway)
 
 	log.Info("checking for Service for Gateway")
 	svc, err := r.getServiceForGateway(ctx, gw)
-	// in both cases when the service does not exist or an error has been triggered, the Gateway
-	// must be not ready. This OR condition is redundant, as (svc != nil AND err == nil)
-	// should never happen, but useful to highlight the purpose.
-	if svc == nil || err != nil {
-		if patchErr := r.patchGatewayStatus(ctx, gw, oldGateway); err != nil {
-			return ctrl.Result{}, patchErr
-		}
-	}
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if svc == nil {
+		// if the ready status is not set, or the gateway is marked as ready, mark it as not ready
+		if !gatewayReadyStatusIsSet || gatewayReadyStatus {
+			return ctrl.Result{}, r.patchGatewayStatus(ctx, gw, oldGateway) // status patch will requeue gateway
+		}
 		log.Info("creating Service for Gateway")
 		return ctrl.Result{}, r.createServiceForGateway(ctx, gw) // service creation will requeue gateway
 	}
@@ -122,15 +120,14 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// in both cases when the service does not exist or an error has been triggered, the Gateway
 	// must be not ready. This OR condition is redundant, as (needsUpdate == true AND err == nil)
 	// should never happen, but useful to highlight the purpose.
-	if needsUpdate || err != nil {
-		if patchErr := r.patchGatewayStatus(ctx, gw, oldGateway); err != nil {
-			return ctrl.Result{}, patchErr
-		}
-	}
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if needsUpdate {
+		// if the ready status is not set, or the gateway is marked as ready, mark it as not ready
+		if !gatewayReadyStatusIsSet || gatewayReadyStatus {
+			return ctrl.Result{}, r.patchGatewayStatus(ctx, gw, oldGateway) // status patch will requeue gateway
+		}
 		return ctrl.Result{}, r.Client.Update(ctx, svc)
 	}
 
@@ -138,26 +135,25 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	switch t := svc.Spec.Type; t {
 	case corev1.ServiceTypeLoadBalancer:
 		if svc.Spec.ClusterIP == "" || len(svc.Status.LoadBalancer.Ingress) < 1 {
+			// if the ready status is not set, or the gateway is marked as ready, mark it as not ready
+			if !gatewayReadyStatusIsSet || gatewayReadyStatus {
+				return ctrl.Result{}, r.patchGatewayStatus(ctx, gw, oldGateway) // status patch will requeue gateway
+			}
 			log.Info("waiting for Service to be ready")
-			return ctrl.Result{Requeue: true}, r.patchGatewayStatus(ctx, gw, oldGateway)
+			return ctrl.Result{Requeue: true}, nil
 		}
 	default:
-		if patchErr := r.patchGatewayStatus(ctx, gw, oldGateway); err != nil {
-			return ctrl.Result{}, patchErr
+		// if the ready status is not set, or the gateway is marked as ready, mark it as not ready
+		if !gatewayReadyStatusIsSet || gatewayReadyStatus {
+			return ctrl.Result{}, r.patchGatewayStatus(ctx, gw, oldGateway) // status patch will requeue gateway
 		}
 		return ctrl.Result{}, fmt.Errorf("found unsupported Service type: %s (only LoadBalancer type is currently supported)", t)
 	}
 
 	// hack for metallb - https://github.com/metallb/metallb/issues/1640
+	// no need to enforce the gateway status here, as this endpoint is not reconciled by the controller
+	// and no reconciliation loop is triggered upon its change or deletion.
 	created, err := r.hackEnsureEndpoints(ctx, svc)
-	// in both cases when the service does not exist or an error has been triggered, the Gateway
-	// must be not ready. This OR condition is redundant, as (created == true AND err == nil)
-	// should never happen, but useful to highlight the purpose.
-	if created || err != nil {
-		if patchErr := r.patchGatewayStatus(ctx, gw, oldGateway); patchErr != nil {
-			return ctrl.Result{}, patchErr
-		}
-	}
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -167,6 +163,6 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	log.Info("Service is ready, updating Gateway")
 	updateGatewayStatus(ctx, gw, svc)
-
+	factorizeStatus(gw, oldGateway)
 	return ctrl.Result{}, r.patchGatewayStatus(ctx, gw, oldGateway)
 }
