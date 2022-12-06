@@ -32,6 +32,65 @@ func (r *UDPRouteReconciler) verifyListener(ctx context.Context, gw *gatewayv1be
 	return fmt.Errorf("No matching Gateway listener found for defined Parentref")
 }
 
+func (r *UDPRouteReconciler) isUDPRouteManaged(ctx context.Context, udproute gatewayv1alpha2.UDPRoute) (bool, *gatewayv1beta1.Gateway, error) {
+	log := log.FromContext(ctx)
+
+	var supportedGateways []gatewayv1beta1.Gateway
+
+	//Use the retrieve objects its parent ref to look for the gateway.
+	for _, parentRef := range udproute.Spec.ParentRefs {
+
+		//Build Gateway object to retrieve
+		gw := new(gatewayv1beta1.Gateway)
+
+		ns := udproute.Namespace
+		if parentRef.Namespace != nil {
+			ns = string(*parentRef.Namespace)
+		}
+
+		//Get Gateway for UDP Route
+		if err := r.Get(ctx, types.NamespacedName{Name: string(parentRef.Name), Namespace: ns}, gw); err != nil {
+			log.Info("Unable to get parent ref gateway for", "udpRoute", parentRef.Name, "Namespace", ns, "err", err)
+			//Check next parent ref.
+			continue
+		}
+
+		//Get GatewayClass for the Gateway and match to our name of controler
+		gwc := new(gatewayv1beta1.GatewayClass)
+		if err := r.Get(ctx, types.NamespacedName{Name: string(gw.Spec.GatewayClassName), Namespace: ns}, gwc); err != nil {
+			log.Info("Unable to get Gatewayclass", "Gateway", gw.Name, "Udp Route", parentRef.Name, "err", err)
+			//Check next parent ref.
+			continue
+		}
+
+		if gwc.Spec.ControllerName != vars.GatewayClassControllerName {
+			//Check next parent ref.
+			continue
+		}
+
+		//Check if referred gateway has the at least one listener with properties defined from UDPRoute parentref.
+		if err := r.verifyListener(ctx, gw, parentRef); err != nil {
+			log.Info("No matching listener found for referred gateway", "GatewayName", parentRef.Name, "GatewayPort", parentRef.Port)
+			//Check next parent ref.
+			continue
+		}
+
+		//TODO : Support for multiple Gateways : https://github.com/Kong/blixt/issues/40
+		if len(supportedGateways) == 1 {
+			err := fmt.Errorf("Not implemented support, for more than one reffered Gateway.")
+			return false, &gatewayv1beta1.Gateway{}, err
+		}
+
+		supportedGateways = append(supportedGateways, *gw)
+	}
+
+	//only used for logging
+	refferedGateway := &supportedGateways[0]
+	log.Info("UDP Route appeared referring to Gateway", "Gateway ", refferedGateway.Name, "GatewayClass Name", refferedGateway.Spec.GatewayClassName)
+
+	return true, refferedGateway, nil
+}
+
 //+kubebuilder:rbac:groups=gateway.konghq.com,resources=udproutes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=gateway.konghq.com,resources=udproutes/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=gateway.konghq.com,resources=udproutes/finalizers,verbs=update
@@ -51,43 +110,10 @@ func (r *UDPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	//Use the retrieve objects its parent ref to look for the gateway.
-	for _, parentRef := range udproute.Spec.ParentRefs {
-
-		//Build Gateway object to retrieve
-		gw := new(gatewayv1beta1.Gateway)
-
-		ns := udproute.Namespace
-		if parentRef.Namespace != nil {
-			ns = string(*parentRef.Namespace)
-		}
-
-		//Get Gateway for UDP Route
-		if err := r.Get(ctx, types.NamespacedName{Name: string(parentRef.Name), Namespace: ns}, gw); err != nil {
-			log.Info("Unable to get parent ref gateway for", "udpRoute", parentRef.Name, "Namespace", ns, "err", err)
-			return ctrl.Result{}, err
-		}
-
-		//Get GatewayClass for the Gateway and match to our name of controler
-		gwc := new(gatewayv1beta1.GatewayClass)
-		if err := r.Get(ctx, types.NamespacedName{Name: string(gw.Spec.GatewayClassName), Namespace: ns}, gwc); err != nil {
-			log.Info("Unable to get Gatewayclass", "Gateway", gw.Name, "Udp Route", parentRef.Name, "err", err)
-			return ctrl.Result{}, err
-		}
-
-		if gwc.Spec.ControllerName != vars.GatewayClassControllerName {
-			return ctrl.Result{}, nil
-		}
-
-		//Check if referred gateway has the at least one listener with properties defined from UDPRoute parentref.
-		if err := r.verifyListener(ctx, gw, parentRef); err != nil {
-			log.Info("No matching listener found for referred gateway", "GatewayName", parentRef.Name, "GatewayPort", parentRef.Port)
-			return ctrl.Result{}, err
-		}
-
-		log.Info("UDP Route appeared referring to Gateway", "UDPRoute", parentRef.Name, "Gateway ", gw.Name, "GatewayClass, Controller Name", gwc.Spec.ControllerName, "GatewayClass Name", gwc.ObjectMeta.Name)
+	isManaged, _, err := r.isUDPRouteManaged(ctx, *udproute)
+	if !isManaged {
+		return ctrl.Result{}, err
 	}
-
 	return ctrl.Result{}, nil
 }
 
