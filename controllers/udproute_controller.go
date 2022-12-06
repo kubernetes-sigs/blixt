@@ -68,12 +68,6 @@ func (r *UDPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, err
 		}
 
-		//Check if referred gateway has the at least one listener with properties defined from UDPRoute parentref.
-		if err := r.verifyListener(ctx, gw, parentRef); err != nil {
-			log.Info("No matching listener found for referred gateway", "GatewayName", parentRef.Name, "GatewayPort", parentRef.Port)
-			return ctrl.Result{}, err
-		}
-
 		//Get GatewayClass for the Gateway and match to our name of controler
 		gwc := new(gatewayv1beta1.GatewayClass)
 		if err := r.Get(ctx, types.NamespacedName{Name: string(gw.Spec.GatewayClassName), Namespace: ns}, gwc); err != nil {
@@ -83,6 +77,12 @@ func (r *UDPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 		if gwc.Spec.ControllerName != vars.GatewayClassControllerName {
 			return ctrl.Result{}, nil
+		}
+
+		//Check if referred gateway has the at least one listener with properties defined from UDPRoute parentref.
+		if err := r.verifyListener(ctx, gw, parentRef); err != nil {
+			log.Info("No matching listener found for referred gateway", "GatewayName", parentRef.Name, "GatewayPort", parentRef.Port)
+			return ctrl.Result{}, err
 		}
 
 		log.Info("UDP Route appeared referring to Gateway", "UDPRoute", parentRef.Name, "Gateway ", gw.Name, "GatewayClass, Controller Name", gwc.Spec.ControllerName, "GatewayClass Name", gwc.ObjectMeta.Name)
