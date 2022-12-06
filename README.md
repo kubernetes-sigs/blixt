@@ -1,6 +1,4 @@
-> **Warning**: Work in progress (WIP)
-
-> **Warning**: Experimental. Do not use in production.
+> **Warning**: Experimental. There is no intention to ever make this viable for production. Do not use in production.
 
 # Blixt
 
@@ -60,13 +58,13 @@ After these goals are achieved, further goals will be decided.
 Deploy [Gateway API][gwapi] [CRDs][crds]:
 
 ```console
-$ kubectl kustomize https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental | kubectl apply -f -
+ kubectl kustomize https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental | kubectl apply -f -
 ```
 
 Deploy:
 
 ```console
-$ kubectl kustomize config/default | kubectl apply -f -
+ kubectl kustomize config/default | kubectl apply -f -
 ```
 
 [gwapi]:https://github.com/kubernetes-sigs/gateway-api
