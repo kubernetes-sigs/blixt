@@ -17,4 +17,9 @@ resources:
   group: gateway
   kind: GatewayClass
   version: v1beta1
+- controller: true
+  domain: networking.k8s.io
+  group: gateway
+  kind: UDPRoute
+  version: v1alpha2
 version: "3"

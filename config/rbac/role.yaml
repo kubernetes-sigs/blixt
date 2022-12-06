@@ -42,6 +42,32 @@ rules:
   verbs:
   - get
 - apiGroups:
+  - gateway.konghq.com
+  resources:
+  - udproutes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - gateway.konghq.com
+  resources:
+  - udproutes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - gateway.konghq.com
+  resources:
+  - udproutes/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - gateway.networking.k8s.io
   resources:
   - gatewayclasses
