@@ -1,6 +1,4 @@
-> **Warning**: Work in progress (WIP)
-
-> **Warning**: Experimental. Do not use in production.
+> **Warning**: Experimental. There is no intention to ever make this viable for production. Do not use in production.
 
 # Blixt
 
