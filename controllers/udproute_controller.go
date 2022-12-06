@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kong/blixt/pkg/vars"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -13,6 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/kong/blixt/pkg/vars"
 )
 
 // UDPRouteReconciler reconciles a UDPRoute object
@@ -21,10 +22,10 @@ type UDPRouteReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// Verify respective gateway has atleast one listener matching to what is specified in UDPRoute parentRefs.
+// Verify respective gateway has at least one listener matching to what is specified in UDPRoute parentRefs.
 func (r *UDPRouteReconciler) verifyListener(ctx context.Context, gw *gatewayv1beta1.Gateway, udprouteSpec gatewayv1alpha2.ParentReference) error {
-	for _, listner := range gw.Spec.Listeners {
-		if (listner.Protocol == gatewayv1beta1.UDPProtocolType) && (listner.Port == gatewayv1beta1.PortNumber(*udprouteSpec.Port)) {
+	for _, listener := range gw.Spec.Listeners {
+		if (listener.Protocol == gatewayv1beta1.UDPProtocolType) && (listener.Port == gatewayv1beta1.PortNumber(*udprouteSpec.Port)) {
 			return nil
 		}
 	}
@@ -50,10 +51,10 @@ func (r *UDPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	//Use the retreive objects its parent ref to look for the gateway.
+	//Use the retrieve objects its parent ref to look for the gateway.
 	for _, parentRef := range udproute.Spec.ParentRefs {
 
-		//Build Gateway object to retreive
+		//Build Gateway object to retrieve
 		gw := new(gatewayv1beta1.Gateway)
 
 		ns := udproute.Namespace
@@ -67,7 +68,7 @@ func (r *UDPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, err
 		}
 
-		//Check if referred gateway has the atleast one listner with properties defined from UDPRoute parentref.
+		//Check if referred gateway has the at least one listener with properties defined from UDPRoute parentref.
 		if err := r.verifyListener(ctx, gw, parentRef); err != nil {
 			log.Info("No matching listener found for referred gateway", "GatewayName", parentRef.Name, "GatewayPort", parentRef.Port)
 			return ctrl.Result{}, err
