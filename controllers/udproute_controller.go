@@ -32,6 +32,7 @@ func (r *UDPRouteReconciler) verifyListener(ctx context.Context, gw *gatewayv1be
 	return fmt.Errorf("No matching Gateway listener found for defined Parentref")
 }
 
+// Verify if UDPRoute is managed by our implementation.
 func (r *UDPRouteReconciler) isUDPRouteManaged(ctx context.Context, udproute gatewayv1alpha2.UDPRoute) (bool, *gatewayv1beta1.Gateway, error) {
 	log := log.FromContext(ctx)
 
