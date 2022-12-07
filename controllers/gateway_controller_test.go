@@ -228,7 +228,11 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 			},
 			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
 				ctx := context.Background()
+				// first reconcile to initialize the Gateway status
 				_, err := reconciler.Reconcile(ctx, gatewayReq)
+				require.NoError(t, err)
+				// second reconcile to have a complete status
+				_, err = reconciler.Reconcile(ctx, gatewayReq)
 				require.NoError(t, err)
 				newGateway := &gatewayv1beta1.Gateway{}
 				err = reconciler.Client.Get(ctx, gatewayReq.NamespacedName, newGateway)
@@ -386,7 +390,11 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 			},
 			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
 				ctx := context.Background()
+				// first reconcile to initialize the Gateway status
 				_, err := reconciler.Reconcile(ctx, gatewayReq)
+				require.NoError(t, err)
+				// second reconcile to have a complete status
+				_, err = reconciler.Reconcile(ctx, gatewayReq)
 				require.NoError(t, err)
 				newGateway := &gatewayv1beta1.Gateway{}
 				err = reconciler.Client.Get(ctx, gatewayReq.NamespacedName, newGateway)

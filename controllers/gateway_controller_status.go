@@ -5,14 +5,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
-
-// patchGatewayStatus applies the diff between the old gateway status and the new one as a patch.
-func (r *GatewayReconciler) patchGatewayStatus(ctx context.Context, gateway, oldGateway *gatewayv1beta1.Gateway) error {
-	return r.Status().Patch(ctx, gateway, client.MergeFrom(oldGateway))
-}
 
 // updateGatewayStatus computes the new Gateway status, setting its ready condition and all the
 // ready listeners's ready conditions to true, unless a resolvedRefs error is discovered. In
