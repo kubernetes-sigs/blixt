@@ -110,7 +110,7 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 		gateway      *gatewayv1beta1.Gateway
 		objectsToAdd []controllerruntimeclient.Object
 
-		testBody func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gatewayClass *gatewayv1beta1.Gateway)
+		run func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gatewayClass *gatewayv1beta1.Gateway)
 	}{
 		{
 			name: "gatewayclass not accepted",
@@ -144,7 +144,7 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 					},
 				},
 			},
-			testBody: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
+			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
 				ctx := context.Background()
 				_, err := reconciler.Reconcile(ctx, gatewayReq)
 				require.NoError(t, err)
@@ -226,7 +226,7 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 					},
 				},
 			},
-			testBody: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
+			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
 				ctx := context.Background()
 				_, err := reconciler.Reconcile(ctx, gatewayReq)
 				require.NoError(t, err)
@@ -282,7 +282,7 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 					},
 				},
 			},
-			testBody: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
+			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
 				ctx := context.Background()
 				_, err := reconciler.Reconcile(ctx, gatewayReq)
 				require.NoError(t, err)
@@ -384,7 +384,7 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 					},
 				},
 			},
-			testBody: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
+			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
 				ctx := context.Background()
 				_, err := reconciler.Reconcile(ctx, gatewayReq)
 				require.NoError(t, err)
@@ -442,7 +442,7 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 				Client: fakeClient,
 			}
 
-			tc.testBody(t, reconciler, tc.gatewayReq, tc.gateway)
+			tc.run(t, reconciler, tc.gatewayReq, tc.gateway)
 		})
 	}
 }
