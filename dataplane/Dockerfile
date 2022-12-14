@@ -1,31 +1,30 @@
-FROM rust as builder
+FROM archlinux as builder
 
-RUN apt-get update
-RUN apt-get install protobuf-compiler -qq
+RUN pacman -Syu --noconfirm
+RUN pacman -S base-devel protobuf rustup --noconfirm
+
+RUN rustup default stable
+RUN rustup install nightly
+RUN rustup component add rust-src --toolchain nightly
+RUN rustup target add x86_64-unknown-linux-musl
+RUN cargo install bpf-linker
 
 WORKDIR /workspace
 
 COPY . .
+RUN --mount=type=cache,target=/workspace/target/ cargo xtask build-ebpf --release
+RUN --mount=type=cache,target=/workspace/target/ RUSTFLAGS=-Ctarget-feature=+crt-static cargo build --release --target=x86_64-unknown-linux-musl
+RUN --mount=type=cache,target=/workspace/target/ cp /workspace/target/x86_64-unknown-linux-musl/release/loader /workspace/dataplane
 
-RUN rustup install nightly
-RUN rustup component add rust-src --toolchain nightly
-RUN cargo install bpf-linker
-
-RUN cargo xtask build-ebpf
-RUN cargo build
-
-FROM archlinux
+FROM alpine
 
 LABEL org.opencontainers.image.source=https://github.com/kong/blixt
 LABEL org.opencontainers.image.licenses=GPL-2.0-only
 
-WORKDIR /
+WORKDIR /opt/blixt/
 
-RUN pacman -Sy
+COPY --from=builder /workspace/dataplane /opt/blixt/dataplane
 
-RUN pacman -S bpf ethtool xdp-tools bpftrace --noconfirm
+COPY LICENSE /opt/blixt/LICENSE
 
-COPY --from=builder /workspace/target/debug/loader /blixt-dataplane
-COPY LICENSE /workspace/LICENSE
-
-ENTRYPOINT ["/blixt-dataplane"]
+ENTRYPOINT ["/opt/blixt/dataplane"]
