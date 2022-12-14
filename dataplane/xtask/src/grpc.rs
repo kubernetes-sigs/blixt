@@ -46,7 +46,7 @@ pub async fn update(opts: Options) -> Result<(), Error> {
         target: Some(Target {
             daddr: daddr.into(),
             dport: opts.dport,
-            ifindex: opts.ifindex,
+            ifindex: Some(opts.ifindex),
         }),
     });
 
