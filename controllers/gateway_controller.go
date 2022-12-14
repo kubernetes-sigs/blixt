@@ -62,7 +62,6 @@ func (r *GatewayReconciler) gatewayHasMatchingGatewayClass(obj client.Object) bo
 	gatewayClass := &gatewayv1beta1.GatewayClass{}
 	if err := r.Client.Get(context.Background(), client.ObjectKey{Name: string(gateway.Spec.GatewayClassName)}, gatewayClass); err != nil {
 		if errors.IsNotFound(err) {
-			r.Log.Error(err, "gatewayclass not found", "gatewayclass", gateway.Spec.GatewayClassName)
 			return false
 		}
 		r.Log.Error(err, "couldn't retrieve gatewayclass for unknown reason, enqueing gateway anyway to avoid miss", "gatewayclass", gateway.Spec.GatewayClassName)
