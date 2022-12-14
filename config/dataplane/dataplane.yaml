@@ -4,22 +4,27 @@ metadata:
   name: dataplane
   namespace: system
   labels:
-    app: dataplane
+    app: blixt
+    component: dataplane
 spec:
   selector:
     matchLabels:
-      app: dataplane
+      app: blixt
+      component: dataplane
   template:
     metadata:
       labels:
-        app: dataplane
+        app: blixt
+        component: dataplane
     spec:
-      serviceAccountName: udproute-manager
       hostNetwork: true
       containers:
       - name: dataplane
         image: ghcr.io/kong/blixt-dataplane:latest
         securityContext:
           privileged: true
-        args: ["eth0"]
+        args: ["-i", "eth0"]
+        env:
+        - name: RUST_LOG
+          value: debug
         imagePullPolicy: IfNotPresent
