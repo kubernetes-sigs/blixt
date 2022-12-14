@@ -75,8 +75,7 @@ func TestGatewayReconciler_gatewayHasMatchingGatewayClass(t *testing.T) {
 					GatewayClassName: "non-existent-gateway-class",
 				},
 			},
-			expected:         false,
-			logEntryExpected: "gatewayclass not found",
+			expected: false,
 		},
 		{
 			name:             "if inexplicably controller-runtime feeds the predicate a non-gateway object, it doesn't match",
