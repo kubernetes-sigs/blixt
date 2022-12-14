@@ -118,6 +118,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 
 .PHONY: test.integration
 test.integration: manifests generate fmt vet
+	go clean -testcache
 	GOFLAGS="-tags=integration_tests" go test -race -v ./test/integration/...
 
 ##@ Build
