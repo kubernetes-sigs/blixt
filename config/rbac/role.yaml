@@ -26,6 +26,20 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/status
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
   - services
   verbs:
   - create
@@ -41,32 +55,6 @@ rules:
   - services/status
   verbs:
   - get
-- apiGroups:
-  - gateway.konghq.com
-  resources:
-  - udproutes
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - gateway.konghq.com
-  resources:
-  - udproutes/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - gateway.konghq.com
-  resources:
-  - udproutes/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - gateway.networking.k8s.io
   resources:
@@ -115,6 +103,32 @@ rules:
   - gateway.networking.k8s.io
   resources:
   - gateways/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - udproutes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - udproutes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - udproutes/status
   verbs:
   - get
   - patch
