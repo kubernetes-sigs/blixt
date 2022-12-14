@@ -51,6 +51,10 @@ func (r *GatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&source.Kind{Type: &corev1.Service{}},
 			handler.EnqueueRequestsFromMapFunc(mapServiceToGateway),
 		).
+		Watches(
+			&source.Kind{Type: &gatewayv1beta1.GatewayClass{}},
+			handler.EnqueueRequestsFromMapFunc(r.mapGatewayClassToGateway),
+		).
 		Complete(r)
 }
 
