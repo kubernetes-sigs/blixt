@@ -133,7 +133,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: build.image
 build.image:
-	docker build -t $(IMAGE):$(TAG) .
+	DOCKER_BUILDKIT=1 docker build -t $(IMAGE):$(TAG) .
 
 ##@ Deployment
 
@@ -199,7 +199,7 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	DOCKER_BUILDKIT=1 docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
