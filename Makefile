@@ -135,6 +135,10 @@ run: manifests generate fmt vet ## Run a controller from your host.
 build.image:
 	DOCKER_BUILDKIT=1 docker build -t $(IMAGE):$(TAG) .
 
+.PHONY: build.all.images
+build.all.images: build.image
+	cd dataplane/ && make build.image TAG=$(TAG)
+
 ##@ Deployment
 
 ifndef ignore-not-found
