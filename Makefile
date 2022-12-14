@@ -95,6 +95,15 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+.PHONY: generate.grpc-client
+generate.grpc-client:
+	protoc \
+		--go_out=. --go_opt=paths=import \
+		--go_opt=module=github.com/kong/blixt \
+		--go-grpc_out=. --go-grpc_opt=paths=import \
+		--go-grpc_opt=module=github.com/kong/blixt \
+		dataplane/api-server/proto/backends.proto
+
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	go fmt ./...
