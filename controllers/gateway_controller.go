@@ -41,6 +41,8 @@ type GatewayReconciler struct {
 }
 
 func (r *GatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.Log = log.FromContext(context.Background())
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gatewayv1beta1.Gateway{},
 			builder.WithPredicates(predicate.NewPredicateFuncs(r.gatewayHasMatchingGatewayClass)),
