@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 
+	"github.com/kong/blixt/pkg/vars"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,13 +25,13 @@ func (r *UDPRouteReconciler) mapDataPlaneDaemonsetToUDPRoutes(obj client.Object)
 	// determine if this is a blixt daemonset
 	matchLabels := daemonset.Spec.Selector.MatchLabels
 	app, ok := matchLabels["app"]
-	if !ok || app != "blixt" {
+	if !ok || app != vars.DefaultDataPlaneAppLabel {
 		return
 	}
 
 	// verify that it's the dataplane daemonset
 	component, ok := matchLabels["component"]
-	if !ok || component != "dataplane" {
+	if !ok || component != vars.DefaultDataPlaneComponentLabel {
 		return
 	}
 
