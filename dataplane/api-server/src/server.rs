@@ -7,7 +7,8 @@ use tokio::sync::Mutex;
 use tonic::{Request, Response, Status};
 
 use crate::backends::backends_server::Backends;
-use crate::backends::{Confirmation, Targets, Vip};
+use crate::backends::{Confirmation, InterfaceIndexConfirmation, PodIp, Targets, Vip};
+use crate::netutils::{if_name_for_routing_ip, if_nametoindex};
 use common::{Backend, BackendKey};
 
 pub struct BackendService {
@@ -36,6 +37,27 @@ impl BackendService {
 
 #[tonic::async_trait]
 impl Backends for BackendService {
+    async fn get_interface_index(
+        &self,
+        request: Request<PodIp>,
+    ) -> Result<Response<InterfaceIndexConfirmation>, Status> {
+        let pod = request.into_inner();
+        let ip = pod.ip;
+        let ip_addr = std::net::Ipv4Addr::from(ip);
+
+        let device = match if_name_for_routing_ip(ip_addr) {
+            Ok(device) => device,
+            Err(err) => return Err(Status::internal(err.to_string())),
+        };
+
+        let ifindex = match if_nametoindex(device) {
+            Ok(ifindex) => ifindex,
+            Err(err) => return Err(Status::internal(err.to_string())),
+        };
+
+        Ok(Response::new(InterfaceIndexConfirmation { ifindex }))
+    }
+
     async fn update(&self, request: Request<Targets>) -> Result<Response<Confirmation>, Status> {
         let targets = request.into_inner();
 
@@ -54,10 +76,36 @@ impl Backends for BackendService {
             port: vip.port,
         };
 
+        let ifindex = match target.ifindex {
+            Some(ifindex) => ifindex,
+            None => {
+                let ip_addr = Ipv4Addr::from(target.daddr);
+                let ifname = match if_name_for_routing_ip(ip_addr) {
+                    Ok(ifname) => ifname,
+                    Err(err) => {
+                        return Err(Status::internal(format!(
+                            "failed to determine ifname: {}",
+                            err.to_string()
+                        )))
+                    }
+                };
+
+                match if_nametoindex(ifname) {
+                    Ok(ifindex) => ifindex,
+                    Err(err) => {
+                        return Err(Status::internal(format!(
+                            "failed to determine ifindex: {}",
+                            err.to_string()
+                        )))
+                    }
+                }
+            }
+        };
+
         let bk = Backend {
             daddr: target.daddr,
             dport: target.dport,
-            ifindex: target.ifindex as u16,
+            ifindex: ifindex as u16,
         };
 
         match self.insert(key, bk).await {

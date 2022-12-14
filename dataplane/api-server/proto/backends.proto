@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package backends;
 
+option go_package = "github.com/kong/blixt/internal/dataplane/client";
+
 message Vip {
     uint32 ip = 1;
     uint32 port = 2;
@@ -10,7 +12,7 @@ message Vip {
 message Target {
     uint32 daddr = 1;
     uint32 dport = 2;
-    uint32 ifindex = 3;
+    optional uint32 ifindex = 3;
 }
 
 message Targets {
@@ -22,7 +24,16 @@ message Confirmation {
     string confirmation = 1;
 }
 
+message PodIP {
+    uint32 ip = 1;
+}
+
+message InterfaceIndexConfirmation {
+    uint32 ifindex = 1;
+}
+
 service backends {
+    rpc GetInterfaceIndex(PodIP) returns (InterfaceIndexConfirmation);
     rpc Update(Targets) returns (Confirmation);
     rpc Delete(Vip) returns (Confirmation);
 }

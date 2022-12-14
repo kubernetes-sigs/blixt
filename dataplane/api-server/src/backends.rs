@@ -11,8 +11,8 @@ pub struct Target {
     pub daddr: u32,
     #[prost(uint32, tag = "2")]
     pub dport: u32,
-    #[prost(uint32, tag = "3")]
-    pub ifindex: u32,
+    #[prost(uint32, optional, tag = "3")]
+    pub ifindex: ::core::option::Option<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Targets {
@@ -25,6 +25,16 @@ pub struct Targets {
 pub struct Confirmation {
     #[prost(string, tag = "1")]
     pub confirmation: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PodIp {
+    #[prost(uint32, tag = "1")]
+    pub ip: u32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct InterfaceIndexConfirmation {
+    #[prost(uint32, tag = "1")]
+    pub ifindex: u32,
 }
 /// Generated client implementations.
 pub mod backends_client {
@@ -95,6 +105,25 @@ pub mod backends_client {
             self.inner = self.inner.accept_compressed(encoding);
             self
         }
+        pub async fn get_interface_index(
+            &mut self,
+            request: impl tonic::IntoRequest<super::PodIp>,
+        ) -> Result<tonic::Response<super::InterfaceIndexConfirmation>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/backends.backends/GetInterfaceIndex",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
         pub async fn update(
             &mut self,
             request: impl tonic::IntoRequest<super::Targets>,
@@ -138,6 +167,10 @@ pub mod backends_server {
     ///Generated trait containing gRPC methods that should be implemented for use with BackendsServer.
     #[async_trait]
     pub trait Backends: Send + Sync + 'static {
+        async fn get_interface_index(
+            &self,
+            request: tonic::Request<super::PodIp>,
+        ) -> Result<tonic::Response<super::InterfaceIndexConfirmation>, tonic::Status>;
         async fn update(
             &self,
             request: tonic::Request<super::Targets>,
@@ -206,6 +239,44 @@ pub mod backends_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
+                "/backends.backends/GetInterfaceIndex" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetInterfaceIndexSvc<T: Backends>(pub Arc<T>);
+                    impl<T: Backends> tonic::server::UnaryService<super::PodIp>
+                    for GetInterfaceIndexSvc<T> {
+                        type Response = super::InterfaceIndexConfirmation;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::PodIp>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).get_interface_index(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetInterfaceIndexSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
                 "/backends.backends/Update" => {
                     #[allow(non_camel_case_types)]
                     struct UpdateSvc<T: Backends>(pub Arc<T>);
