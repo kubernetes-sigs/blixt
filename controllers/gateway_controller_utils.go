@@ -163,6 +163,32 @@ func (r *GatewayReconciler) hackEnsureEndpoints(ctx context.Context, svc *corev1
 	return false, nil
 }
 
+func (r *GatewayReconciler) mapGatewayClassToGateway(obj client.Object) (recs []reconcile.Request) {
+	gatewayClass, ok := obj.(*gatewayv1beta1.GatewayClass)
+	if !ok {
+		r.Log.Error(fmt.Errorf("unexpected object type in gateway watch predicates"), "expected", "*gatewayv1beta1.GatewayClass", "found", reflect.TypeOf(obj))
+		return
+	}
+
+	gateways := &gatewayv1beta1.GatewayList{}
+	if err := r.Client.List(context.Background(), gateways); err != nil {
+		// TODO: https://github.com/kubernetes-sigs/controller-runtime/issues/1996
+		r.Log.Error(err, "could not map gatewayclass event to gateways")
+		return
+	}
+
+	for _, gateway := range gateways.Items {
+		if gateway.Spec.GatewayClassName == gatewayv1beta1.ObjectName(gatewayClass.Name) {
+			recs = append(recs, reconcile.Request{NamespacedName: types.NamespacedName{
+				Namespace: gateway.Namespace,
+				Name:      gateway.Name,
+			}})
+		}
+	}
+
+	return
+}
+
 func mapServiceToGateway(obj client.Object) (reqs []reconcile.Request) {
 	svc, ok := obj.(*corev1.Service)
 	if !ok {
