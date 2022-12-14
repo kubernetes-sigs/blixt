@@ -6,6 +6,7 @@ metadata:
   labels:
     app: blixt-udproute-sample
 spec:
+  minReadySeconds: 5
   selector:
     matchLabels:
       app: blixt-udproute-sample
