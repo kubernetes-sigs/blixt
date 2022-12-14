@@ -1,0 +1,8 @@
+bases:
+- ../default
+
+images:
+- name: ghcr.io/kong/blixt-dataplane
+  newTag: integration-tests
+- name: ghcr.io/kong/blixt-controlplane
+  newTag: integration-tests
