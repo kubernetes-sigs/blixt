@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -69,7 +70,7 @@ func (r *UDPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	if !isDataPlaneFinalizerSet(udproute) {
+	if !controllerutil.ContainsFinalizer(udproute, DataPlaneFinalizer) {
 		if udproute.DeletionTimestamp != nil {
 			// if the finalizer isn't set, AND the object is being deleted then there's
 			// no reason to bother with dataplane configuration for it its already
