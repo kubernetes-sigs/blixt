@@ -173,10 +173,13 @@ $(LOCALBIN):
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
+KIND ?= $(LOCALBIN)/kind
+KTF ?= $(LOCALBIN)/ktf
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v3.8.7
 CONTROLLER_TOOLS_VERSION ?= v0.9.2
+KIND_VERSION ?= v0.17.0
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -193,6 +196,16 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+
+.PHONY: kind
+kind: $(KIND)
+$(KIND): $(LOCALBIN)
+	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/kind@$(KIND_VERSION)
+
+.PHONY: ktf
+ktf: $(KTF) $(KIND)
+$(KTF): $(LOCALBIN)
+	test -s $(LOCALBIN)/ktf || GOBIN=$(LOCALBIN) go install github.com/kong/kubernetes-testing-framework/cmd/ktf@latest
 
 .PHONY: bundle
 bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
@@ -249,3 +262,7 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+.PHONY: build.cluster
+build.cluster: $(KTF) # builds a KIND cluster which can be used for testing and development
+	PATH="$(LOCALBIN):${PATH}" $(KTF) env create --name blixt-development --addon metallb

@@ -56,7 +56,8 @@ After these goals are achieved, further goals will be decided.
 ## Usage
 
 > **Note**: Currently usage is only possible on [Kubernetes In Docker
-> (KIND)][kind] clusters.
+> (KIND)][kind] clusters. You can generate a new development cluster for
+> testing with `make build.cluster`.
 
 Deploy [Gateway API][gwapi] [CRDs][crds]:
 
