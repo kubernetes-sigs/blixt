@@ -2,27 +2,27 @@ apiVersion: v1
 kind: Namespace
 metadata:
   labels:
-    control-plane: controller-manager
+    control-plane: controlplane
   name: system
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: controller-manager
+  name: controlplane
   namespace: system
   labels:
-    control-plane: controller-manager
+    control-plane: controlplane
 spec:
   selector:
     matchLabels:
-      control-plane: controller-manager
+      control-plane: controlplane
   replicas: 1
   template:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: manager
       labels:
-        control-plane: controller-manager
+        control-plane: controlplane
     spec:
       securityContext:
         runAsNonRoot: true
@@ -67,5 +67,5 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
-      serviceAccountName: controller-manager
+      serviceAccountName: controlplane
       terminationGracePeriodSeconds: 10

@@ -17,7 +17,7 @@ const (
 const (
 	// DefaultControlPlaneDeploymentName is the name that will be used for the
 	// controlplane's Deployment (by default).
-	DefaultControlPlaneDeploymentName = "blixt-controller-manager"
+	DefaultControlPlaneDeploymentName = "blixt-controlplane"
 
 	// DefaultDataPlaneDaemonSetName is the name that will be used for the
 	// dataplane's DaemonSet (by default).
