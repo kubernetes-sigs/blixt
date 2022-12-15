@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
+use std::net::{IpAddr, SocketAddr};
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, UdpSocket},
     signal,
     sync::mpsc::{self, Receiver, Sender},
@@ -56,10 +56,28 @@ async fn run_health_server(port: u16, mut rx: Receiver<u16>) -> std::io::Result<
 
     println!("health check server listening on {}", port);
 
+    let mut peers = Peers::default();
     loop {
-        let (mut stream, _) = listener.accept().await?;
-        stream.write_all("ready".as_bytes()).await?;
-        let peer = stream.peer_addr()?;
-        println!("received health check from {}", peer);
+        let (stream, _) = listener.accept().await?;
+        peers.add(stream.peer_addr()?);
+    }
+}
+
+#[derive(Default)]
+struct Peers {
+    peers: Vec<IpAddr>,
+}
+
+impl Peers {
+    fn add(&mut self, addr: SocketAddr) {
+        if self.peers.len() > 100 {
+            // reset to ensure it's not unbounded
+            self.peers = vec![];
+        }
+
+        if !self.peers.contains(&addr.ip()) {
+            println!("received health check from {}", addr);
+            self.peers.push(addr.ip());
+        }
     }
 }
