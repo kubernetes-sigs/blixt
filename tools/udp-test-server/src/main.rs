@@ -58,8 +58,6 @@ async fn run_health_server(port: u16, mut rx: Receiver<u16>) -> std::io::Result<
 
     loop {
         let (mut stream, _) = listener.accept().await?;
-        let mut buf = [0; 1024];
-        stream.read(&mut buf).await?;
         stream.write_all("ready".as_bytes()).await?;
         let peer = stream.peer_addr()?;
         println!("received health check from {}", peer);
