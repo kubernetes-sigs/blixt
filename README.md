@@ -55,10 +55,13 @@ After these goals are achieved, further goals will be decided.
 
 ## Usage
 
+> **Note**: Currently usage is only possible on [Kubernetes In Docker
+> (KIND)][kind] clusters.
+
 Deploy [Gateway API][gwapi] [CRDs][crds]:
 
 ```console
-kubectl kustomize https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental | kubectl apply -f -
+kubectl kustomize https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.5.1 | kubectl apply -f -
 ```
 
 Deploy:
@@ -67,6 +70,20 @@ Deploy:
 kubectl kustomize config/default | kubectl apply -f -
 ```
 
+At this point you should see the `controlplane` and `dataplane` pods running
+in the `blixt-system` namespace:
+
+```console
+$ kubectl -n blixt-system get pods
+NAME                                 READY   STATUS    RESTARTS   AGE
+blixt-controlplane-cdccc685b-9dxj2   2/2     Running   0          83s
+blixt-dataplane-brsl9                1/1     Running   0          83s
+```
+
+Check the `config/samples` directory for `Gateway` and `*Route` examples you
+can now deploy.
+
+[kind]:https://github.com/kubernetes-sigs/kind
 [gwapi]:https://github.com/kubernetes-sigs/gateway-api
 [crds]:https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
 
