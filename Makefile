@@ -263,6 +263,8 @@ catalog-build: opm ## Build a catalog image.
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
+KIND_CLUSTER ?= blixt-dev
+
 .PHONY: build.cluster
 build.cluster: $(KTF) # builds a KIND cluster which can be used for testing and development
-	PATH="$(LOCALBIN):${PATH}" $(KTF) env create --name blixt-development --addon metallb
+	PATH="$(LOCALBIN):${PATH}" $(KTF) env create --name $(KIND_CLUSTER) --addon metallb
