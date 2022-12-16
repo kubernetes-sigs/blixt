@@ -1,5 +1,6 @@
 IMAGE ?= ghcr.io/kong/blixt-dataplane
 TAG ?= latest
+KIND_CLUSTER ?= blixt-dev
 
 all: build
 
@@ -20,3 +21,8 @@ build.release:
 .PHONY: build.image
 build.image:
 	DOCKER_BUILDKIT=1 docker build -t $(IMAGE):$(TAG) ./
+
+.PHONY: load.image
+load.image: build.image
+	kind load docker-image $(IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
+		kubectl -n blixt-system rollout restart daemonset blixt-dataplane
