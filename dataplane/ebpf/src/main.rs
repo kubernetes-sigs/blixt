@@ -31,6 +31,17 @@ const IPPROTO_UDP: u8 = 17;
 const ETH_HDR_LEN: usize = mem::size_of::<ethhdr>();
 const IP_HDR_LEN: usize = mem::size_of::<iphdr>();
 
+fn ip_from_int(ip: u32) -> [u8; 4] {
+    let mut addr: [u8; 4] = [0; 4];
+
+    addr[0] = ((ip >> 0) & 0xFF) as u8;
+    addr[1] = ((ip >> 8) & 0xFF) as u8;
+    addr[2] = ((ip >> 16) & 0xFF) as u8;
+    addr[3] = ((ip >> 24) & 0xFF) as u8;
+
+    addr
+}
+
 // Gives us raw pointers to a specific offset in the packet
 #[inline(always)]
 unsafe fn ptr_at<T>(ctx: &TcContext, offset: usize) -> Result<*mut T, i64> {
@@ -104,10 +115,14 @@ fn try_tc_ingress(ctx: TcContext) -> Result<i32, i64> {
 
     let backend = get_backend(key).ok_or(TC_ACT_OK)?;
 
+    let daddr_dot_dec = ip_from_int(unsafe { (*ip_hdr).daddr });
     info!(
         &ctx,
-        "Received a packet destined for svc ip: {:X} at port: {}",
-        u32::from_be(unsafe { (*ip_hdr).daddr }),
+        "Received a packet destined for svc ip: {}.{}.{}.{} at port: {}",
+        daddr_dot_dec[0],
+        daddr_dot_dec[1],
+        daddr_dot_dec[2],
+        daddr_dot_dec[3],
         u16::from_be(unsafe { (*udp_hdr).dest })
     );
 
