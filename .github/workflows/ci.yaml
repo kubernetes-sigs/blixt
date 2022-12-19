@@ -83,12 +83,12 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         tags: kong/blixt-controlplane:pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-        outputs: type=docker,dest=/tmp/blixt-control-plane.tar
+        outputs: type=docker,dest=/tmp/blixt-controlplane.tar
     - name: Upload Image Artifact - Control Plane
       uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8
       with:
-        name: blixt-control-plane
-        path: /tmp/blixt-control-plane.tar
+        name: blixt-controlplane
+        path: /tmp/blixt-controlplane.tar
     - name: Docker build - Dataplane
       uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
       with:
@@ -133,7 +133,7 @@ jobs:
         push: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        tags: ghcr.io/kong/blixt-control-plane:latest
+        tags: ghcr.io/kong/blixt-controlplane:latest
     - name: Docker build - Data Plane
       uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
       with:
