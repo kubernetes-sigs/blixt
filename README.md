@@ -70,6 +70,27 @@ kubectl kustomize config/default | kubectl apply -f -
 [gwapi]:https://github.com/kubernetes-sigs/gateway-api
 [crds]:https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
 
+## Community
+
+This project originally started at [Kong][kong] but is being [donated to
+Kubernetes SIG Network][donation]. It is becoming a part of the [Gateway
+API][gwapi] project and as such is discussed in the [Gateway API weekly
+meetings][gwapi-meet].In particular, we do some discussion and paired
+programming of this project on the `Gateway API Code Jam` meeting which
+is on the [calendar][gwapi-meet] for every Friday.
+
+You can also reach out with problems or questions by creating an
+[issue][issues], or a [discussion][disc] on this repo. You can also reach out
+on [Kubernetes Slack][kslack] on the `#sig-network-gateway-api` channel.
+
+[kong]:https://github.com/kong
+[donation]:https://github.com/kong/blixt/discussions/42
+[gwapi]:https://gateway-api.sigs.k8s.io/
+[gwapi-meet]:https://gateway-api.sigs.k8s.io/contributing/#meetings
+[issues]:https://github.com/kong/blixt/issues
+[disc]:https://github.com/kong/blixt/discussions
+[kslack]:https://kubernetes.slack.com
+
 # License
 
 The Blixt control-plane components are licensed under [Apache License, Version
