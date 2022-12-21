@@ -2,6 +2,7 @@
 #![no_main]
 
 use core::mem;
+mod ingress;
 
 use aya_bpf::{
     bindings::{TC_ACT_OK, TC_ACT_PIPE, TC_ACT_SHOT},
