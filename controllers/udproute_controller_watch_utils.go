@@ -2,14 +2,16 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 
 	"github.com/kong/blixt/pkg/vars"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 // mapDataPlaneDaemonsetToUDPRoutes is a mapping function to map dataplane
@@ -39,8 +41,7 @@ func (r *UDPRouteReconciler) mapDataPlaneDaemonsetToUDPRoutes(obj client.Object)
 	ctx := context.Background()
 	if err := r.Client.List(ctx, udproutes); err != nil {
 		// TODO: https://github.com/kubernetes-sigs/controller-runtime/issues/1996
-		log := log.FromContext(ctx)
-		log.Error(err, "could not enqueue UDPRoutes for DaemonSet update")
+		r.log.Error(err, "could not enqueue UDPRoutes for DaemonSet update")
 		return
 	}
 
