@@ -49,6 +49,10 @@ func (r *UDPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&source.Kind{Type: &appsv1.DaemonSet{}},
 			handler.EnqueueRequestsFromMapFunc(r.mapDataPlaneDaemonsetToUDPRoutes),
 		).
+		Watches(
+			&source.Kind{Type: &gatewayv1beta1.Gateway{}},
+			handler.EnqueueRequestsFromMapFunc(r.mapGatewayToUDPRoutes),
+		).
 		Complete(r)
 }
 
