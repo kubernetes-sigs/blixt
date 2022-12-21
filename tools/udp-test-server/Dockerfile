@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/workspace/target/ \
 RUN --mount=type=cache,target=/workspace/target/ \
     cp /workspace/target/x86_64-unknown-linux-musl/release/udp-test-server /workspace/udp-test-server
 
-FROM gcr.io/distroless/static
+FROM alpine
 
 LABEL org.opencontainers.image.source https://github.com/kong/blixt-udp-test-server
 
