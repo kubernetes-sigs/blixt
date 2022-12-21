@@ -84,6 +84,78 @@ func CompileUDPRouteToDataPlaneBackend(ctx context.Context, c client.Client, udp
 	return targets, nil
 }
 
+// CompileTCPRouteToDataPlaneBackend takes a TCPRoute and the Gateway it is
+// attached to and produces Backend Targets for the DataPlane to configure.
+func CompileTCPRouteToDataPlaneBackend(ctx context.Context, c client.Client, tcproute *gatewayv1alpha2.TCPRoute, gateway *gatewayv1beta1.Gateway) (*Targets, error) {
+	// TODO: add support for multiple rules https://github.com/Kong/blixt/issues/10
+	if len(tcproute.Spec.Rules) != 1 {
+		return nil, fmt.Errorf("currently can only support 1 TCPRoute rule, received %d", len(tcproute.Spec.Rules))
+	}
+	rule := tcproute.Spec.Rules[0]
+
+	// TODO: add support for multiple rules https://github.com/Kong/blixt/issues/10
+	if len(rule.BackendRefs) != 1 {
+		return nil, fmt.Errorf("expect 1 backendRef received %d", len(rule.BackendRefs))
+	}
+	backendRef := rule.BackendRefs[0]
+
+	gatewayIP, err := getGatewayIP(gateway)
+	if gatewayIP == nil {
+		return nil, err
+	}
+
+	gatewayPort, err := getGatewayPort(gateway, tcproute.Spec.ParentRefs)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO only using one endpoint for now until https://github.com/Kong/blixt/issues/10
+	var target *Target
+	if tcproute.DeletionTimestamp == nil {
+		endpoints, err := endpointsFromBackendRef(ctx, c, tcproute.Namespace, backendRef)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, subset := range endpoints.Subsets {
+			if len(subset.Addresses) < 1 {
+				return nil, fmt.Errorf("addresses not ready for endpoints")
+			}
+			if len(subset.Ports) < 1 {
+				return nil, fmt.Errorf("ports not ready for endpoints")
+			}
+
+			if subset.Addresses[0].IP == "" {
+				return nil, fmt.Errorf("empty IP for endpoint subset")
+			}
+
+			ip := net.ParseIP(subset.Addresses[0].IP)
+
+			podip := binary.BigEndian.Uint32(ip.To4())
+
+			target = &Target{
+				Daddr: podip,
+				Dport: uint32(subset.Ports[0].Port),
+			}
+		}
+		if target == nil {
+			return nil, fmt.Errorf("endpoints not ready")
+		}
+	}
+
+	ipint := binary.BigEndian.Uint32(gatewayIP.To4())
+
+	targets := &Targets{
+		Vip: &Vip{
+			Ip:   ipint,
+			Port: gatewayPort,
+		},
+		Target: target,
+	}
+
+	return targets, nil
+}
+
 func endpointsFromBackendRef(ctx context.Context, c client.Client, namespace string, backendRef gatewayv1alpha2.BackendRef) (*corev1.Endpoints, error) {
 	if backendRef.Namespace != nil {
 		namespace = string(*backendRef.Namespace)

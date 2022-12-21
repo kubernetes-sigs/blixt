@@ -268,3 +268,8 @@ KIND_CLUSTER ?= blixt-dev
 .PHONY: build.cluster
 build.cluster: $(KTF) # builds a KIND cluster which can be used for testing and development
 	PATH="$(LOCALBIN):${PATH}" $(KTF) env create --name $(KIND_CLUSTER) --addon metallb
+
+.PHONY: load.image
+load.image: build.image
+	kind load docker-image $(IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
+		kubectl -n blixt-system rollout restart deployment blixt-controlplane

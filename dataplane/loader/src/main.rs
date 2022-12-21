@@ -35,12 +35,24 @@ async fn main() -> Result<(), anyhow::Error> {
     if let Err(e) = BpfLogger::init(&mut bpf) {
         warn!("failed to initialize eBPF logger: {}", e);
     }
+
+    info!("attaching tc_ingress program to {}", &opt.iface);
+
     let _ = tc::qdisc_add_clsact(&opt.iface);
-    let program: &mut SchedClassifier = bpf.program_mut("tc_ingress").unwrap().try_into()?;
-    program.load()?;
-    program
+    let ingress_program: &mut SchedClassifier =
+        bpf.program_mut("tc_ingress").unwrap().try_into()?;
+    ingress_program.load()?;
+    ingress_program
         .attach(&opt.iface, TcAttachType::Ingress)
-        .context("failed to attach the TCP program")?;
+        .context("failed to attach the ingress TC program")?;
+
+    info!("attaching tc_egress program to {}", &opt.iface);
+
+    let egress_program: &mut SchedClassifier = bpf.program_mut("tc_egress").unwrap().try_into()?;
+    egress_program.load()?;
+    egress_program
+        .attach(&opt.iface, TcAttachType::Egress)
+        .context("failed to attach the egress TC program")?;
 
     info!("starting api server");
     let backends: HashMap<_, BackendKey, Backend> = HashMap::try_from(bpf.map_mut("BACKENDS")?)?;

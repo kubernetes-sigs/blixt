@@ -1,0 +1,5 @@
+resources:
+- gateway.yaml
+- server.yaml
+- tcproute.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

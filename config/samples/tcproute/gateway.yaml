@@ -1,0 +1,17 @@
+kind: GatewayClass
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: blixt-tcproute-sample
+spec:
+  controllerName: konghq.com/blixt
+---
+kind: Gateway
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: blixt-tcproute-sample
+spec:
+  gatewayClassName: blixt-tcproute-sample
+  listeners:
+  - name: tcp
+    protocol: TCP
+    port: 9080
