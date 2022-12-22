@@ -4,6 +4,7 @@ fn main() {
     println!("building proto {}", proto_file);
 
     tonic_build::configure()
+        .protoc_arg("--experimental_allow_proto3_optional")
         .build_server(true)
         .out_dir("./src")
         .compile(&[proto_file], &["."])
