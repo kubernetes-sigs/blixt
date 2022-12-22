@@ -85,7 +85,7 @@ impl Backends for BackendService {
                     Err(err) => {
                         return Err(Status::internal(format!(
                             "failed to determine ifname: {}",
-                            err.to_string()
+                            err
                         )))
                     }
                 };
@@ -95,7 +95,7 @@ impl Backends for BackendService {
                     Err(err) => {
                         return Err(Status::internal(format!(
                             "failed to determine ifindex: {}",
-                            err.to_string()
+                            err
                         )))
                     }
                 }
