@@ -36,7 +36,7 @@ pub fn if_name_for_routing_ip(ip_addr: Ipv4Addr) -> Result<String, Error> {
     let stdout = from_utf8(output.stdout.as_slice())?;
 
     // construct a regex to match the output
-    let mut regex_str = String::from(ip.clone());
+    let mut regex_str = ip.clone();
     regex_str.push_str(r" (via [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+ )?dev ([a-zA-Z0-9]+)\s+");
     let re = Regex::new(&regex_str)?;
 
@@ -45,11 +45,11 @@ pub fn if_name_for_routing_ip(ip_addr: Ipv4Addr) -> Result<String, Error> {
     let match_err = format!("no device found to route {}", ip);
     let device = re
         .captures(stdout)
-        .ok_or(Error::msg(match_err.clone()))?
+        .ok_or_else(|| Error::msg(match_err.clone()))?
         .iter()
         .last()
-        .ok_or(Error::msg(match_err.clone()))?
-        .ok_or(Error::msg(match_err.clone()))?
+        .ok_or_else(|| Error::msg(match_err.clone()))?
+        .ok_or_else(|| Error::msg(match_err))?
         .as_str()
         .to_owned();
 
