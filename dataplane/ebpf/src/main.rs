@@ -8,11 +8,12 @@
 mod bindings;
 mod ingress;
 mod utils;
+mod egress;
 
 use memoffset::offset_of;
 
 use aya_bpf::{
-    bindings::{TC_ACT_OK, TC_ACT_PIPE, TC_ACT_SHOT},
+    bindings::{TC_ACT_PIPE, TC_ACT_SHOT, TC_ACT_OK},
     macros::{classifier, map},
     maps::HashMap,
     programs::TcContext,
@@ -21,7 +22,8 @@ use aya_bpf::{
 use bindings::{ethhdr, iphdr};
 use common::{Backend, BackendKey};
 use ingress::{tcp::handle_tcp_ingress, udp::handle_udp_ingress};
-use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_TCP, IPPROTO_UDP};
+use egress::{icmp::handle_icmp_egress};
+use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_TCP, IPPROTO_UDP, IPPROTO_ICMP};
 
 // -----------------------------------------------------------------------------
 // Maps
@@ -30,6 +32,10 @@ use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_TCP, IPPROTO_UDP};
 #[map(name = "BACKENDS")]
 static mut BACKENDS: HashMap<BackendKey, Backend> =
     HashMap::<BackendKey, Backend>::with_max_entries(128, 0);
+
+#[map(name = "CONNTRACK")] 
+static mut CONNTRACK: HashMap<u32, u32> =
+    HashMap::<u32, u32>::with_max_entries(128, 0);
 
 // -----------------------------------------------------------------------------
 // Ingress
@@ -42,6 +48,7 @@ pub fn tc_ingress(ctx: TcContext) -> i32 {
         Err(_) => TC_ACT_SHOT,
     };
 
+    // TODO(astoycos) better Error reporting framework
     return TC_ACT_OK;
 }
 
@@ -78,12 +85,28 @@ pub fn tc_egress(ctx: TcContext) -> i32 {
         Err(_) => TC_ACT_SHOT,
     };
 
+    // TODO(astoycos) better Error reporting framework
     return TC_ACT_OK;
 }
 
-fn try_tc_egress(_ctx: TcContext) -> Result<i32, i64> {
-    // TODO: not implemented yet
-    Ok(TC_ACT_PIPE)
+fn try_tc_egress(ctx: TcContext) -> Result<i32, i64> {
+    let h_proto = u16::from_be(
+        ctx.load(offset_of!(ethhdr, h_proto))
+            .map_err(|_| TC_ACT_PIPE)?,
+    );
+
+    if h_proto != ETH_P_IP {
+        return Ok(TC_ACT_PIPE);
+    }
+
+    let protocol = ctx
+        .load::<u8>(ETH_HDR_LEN + offset_of!(iphdr, protocol))
+        .map_err(|_| TC_ACT_PIPE)?;
+
+    match protocol {
+        IPPROTO_ICMP => handle_icmp_egress(ctx),
+        _ => Ok(TC_ACT_PIPE),
+    }
 }
 
 // -----------------------------------------------------------------------------

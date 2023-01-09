@@ -1,7 +1,7 @@
 use core::mem;
 
 use aya_bpf::{
-    bindings::TC_ACT_OK,
+    bindings::TC_ACT_PIPE,
     helpers::{bpf_csum_diff, bpf_redirect_neigh},
     programs::TcContext,
 };
@@ -11,6 +11,7 @@ use crate::{
     bindings::{iphdr, udphdr},
     utils::{csum_fold_helper, ip_from_int, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
     BACKENDS,
+    CONNTRACK,
 };
 use common::BackendKey;
 
@@ -21,12 +22,14 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
 
     let udp_hdr: *mut udphdr = unsafe { ptr_at(&ctx, udp_header_offset)? };
 
+    let original_daddr = unsafe { (*ip_hdr).daddr };
+
     let key = BackendKey {
-        ip: u32::from_be(unsafe { (*ip_hdr).daddr }),
+        ip: u32::from_be(original_daddr),
         port: (u16::from_be(unsafe { (*udp_hdr).dest })) as u32,
     };
 
-    let backend = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_OK)?;
+    let backend = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_PIPE)?;
 
     let daddr_dot_dec = ip_from_int(unsafe { (*ip_hdr).daddr });
     info!(
@@ -40,12 +43,13 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
     );
 
     unsafe {
+        CONNTRACK.insert(&(*ip_hdr).saddr, &original_daddr, 0 as u64)?;
         (*ip_hdr).daddr = backend.daddr.to_be();
-    }
-
+    };
+    
     if (ctx.data() + ETH_HDR_LEN + mem::size_of::<iphdr>()) > ctx.data_end() {
         info!(&ctx, "Iphdr is out of bounds");
-        return Ok(TC_ACT_OK);
+        return Ok(TC_ACT_PIPE);
     }
 
     // Calculate l3 cksum
