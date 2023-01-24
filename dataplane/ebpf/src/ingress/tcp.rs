@@ -9,8 +9,8 @@ use aya_log_ebpf::info;
 
 use crate::{
     bindings::{iphdr, tcphdr},
-    utils::{csum_fold_helper, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
-    BACKENDS,
+    utils::{csum_fold_helper, ip_from_int, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
+    TCP_BACKENDS,
 };
 use common::BackendKey;
 
@@ -26,7 +26,7 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
         port: (u16::from_be(unsafe { (*tcp_hdr).dest })) as u32,
     };
 
-    let backend = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_OK)?;
+    let backend = unsafe { TCP_BACKENDS.get(&key) }.ok_or(TC_ACT_OK)?;
 
     info!(&ctx, "Received a TCP packet destined for svc ip: {:ipv4} at Port: {} ", u32::from_be(unsafe { (*ip_hdr).daddr }), u16::from_be(unsafe { (*tcp_hdr).dest} ));
 

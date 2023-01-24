@@ -8,6 +8,13 @@ pub struct Backend {
     pub ifindex: u16,
 }
 
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+pub struct BackendsList {
+    pub backends: [Backend; 4],
+    pub index: usize,
+}
+
 #[cfg(feature = "user")]
 unsafe impl aya::Pod for Backend {}
 

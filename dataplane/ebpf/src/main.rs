@@ -20,7 +20,7 @@ use aya_bpf::{
 };
 
 use bindings::{ethhdr, iphdr};
-use common::{Backend, BackendKey};
+use common::{BackendKey, BackendsList, Backend};
 use ingress::{tcp::handle_tcp_ingress, udp::handle_udp_ingress};
 use egress::{icmp::handle_icmp_egress};
 use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_TCP, IPPROTO_UDP, IPPROTO_ICMP};
@@ -29,8 +29,12 @@ use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_TCP, IPPROTO_UDP, IPPROTO_ICMP};
 // Maps
 // -----------------------------------------------------------------------------
 
-#[map(name = "BACKENDS")]
-static mut BACKENDS: HashMap<BackendKey, Backend> =
+#[map(name = "UDP_BACKENDS")]
+static mut UDP_BACKENDS: HashMap<BackendKey, BackendsList> =
+    HashMap::<BackendKey, BackendsList>::with_max_entries(128, 0);
+
+#[map(name = "TCP_BACKENDS")]
+static mut TCP_BACKENDS: HashMap<BackendKey, Backend> =
     HashMap::<BackendKey, Backend>::with_max_entries(128, 0);
 
 #[map(name = "BLIXT_CONNTRACK")] 
