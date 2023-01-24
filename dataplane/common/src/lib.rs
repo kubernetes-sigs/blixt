@@ -11,7 +11,7 @@ pub struct Backend {
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct BackendsList {
-    pub backends: [Backend; 4],
+    pub backends: [Backend; 16],
     pub index: usize,
 }
 
