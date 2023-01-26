@@ -1,5 +1,7 @@
 #![no_std]
 
+pub const BACKENDS_ARRAY_LENGTH: usize = 16;
+
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct Backend {
@@ -11,12 +13,13 @@ pub struct Backend {
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct BackendsList {
-    pub backends: [Backend; 16],
+    pub backends: [Backend; BACKENDS_ARRAY_LENGTH],
     pub index: usize,
+    pub n_elements: usize,
 }
 
 #[cfg(feature = "user")]
-unsafe impl aya::Pod for Backend {}
+unsafe impl aya::Pod for BackendsList {}
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]

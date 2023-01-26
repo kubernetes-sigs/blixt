@@ -7,7 +7,7 @@ use aya::programs::{tc, SchedClassifier, TcAttachType};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
 use clap::Parser;
-use common::{Backend, BackendKey};
+use common::{BackendKey, BackendsList};
 use log::{info, warn};
 
 #[derive(Debug, Parser)]
@@ -55,7 +55,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .context("failed to attach the egress TC program")?;
 
     info!("starting api server");
-    let backends: HashMap<_, BackendKey, Backend> = HashMap::try_from(bpf.map_mut("BACKENDS")?)?;
+    let backends: HashMap<_, BackendKey, BackendsList> = HashMap::try_from(bpf.map_mut("BACKENDS")?)?;
     start_api_server(Ipv4Addr::new(0, 0, 0, 0), 9874, backends).await?;
 
     info!("Exiting...");

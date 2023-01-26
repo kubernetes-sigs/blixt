@@ -13,7 +13,7 @@ use aya_log_ebpf::{
 use crate::{
     bindings::{iphdr, udphdr},
     utils::{csum_fold_helper, ip_from_int, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
-    UDP_BACKENDS,
+    BACKENDS,
 };
 use common::{BackendKey, BackendsList};
 
@@ -41,20 +41,12 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
     };
 
     // get the backends available for the combination vip/port
-    let backends_list = match unsafe { UDP_BACKENDS.get(&key) } {
-        Some(backends) => {
-            info!(&ctx, "FOUND backends for vip/port {}/{}", key.ip, key.port);
-            backends
-        }
-        None => {
-            info!(&ctx, "NO backends found for vip/port {}/{}", key.ip, key.port);
-            return Ok(TC_ACT_OK);
-        }
-    };
+    let backends_list = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_OK)?;
 
     let mut new_backends: BackendsList = BackendsList {
         backends: backends_list.backends,
-        index: backends_list.index + 1
+        index: backends_list.index + 1,
+        n_elements: backends_list.n_elements
     };
 
     if new_backends.index > new_backends.backends.len() - 1 {
@@ -104,7 +96,7 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
     };
 
     // update the entry in BACKENDS
-    match unsafe { UDP_BACKENDS.insert(&key, &new_backends, 0) } {
+    match unsafe { BACKENDS.insert(&key, &new_backends, 0) } {
         Ok(_) => {
             info!(&ctx, "index updated for vip/port {}/{}", key.ip, key.port);
         }

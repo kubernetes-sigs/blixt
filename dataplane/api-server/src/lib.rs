@@ -9,12 +9,12 @@ use aya::maps::{HashMap, MapRefMut};
 use tonic::transport::Server;
 
 use backends::backends_server::BackendsServer;
-use common::{Backend, BackendKey};
+use common::{BackendsList, BackendKey};
 
 pub async fn start(
     addr: Ipv4Addr,
     port: u16,
-    bpf_map: HashMap<MapRefMut, BackendKey, Backend>,
+    bpf_map: HashMap<MapRefMut, BackendKey, BackendsList>,
 ) -> Result<(), Error> {
     let server = server::BackendService::new(bpf_map);
     // TODO: mTLS https://github.com/Kong/blixt/issues/50
