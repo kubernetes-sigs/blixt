@@ -17,7 +17,7 @@ message Target {
 
 message Targets {
     Vip vip = 1;
-    Target target = 2;
+    repeated Target target = 2;
 }
 
 message Confirmation {

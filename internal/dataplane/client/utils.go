@@ -38,7 +38,7 @@ func CompileUDPRouteToDataPlaneBackend(ctx context.Context, c client.Client, udp
 	}
 
 	// TODO only using one endpoint for now until https://github.com/Kong/blixt/issues/10
-	var target *Target
+	targetEndpoints := []*Target{}
 	if udproute.DeletionTimestamp == nil {
 		endpoints, err := endpointsFromBackendRef(ctx, c, udproute.Namespace, backendRef)
 		if err != nil {
@@ -61,12 +61,12 @@ func CompileUDPRouteToDataPlaneBackend(ctx context.Context, c client.Client, udp
 
 			podip := binary.BigEndian.Uint32(ip.To4())
 
-			target = &Target{
+			targetEndpoints = append(targetEndpoints, &Target{
 				Daddr: podip,
 				Dport: uint32(subset.Ports[0].Port),
-			}
+			})
 		}
-		if target == nil {
+		if len(targetEndpoints) == 0 {
 			return nil, fmt.Errorf("endpoints not ready")
 		}
 	}
@@ -78,7 +78,7 @@ func CompileUDPRouteToDataPlaneBackend(ctx context.Context, c client.Client, udp
 			Ip:   ipint,
 			Port: gatewayPort,
 		},
-		Target: target,
+		Target: targetEndpoints,
 	}
 
 	return targets, nil
@@ -150,7 +150,9 @@ func CompileTCPRouteToDataPlaneBackend(ctx context.Context, c client.Client, tcp
 			Ip:   ipint,
 			Port: gatewayPort,
 		},
-		Target: target,
+		Target: []*Target{
+			target,
+		},
 	}
 
 	return targets, nil
@@ -174,7 +176,7 @@ func endpointsFromBackendRef(ctx context.Context, c client.Client, namespace str
 
 func getGatewayIP(gw *gatewayv1beta1.Gateway) (ip net.IP, err error) {
 	if len(gw.Status.Addresses) > 1 {
-		return nil, fmt.Errorf("Gateway %s/%s had %d addresses but we only currently support 1", gw.Namespace, gw.Name, len(gw.Status.Addresses))
+		return nil, fmt.Errorf("gateway %s/%s had %d addresses but we only currently support 1", gw.Namespace, gw.Name, len(gw.Status.Addresses))
 	}
 
 	for _, address := range gw.Status.Addresses {
