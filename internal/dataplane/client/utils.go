@@ -78,7 +78,7 @@ func CompileUDPRouteToDataPlaneBackend(ctx context.Context, c client.Client, udp
 			Ip:   ipint,
 			Port: gatewayPort,
 		},
-		Target: targetEndpoints,
+		Targets: targetEndpoints,
 	}
 
 	return targets, nil
@@ -150,7 +150,7 @@ func CompileTCPRouteToDataPlaneBackend(ctx context.Context, c client.Client, tcp
 			Ip:   ipint,
 			Port: gatewayPort,
 		},
-		Target: []*Target{
+		Targets: []*Target{
 			target,
 		},
 	}

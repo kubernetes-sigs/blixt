@@ -22,7 +22,7 @@ pub struct Targets {
     #[prost(message, optional, tag = "1")]
     pub vip: ::core::option::Option<Vip>,
     #[prost(message, repeated, tag = "2")]
-    pub target: ::prost::alloc::vec::Vec<Target>,
+    pub targets: ::prost::alloc::vec::Vec<Target>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

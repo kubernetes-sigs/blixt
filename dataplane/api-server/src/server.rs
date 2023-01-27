@@ -1,5 +1,6 @@
 use std::net::Ipv4Addr;
 use std::sync::Arc;
+use std::vec::Vec;
 
 use anyhow::Error;
 use aya::maps::{HashMap, MapRefMut};
@@ -22,22 +23,19 @@ impl BackendService {
         }
     }
 
-    async fn insert(&self, key: BackendKey, bk: Backend) -> Result<(), Error> {
+    async fn insert(&self, key: BackendKey, bks: Vec<Backend>) -> Result<(), Error> {
         let mut bpf_map = self.bpf_map.lock().await;
         let mut backends_list: BackendsList;
+        let mut i = 0;
+
         match bpf_map.get(&key, 0) {
             Ok(v) => {
-                if v.n_elements == BACKENDS_ARRAY_LENGTH {
-                    // TODO: allow a replace of backend
-                    // We cannot understand whether a backend should replace another one.
-                    // For the time being, the functionality is limited to adding backends, we cannot
-                    // remove them from the map.
-                    return Err(Status::internal("backends array already full").into());
-                }
-                let i = v.n_elements;
                 backends_list = v.clone();
-                backends_list.backends[i] = bk;
-                backends_list.n_elements = i+1;
+                for bk in bks.iter() {
+                    backends_list.backends[i] = *bk;
+                    i += 1;
+                }
+                backends_list.n_elements = bks.len();
             }
             Err(_) => {
                 backends_list = BackendsList {
@@ -49,8 +47,11 @@ impl BackendService {
                     index: 0,
                     n_elements: 0,
                 };
-                backends_list.backends[0] = bk;
-                backends_list.n_elements = 1;
+                for bk in bks.iter() {
+                    backends_list.backends[i] = *bk;
+                    i += 1;
+                }
+                backends_list.n_elements = bks.len();
             }
         };
         bpf_map.insert(key, backends_list, 0)?;
@@ -95,49 +96,52 @@ impl Backends for BackendService {
             None => return Err(Status::invalid_argument("missing vip ip and port")),
         };
 
-        let target = match targets.target {
-            Some(target) => target,
-            None => return Err(Status::invalid_argument("missing targets for vip")),
-        };
+        if targets.targets.len() == 0 {
+            return Err(Status::invalid_argument("missing targets for vip"));
+        }
 
         let key = BackendKey {
             ip: vip.ip,
             port: vip.port,
         };
 
-        let ifindex = match target.ifindex {
-            Some(ifindex) => ifindex,
-            None => {
-                let ip_addr = Ipv4Addr::from(target.daddr);
-                let ifname = match if_name_for_routing_ip(ip_addr) {
-                    Ok(ifname) => ifname,
-                    Err(err) => {
-                        return Err(Status::internal(format!(
-                            "failed to determine ifname: {}",
-                            err
-                        )))
-                    }
-                };
+        let mut bks: Vec<Backend> = Vec::new();
 
-                match if_nametoindex(ifname) {
-                    Ok(ifindex) => ifindex,
-                    Err(err) => {
-                        return Err(Status::internal(format!(
-                            "failed to determine ifindex: {}",
-                            err
-                        )))
+        for target in targets.targets.iter() {
+            let ifindex = match target.ifindex {
+                Some(ifindex) => ifindex,
+                None => {
+                    let ip_addr = Ipv4Addr::from(target.daddr);
+                    let ifname = match if_name_for_routing_ip(ip_addr) {
+                        Ok(ifname) => ifname,
+                        Err(err) => {
+                            return Err(Status::internal(format!(
+                                "failed to determine ifname: {}",
+                                err
+                            )))
+                        }
+                    };
+    
+                    match if_nametoindex(ifname) {
+                        Ok(ifindex) => ifindex,
+                        Err(err) => {
+                            return Err(Status::internal(format!(
+                                "failed to determine ifindex: {}",
+                                err
+                            )))
+                        }
                     }
                 }
-            }
-        };
+            };
+            bks.push(Backend {
+                daddr: target.daddr,
+                dport: target.dport,
+                ifindex: ifindex as u16,
+            });
+        }
 
-        let bk = Backend {
-            daddr: target.daddr,
-            dport: target.dport,
-            ifindex: ifindex as u16,
-        };
 
-        match self.insert(key, bk).await {
+        match self.insert(key, bks).await {
             Ok(_) => Ok(Response::new(Confirmation {
                 confirmation: format!(
                     "success, vip {}:{} was updated",

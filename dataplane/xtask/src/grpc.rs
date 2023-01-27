@@ -34,20 +34,23 @@ pub async fn update(opts: Options) -> Result<(), Error> {
     let mut client = BackendsClient::connect(format!("http://{}", server_addr)).await?;
 
     let addr = net::Ipv4Addr::from_str(&opts.vip_ip)?;
-    let daddr = net::Ipv4Addr::from_str(&opts.daddr)?;
+    // let daddr = net::Ipv4Addr::from_str(&opts.daddr)?;
 
     let vip = Vip {
         ip: addr.into(),
         port: opts.vip_port,
     };
 
+    let backends: Vec<Target> = Vec::new();
+
     let req = Request::new(Targets {
         vip: Some(vip.clone()),
-        target: Some(Target {
-            daddr: daddr.into(),
-            dport: opts.dport,
-            ifindex: Some(opts.ifindex),
-        }),
+        // targets: Some(Targets {
+        //     daddr: daddr.into(),
+        //     dport: opts.dport,
+        //     ifindex: Some(opts.ifindex),
+        // }),
+        targets: backends,
     });
 
     if opts.delete {
