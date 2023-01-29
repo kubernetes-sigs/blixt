@@ -4,8 +4,8 @@ RUN pacman -Syu --noconfirm
 RUN pacman -S base-devel protobuf rustup --noconfirm
 
 RUN rustup default stable
-RUN rustup install nightly-2023-01-10
-RUN rustup component add rust-src --toolchain nightly-2023-01-10
+RUN rustup install nightly
+RUN rustup component add rust-src --toolchain nightly
 RUN rustup target add x86_64-unknown-linux-musl
 RUN --mount=type=cache,target=/root/.cargo/registry \
     cargo install bpf-linker
