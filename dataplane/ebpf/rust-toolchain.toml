@@ -1,3 +1,2 @@
 [toolchain]
-#TODO: revert once this issue with aya and rust nightly is fixed: https://github.com/aya-rs/aya/issues/490
-channel="nightly-2023-01-10"
+channel="nightly"
