@@ -67,3 +67,4 @@ jobs:
       env:
         BLIXT_CONTROLPLANE_IMAGE: "ghcr.io/kong/blixt-controlplane:integration-tests"
         BLIXT_DATAPLANE_IMAGE: "ghcr.io/kong/blixt-dataplane:integration-tests"
+        BLIXT_UDP_SERVER_IMAGE: "ghcr.io/kong/blixt-udp-test-server:integration-tests"
