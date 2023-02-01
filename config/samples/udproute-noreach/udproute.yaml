@@ -1,0 +1,12 @@
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: blixt-udproute-sample
+spec:
+  parentRefs:
+  - name: blixt-udproute-sample
+    port: 9875
+  rules:
+  - backendRefs:
+    - name: blixt-udproute-sample
+      port: 9875

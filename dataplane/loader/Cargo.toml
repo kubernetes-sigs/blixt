@@ -11,7 +11,7 @@ common = { path = "../common", features=["user"] }
 clap = { version = "3.1", features = ["derive"] }
 env_logger = "0.9"
 log = "0.4"
-tokio = { version = "1.18", features = ["macros", "rt", "rt-multi-thread", "net", "signal"] }
+tokio = { version = "1.25.0", features = ["macros", "rt", "rt-multi-thread", "net", "signal"] }
 api-server = { path = "../api-server" }
 anyhow = "1"
 
