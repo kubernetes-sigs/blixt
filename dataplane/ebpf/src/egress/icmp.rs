@@ -10,7 +10,7 @@ use aya_log_ebpf::info;
 use crate::{
     bindings::{iphdr, icmphdr},
     utils::{csum_fold_helper, ip_from_int, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
-    CONNTRACK,
+    BLIXT_CONNTRACK,
 };
 
 const ICMP_HDR_LEN: usize = mem::size_of::<icmphdr>();
@@ -36,7 +36,7 @@ pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
 
     let dest_addr = unsafe { (*ip_hdr).daddr };
     
-    let new_src = unsafe { CONNTRACK.get(&dest_addr) }.ok_or(TC_ACT_PIPE)?;
+    let new_src = unsafe { BLIXT_CONNTRACK.get(&dest_addr) }.ok_or(TC_ACT_PIPE)?;
 
     let daddr_dot_dec = ip_from_int(unsafe { (*ip_hdr).daddr });
     info!(
@@ -87,7 +87,7 @@ pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
     // remove conntrack entry after icmp port unreachable message is sent back
     // to the client.
     // TODO(astoycos) we should handle these failure modes better
-    unsafe { CONNTRACK.remove(&dest_addr)? };
+    unsafe { BLIXT_CONNTRACK.remove(&dest_addr)? };
 
     return Ok(TC_ACT_PIPE);
 }

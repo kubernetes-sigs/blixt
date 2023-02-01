@@ -33,8 +33,8 @@ use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_TCP, IPPROTO_UDP, IPPROTO_ICMP};
 static mut BACKENDS: HashMap<BackendKey, Backend> =
     HashMap::<BackendKey, Backend>::with_max_entries(128, 0);
 
-#[map(name = "CONNTRACK")] 
-static mut CONNTRACK: HashMap<u32, u32> =
+#[map(name = "BLIXT_CONNTRACK")] 
+static mut BLIXT_CONNTRACK: HashMap<u32, u32> =
     HashMap::<u32, u32>::with_max_entries(128, 0);
 
 // -----------------------------------------------------------------------------

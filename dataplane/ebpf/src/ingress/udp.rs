@@ -11,7 +11,7 @@ use crate::{
     bindings::{iphdr, udphdr},
     utils::{csum_fold_helper, ip_from_int, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
     BACKENDS,
-    CONNTRACK,
+    BLIXT_CONNTRACK,
 };
 use common::BackendKey;
 
@@ -43,7 +43,7 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
     );
 
     unsafe {
-        CONNTRACK.insert(&(*ip_hdr).saddr, &original_daddr, 0 as u64)?;
+        BLIXT_CONNTRACK.insert(&(*ip_hdr).saddr, &original_daddr, 0 as u64)?;
         (*ip_hdr).daddr = backend.daddr.to_be();
     };
     
