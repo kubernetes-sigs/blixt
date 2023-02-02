@@ -1,8 +1,12 @@
 bases:
 - ../default
+- ../samples/udproute
+- ../samples/udproute-noreach
 
 images:
 - name: ghcr.io/kong/blixt-dataplane
   newTag: integration-tests
 - name: ghcr.io/kong/blixt-controlplane
+  newTag: integration-tests
+- name: ghcr.io/kong/blixt-udp-test-server
   newTag: integration-tests

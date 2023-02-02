@@ -19,6 +19,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	"github.com/kong/blixt/test/utils"
 )
 
 const (
@@ -29,7 +30,10 @@ const (
 
 func TestUDPRouteBasics(t *testing.T) {
 	udpRouteBasicsCleanupKey := "udproutebasics"
-	defer runCleanup(udpRouteBasicsCleanupKey)
+	defer func() {
+		utils.DumpDiagnosticsIfFailed(ctx, t , env.Cluster())
+		runCleanup(udpRouteBasicsCleanupKey)
+	}()
 
 	t.Log("deploying config/samples/udproute kustomize")
 	require.NoError(t, clusters.KustomizeDeployForCluster(ctx, env.Cluster(), udprouteSampleKustomize))
@@ -89,7 +93,10 @@ func TestUDPRouteBasics(t *testing.T) {
 
 func TestUDPRouteNoReach(t *testing.T) {
 	udpRouteNoReachCleanupKey := "udproutenoreach"
-	defer runCleanup(udpRouteNoReachCleanupKey)
+	defer func() {
+		utils.DumpDiagnosticsIfFailed(ctx, t , env.Cluster())
+		runCleanup(udpRouteNoReachCleanupKey)
+	}()
 
 	t.Log("deploying config/samples/udproute-noreach kustomize")
 	require.NoError(t, clusters.KustomizeDeployForCluster(ctx, env.Cluster(), udproutenoreachSampleKustomize))
@@ -137,7 +144,7 @@ func TestUDPRouteNoReach(t *testing.T) {
 
 	// ensure server sent back icmp host unreachable
 	t.Logf("ensuring UDP server sent back icmp host unreachable")
-	err = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	err = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	require.NoError(t, err)
 	_, err = conn.Read(make([]byte, 2048))
 	require.ErrorContains(t, err, "read: connection refused")

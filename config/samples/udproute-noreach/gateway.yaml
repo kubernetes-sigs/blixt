@@ -1,16 +1,16 @@
 kind: GatewayClass
 apiVersion: gateway.networking.k8s.io/v1beta1
 metadata:
-  name: blixt-udproute-sample
+  name: blixt-udproute-noreach-sample
 spec:
   controllerName: konghq.com/blixt
 ---
 kind: Gateway
 apiVersion: gateway.networking.k8s.io/v1beta1
 metadata:
-  name: blixt-udproute-sample
+  name: blixt-udproute-noreach-sample
 spec:
-  gatewayClassName: blixt-udproute-sample
+  gatewayClassName: blixt-udproute-noreach-sample
   listeners:
   - name: udp
     protocol: UDP
