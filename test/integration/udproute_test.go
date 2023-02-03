@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	udprouteSampleKustomize        = "../../config/samples/udproute"
-	udproutenoreachSampleKustomize = "../../config/samples/udproute-noreach"
+	udprouteSampleKustomize        = "../../config/tests/udproute"
+	udproutenoreachSampleKustomize = "../../config/tests/udproute-noreach"
 	udprouteSampleName             = "blixt-udproute-sample"
 )
 

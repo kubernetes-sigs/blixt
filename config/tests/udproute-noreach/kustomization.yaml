@@ -1,0 +1,6 @@
+bases:
+- ../../samples/udproute-noreach
+
+images:
+- name: ghcr.io/kong/blixt-udp-test-server
+  newTag: integration-tests

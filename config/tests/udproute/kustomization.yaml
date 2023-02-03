@@ -1,0 +1,6 @@
+bases:
+- ../../samples/udproute
+
+images:
+- name: ghcr.io/kong/blixt-udp-test-server
+  newTag: integration-tests
