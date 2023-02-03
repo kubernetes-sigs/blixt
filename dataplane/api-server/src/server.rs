@@ -10,25 +10,30 @@ use tonic::{Request, Response, Status};
 use crate::backends::backends_server::Backends;
 use crate::backends::{Confirmation, InterfaceIndexConfirmation, PodIp, Targets, Vip};
 use crate::netutils::{if_name_for_routing_ip, if_nametoindex};
-use common::{Backend, BackendKey, BackendsList, BACKENDS_ARRAY_LENGTH};
+use common::{Backend, BackendKey, BackendsList, BackendsIndexes, BACKENDS_ARRAY_LENGTH};
 
 pub struct BackendService {
-    bpf_map: Arc<Mutex<HashMap<MapRefMut, BackendKey, BackendsList>>>,
+    backends_map: Arc<Mutex<HashMap<MapRefMut, BackendKey, BackendsList>>>,
+    backends_indexes_map: Arc<Mutex<HashMap<MapRefMut, BackendKey, BackendsIndexes>>>,
 }
 
 impl BackendService {
-    pub fn new(bpf_map: HashMap<MapRefMut, BackendKey, BackendsList>) -> BackendService {
+    pub fn new(backends_map: HashMap<MapRefMut, BackendKey, BackendsList>,
+        backends_indexes_map: HashMap<MapRefMut, BackendKey, BackendsIndexes>) -> BackendService {
         BackendService {
-            bpf_map: Arc::new(Mutex::new(bpf_map)),
+            backends_map: Arc::new(Mutex::new(backends_map)),
+            backends_indexes_map: Arc::new(Mutex::new(backends_indexes_map)),
         }
     }
 
     async fn insert(&self, key: BackendKey, bks: Vec<Backend>) -> Result<(), Error> {
-        let mut bpf_map = self.bpf_map.lock().await;
+        let mut backends_map = self.backends_map.lock().await;
+        let mut backends_indexes_map = self.backends_indexes_map.lock().await;
+
         let mut backends_list: BackendsList;
         let mut i = 0;
 
-        match bpf_map.get(&key, 0) {
+        match backends_map.get(&key, 0) {
             Ok(v) => {
                 backends_list = v.clone();
                 for bk in bks.iter() {
@@ -36,6 +41,8 @@ impl BackendService {
                     i += 1;
                 }
                 backends_list.n_elements = bks.len();
+                
+                backends_indexes_map.insert(key, BackendsIndexes { index: 0 }, 0)?;
             }
             Err(_) => {
                 backends_list = BackendsList {
@@ -44,7 +51,6 @@ impl BackendService {
                         dport: 0,
                         ifindex: 0,
                     }; BACKENDS_ARRAY_LENGTH],
-                    index: 0,
                     n_elements: 0,
                 };
                 for bk in bks.iter() {
@@ -54,12 +60,12 @@ impl BackendService {
                 backends_list.n_elements = bks.len();
             }
         };
-        bpf_map.insert(key, backends_list, 0)?;
+        backends_map.insert(key, backends_list, 0)?;
         Ok(())
     }
 
     async fn remove(&self, key: BackendKey) -> Result<(), Error> {
-        let mut bpf_map = self.bpf_map.lock().await;
+        let mut bpf_map = self.backends_map.lock().await;
         bpf_map.remove(&key)?;
         Ok(())
     }
@@ -136,8 +142,9 @@ impl Backends for BackendService {
             bks.push(Backend {
                 daddr: target.daddr,
                 dport: target.dport,
-                ifindex: ifindex as u16,
+                ifindex: ifindex as u32,
             });
+
         }
 
 

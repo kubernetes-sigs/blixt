@@ -7,7 +7,7 @@ use aya::programs::{tc, SchedClassifier, TcAttachType};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
 use clap::Parser;
-use common::{BackendKey, BackendsList};
+use common::{BackendKey, BackendsList, BackendsIndexes};
 use log::{info, warn};
 
 #[derive(Debug, Parser)]
@@ -56,7 +56,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("starting api server");
     let backends: HashMap<_, BackendKey, BackendsList> = HashMap::try_from(bpf.map_mut("BACKENDS")?)?;
-    start_api_server(Ipv4Addr::new(0, 0, 0, 0), 9874, backends).await?;
+    let backends_indexes: HashMap<_, BackendKey, BackendsIndexes> = HashMap::try_from(bpf.map_mut("BACKENDS_INDEXES")?)?;
+    start_api_server(Ipv4Addr::new(0, 0, 0, 0), 9874, backends, backends_indexes).await?;
 
     info!("Exiting...");
 

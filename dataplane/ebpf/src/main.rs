@@ -20,7 +20,7 @@ use aya_bpf::{
 };
 
 use bindings::{ethhdr, iphdr};
-use common::{BackendKey, BackendsList};
+use common::{BackendKey, BackendsList, BackendsIndexes};
 use ingress::{tcp::handle_tcp_ingress, udp::handle_udp_ingress};
 use egress::{icmp::handle_icmp_egress};
 use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_TCP, IPPROTO_UDP, IPPROTO_ICMP};
