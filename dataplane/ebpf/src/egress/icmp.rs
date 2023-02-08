@@ -84,9 +84,6 @@ pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
     } as u64;
     unsafe { (*icmp_inner_ip_hdr).check = csum_fold_helper(full_cksum) };
 
-    // remove conntrack entry after icmp port unreachable message is sent back
-    // to the client.
-    // TODO(astoycos) we should handle these failure modes better
     unsafe { BLIXT_CONNTRACK.remove(&dest_addr)? };
 
     return Ok(TC_ACT_PIPE);

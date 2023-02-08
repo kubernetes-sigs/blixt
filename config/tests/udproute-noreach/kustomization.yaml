@@ -1,5 +1,22 @@
-bases:
-- ../../samples/udproute-noreach
+resources: 
+- ../../samples/udproute
+
+patchesStrategicMerge:
+- |-
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: blixt-udproute-sample
+  spec:
+    template:
+      spec:
+        containers:
+        - name: server
+          command:
+            - ./udp-test-server
+            # --dry-run disables UDP listeners in order to test failures to send
+            # data, and trigger ICMP port failure responses from the kernel
+            - --dry-run
 
 images:
 - name: ghcr.io/kong/blixt-udp-test-server

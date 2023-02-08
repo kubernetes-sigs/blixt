@@ -9,17 +9,17 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"testing"
 	"time"
-	"os"
 
 	"github.com/google/uuid"
+	"github.com/kong/blixt/test/utils"
 	"github.com/kong/kubernetes-testing-framework/pkg/clusters"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
-	"github.com/kong/blixt/test/utils"
 )
 
 const (
@@ -31,7 +31,7 @@ const (
 func TestUDPRouteBasics(t *testing.T) {
 	udpRouteBasicsCleanupKey := "udproutebasics"
 	defer func() {
-		utils.DumpDiagnosticsIfFailed(ctx, t , env.Cluster())
+		utils.DumpDiagnosticsIfFailed(ctx, t, env.Cluster())
 		runCleanup(udpRouteBasicsCleanupKey)
 	}()
 
@@ -94,7 +94,7 @@ func TestUDPRouteBasics(t *testing.T) {
 func TestUDPRouteNoReach(t *testing.T) {
 	udpRouteNoReachCleanupKey := "udproutenoreach"
 	defer func() {
-		utils.DumpDiagnosticsIfFailed(ctx, t , env.Cluster())
+		utils.DumpDiagnosticsIfFailed(ctx, t, env.Cluster())
 		runCleanup(udpRouteNoReachCleanupKey)
 	}()
 
@@ -104,15 +104,6 @@ func TestUDPRouteNoReach(t *testing.T) {
 		cleanupLog("cleaning up config/samples/udproute-noreach kustomize")
 		return clusters.KustomizeDeleteForCluster(ctx, env.Cluster(), udproutenoreachSampleKustomize)
 	})
-
-	// TODO (astoycos) this currently won't work but it will with updated control-plane logic
-	// add it back so we don't have to maintain a whole new kustomize config for a one line change.
-	// // Update Server to ensure it's in dry run mode then wait for it to be ready
-	// server, err := env.Cluster().Client().AppsV1().Deployments(corev1.NamespaceDefault).Get(ctx, udprouteSampleName, metav1.GetOptions{})
-	// require.NoError(t, err)
-	// server.Spec.Template.Spec.Containers[0].Command = []string{"./udp-test-server", "--dry-run"}
-	// _, err = env.Cluster().Client().AppsV1().Deployments(corev1.NamespaceDefault).Update(ctx, server, metav1.UpdateOptions{})
-	// require.NoError(t, err)
 
 	t.Log("waiting for Gateway to have an address")
 	var gw *gatewayv1beta1.Gateway

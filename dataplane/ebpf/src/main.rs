@@ -48,7 +48,7 @@ pub fn tc_ingress(ctx: TcContext) -> i32 {
         Err(_) => TC_ACT_SHOT,
     };
 
-    // TODO(astoycos) better Error reporting framework
+    // TODO(https://github.com/Kong/blixt/issues/69) better Error reporting framework
     return TC_ACT_OK;
 }
 
@@ -85,7 +85,7 @@ pub fn tc_egress(ctx: TcContext) -> i32 {
         Err(_) => TC_ACT_SHOT,
     };
 
-    // TODO(astoycos) better Error reporting framework
+    // TODO(https://github.com/Kong/blixt/issues/69) better Error reporting framework
     return TC_ACT_OK;
 }
 
