@@ -1,5 +1,6 @@
 use std::io::{Error, ErrorKind};
 use std::net::{IpAddr, SocketAddr};
+use std::env;
 use tokio::{
     net::{TcpListener, UdpSocket},
     signal,
@@ -8,11 +9,19 @@ use tokio::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = env::args().collect();
     let (tx, rx) = mpsc::channel(3);
-    tokio::spawn(run_server(9875, tx.clone()));
-    tokio::spawn(run_server(9876, tx.clone()));
-    tokio::spawn(run_server(9877, tx.clone()));
     tokio::spawn(run_health_server(9878, rx));
+
+    if args.len() == 2 && args[1] == "--dry-run" {
+        println!("Running in dry-run mode no udp servers started");
+    } else {
+        println!("Running udp servers at ports 9875, 9876, and 9877");
+        tokio::spawn(run_server(9875, tx.clone()));
+        tokio::spawn(run_server(9876, tx.clone()));
+        tokio::spawn(run_server(9877, tx.clone()));
+    }
+
     signal::ctrl_c().await?;
     Ok(())
 }

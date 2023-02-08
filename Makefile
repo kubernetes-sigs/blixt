@@ -138,6 +138,7 @@ build.image:
 .PHONY: build.all.images
 build.all.images: build.image
 	cd dataplane/ && make build.image TAG=$(TAG)
+	cd tools/udp-test-server && make build.image TAG=$(TAG)
 
 ##@ Deployment
 

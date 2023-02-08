@@ -3,7 +3,7 @@ TAG ?= latest
 
 .PHONY: build.image
 build.image:
-	docker build -t $(IMAGE):$(TAG) ./
+	 DOCKER_BUILDKIT=1 docker build -t $(IMAGE):$(TAG) ./
 
 .PHONY: push.image
 push.image: build.image

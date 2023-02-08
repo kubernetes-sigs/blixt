@@ -67,3 +67,13 @@ jobs:
       env:
         BLIXT_CONTROLPLANE_IMAGE: "ghcr.io/kong/blixt-controlplane:integration-tests"
         BLIXT_DATAPLANE_IMAGE: "ghcr.io/kong/blixt-dataplane:integration-tests"
+        BLIXT_UDP_SERVER_IMAGE: "ghcr.io/kong/blixt-udp-test-server:integration-tests"
+
+    ## Upload diagnostics if integration test step failed.
+    - name: upload diagnostics
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: blixt-integration-test-diag
+        path: /tmp/ktf-diag*
+        if-no-files-found: ignore

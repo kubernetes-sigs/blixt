@@ -12,6 +12,7 @@ pub const ETH_P_IP: u16 = 0x0800;
 
 pub const IPPROTO_TCP: u8 = 6;
 pub const IPPROTO_UDP: u8 = 17;
+pub const IPPROTO_ICMP: u8 = 1;
 
 pub const ETH_HDR_LEN: usize = mem::size_of::<ethhdr>();
 pub const IP_HDR_LEN: usize = mem::size_of::<iphdr>();

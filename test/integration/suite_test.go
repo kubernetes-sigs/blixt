@@ -24,30 +24,35 @@ var (
 	ctx    context.Context
 	cancel context.CancelFunc
 	env    environments.Environment
+	cleanup map[string]([]func(context.Context) error)
 
 	gwclient *versioned.Clientset
 
 	controlplaneImage = os.Getenv("BLIXT_CONTROLPLANE_IMAGE")
 	dataplaneImage    = os.Getenv("BLIXT_DATAPLANE_IMAGE")
+	udpServerImage    = os.Getenv("BLIXT_UDP_SERVER_IMAGE")
 
 	existingCluster      = os.Getenv("BLIXT_USE_EXISTING_KIND_CLUSTER")
 	keepTestCluster      = func() bool { return os.Getenv("BLIXT_TEST_KEEP_CLUSTER") == "true" || existingCluster != "" }()
 	keepKustomizeDeploys = func() bool { return os.Getenv("BLIXT_TEST_KEEP_KUSTOMIZE_DEPLOYS") == "true" }()
 
-	cleanup = []func(context.Context) error{}
+	mainCleanupKey = "main"
 )
 
 const (
 	gwCRDsKustomize = "https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.5.1"
-	testKustomize   = "../../config/tests"
+	testKustomize   = "../../config/tests/blixt"
 )
 
 func TestMain(m *testing.M) {
+	mainCleanupKey = "main"
+	defer runCleanup(mainCleanupKey)
+
 	// check that we have a controlplane and dataplane image to use for the tests.
 	// generally the runner of the tests should have built these from the latest
 	// changes prior to the tests and fed them to the test suite.
-	if controlplaneImage == "" || dataplaneImage == "" {
-		exitOnErr(fmt.Errorf("BLIXT_CONTROLPLANE_IMAGE and BLIXT_DATAPLANE_IMAGE must be provided"))
+	if controlplaneImage == "" || dataplaneImage == "" || udpServerImage == "" {
+		exitOnErr(fmt.Errorf("BLIXT_CONTROLPLANE_IMAGE, BLIXT_DATAPLANE_IMAGE, and BLIXT_UDP_SERVER_IMAGE must be provided"))
 	}
 
 	ctx, cancel = context.WithCancel(context.Background())
@@ -70,13 +75,15 @@ func TestMain(m *testing.M) {
 		exitOnErr(err)
 		loadImages, err = loadImages.WithImage(dataplaneImage)
 		exitOnErr(err)
+		loadImages, err = loadImages.WithImage(udpServerImage)
+		exitOnErr(err)
 
 		// create the testing environment and cluster
 		env, err = environments.NewBuilder().WithAddons(metallb.New(), loadImages.Build()).Build(ctx)
 		exitOnErr(err)
 
 		if !keepTestCluster {
-			addCleanup(func(context.Context) error {
+			addCleanup(mainCleanupKey, func(context.Context) error {
 				cleanupLog("cleaning up test environment and cluster %s\n", env.Cluster().Name())
 				return env.Cleanup(ctx)
 			})
@@ -94,7 +101,7 @@ func TestMain(m *testing.M) {
 	fmt.Println("INFO: deploying Gateway API CRDs")
 	exitOnErr(clusters.KustomizeDeployForCluster(ctx, env.Cluster(), gwCRDsKustomize))
 	if !keepKustomizeDeploys {
-		addCleanup(func(context.Context) error {
+		addCleanup(mainCleanupKey, func(context.Context) error {
 			cleanupLog("cleaning up Gateway API CRDs")
 			return clusters.KustomizeDeleteForCluster(ctx, env.Cluster(), gwCRDsKustomize)
 		})
@@ -105,7 +112,7 @@ func TestMain(m *testing.M) {
 	fmt.Println("INFO: deploying blixt via config/test kustomize")
 	exitOnErr(clusters.KustomizeDeployForCluster(ctx, env.Cluster(), testKustomize))
 	if !keepKustomizeDeploys {
-		addCleanup(func(context.Context) error {
+		addCleanup(mainCleanupKey, func(context.Context) error {
 			cleanupLog("cleaning up blixt via config/test kustomize")
 			return clusters.KustomizeDeleteForCluster(ctx, env.Cluster(), testKustomize)
 		})
@@ -114,8 +121,8 @@ func TestMain(m *testing.M) {
 
 	exit := m.Run()
 
-	exitOnErr(runCleanup())
-
+	exitOnErr(runCleanup(mainCleanupKey))
+	
 	os.Exit(exit)
 }
 
@@ -124,7 +131,7 @@ func exitOnErr(err error) {
 		return
 	}
 
-	if cleanupErr := runCleanup(); cleanupErr != nil {
+	if cleanupErr := runCleanup(mainCleanupKey); cleanupErr != nil {
 		err = fmt.Errorf("%s; %w", err, cleanupErr)
 	}
 
@@ -134,27 +141,41 @@ func exitOnErr(err error) {
 	}
 }
 
-func addCleanup(job func(context.Context) error) {
+func addCleanup(cleanupKey string, job func(context.Context) error) {
+	//initialize cleanup map if needed
+	if cleanup == nil {
+		cleanup = map[string]([]func(context.Context) error){cleanupKey: []func(context.Context) error{job}}
+		return
+	}
+
+	//initialize cleanup entry if needed
+	if _, ok := cleanup[cleanupKey]; !ok {
+		cleanup[cleanupKey] = []func(context.Context) error{job}
+		return
+	}
+
 	// prepend so that cleanup runs in reverse order
-	cleanup = append([]func(context.Context) error{job}, cleanup...)
+	cleanup[cleanupKey] = append([]func(context.Context) error{job}, cleanup[cleanupKey]...)
 }
 
 func cleanupLog(msg string, args ...any) {
 	fmt.Printf(fmt.Sprintf("INFO: %s\n", msg), args...)
 }
 
-func runCleanup() (cleanupErr error) {
+func runCleanup(cleanupKey string) (cleanupErr error) {
 	if len(cleanup) < 1 {
 		return
 	}
 
-	fmt.Println("INFO: running cleanup jobs")
-	for _, job := range cleanup {
+	fmt.Printf("INFO: running cleanup jobs for key %s\n", cleanupKey)
+	cleanupList := cleanup[cleanupKey]
+
+	for _, job := range cleanupList {
 		if err := job(ctx); err != nil {
 			cleanupErr = fmt.Errorf("%s; %w", err, cleanupErr)
 		}
 	}
-	cleanup = nil
+	delete(cleanup, cleanupKey)
 	return
 }
 
