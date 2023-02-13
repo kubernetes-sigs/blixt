@@ -14,12 +14,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kong/blixt/test/utils"
 	"github.com/kong/kubernetes-testing-framework/pkg/clusters"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	testutils "github.com/kong/blixt/internal/test/utils"
 )
 
 const (
@@ -31,7 +32,7 @@ const (
 func TestUDPRouteBasics(t *testing.T) {
 	udpRouteBasicsCleanupKey := "udproutebasics"
 	defer func() {
-		utils.DumpDiagnosticsIfFailed(ctx, t, env.Cluster())
+		testutils.DumpDiagnosticsIfFailed(ctx, t, env.Cluster())
 		runCleanup(udpRouteBasicsCleanupKey)
 	}()
 
@@ -94,7 +95,7 @@ func TestUDPRouteBasics(t *testing.T) {
 func TestUDPRouteNoReach(t *testing.T) {
 	udpRouteNoReachCleanupKey := "udproutenoreach"
 	defer func() {
-		utils.DumpDiagnosticsIfFailed(ctx, t, env.Cluster())
+		testutils.DumpDiagnosticsIfFailed(ctx, t, env.Cluster())
 		runCleanup(udpRouteNoReachCleanupKey)
 	}()
 
