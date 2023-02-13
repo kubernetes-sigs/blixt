@@ -2,10 +2,16 @@ package utils
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"log"
+	"testing"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/stdr"
+	"github.com/kong/kubernetes-testing-framework/pkg/clusters"
+	"github.com/kong/kubernetes-testing-framework/pkg/environments"
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -61,4 +67,41 @@ func NewFakeClientWithGatewayClasses(initObjects ...client.Object) (gatewayv1bet
 	return gatewayv1beta1.ObjectName(managedGatewayClass.Name),
 		gatewayv1beta1.ObjectName(unmanagedGatewayClass.Name),
 		fakeClient
+}
+
+// WaitForBlixtReadiness waits for Blixt to be ready in the provided testing
+// environment (but deploying Blixt is expected to have already been handled
+// elsewhere).
+func WaitForBlixtReadiness(ctx context.Context, env environments.Environment) error {
+	for {
+		select {
+		case <-ctx.Done():
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("context completed while waiting for components: %w", err)
+			}
+			return fmt.Errorf("context completed while waiting for components")
+		default:
+			var controlplaneReady, dataplaneReady bool
+
+			controlplane, err := env.Cluster().Client().AppsV1().Deployments(vars.DefaultNamespace).Get(ctx, vars.DefaultControlPlaneDeploymentName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if controlplane.Status.AvailableReplicas > 0 {
+				controlplaneReady = true
+			}
+
+			dataplane, err := env.Cluster().Client().AppsV1().DaemonSets(vars.DefaultNamespace).Get(ctx, vars.DefaultDataPlaneDaemonSetName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if dataplane.Status.NumberAvailable > 0 {
+				dataplaneReady = true
+			}
+
+			if controlplaneReady && dataplaneReady {
+				return nil
+			}
+		}
+	}
 }
