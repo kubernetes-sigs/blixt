@@ -40,7 +40,7 @@ var (
 
 const (
 	gwCRDsKustomize = "https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.5.1"
-	testKustomize   = "../../config/tests/blixt"
+	testKustomize   = "../../config/tests/integration"
 )
 
 func TestMain(m *testing.M) {
