@@ -1,0 +1,9 @@
+bases:
+- ../../default
+- perf-server.yaml
+
+images:
+- name: ghcr.io/kong/blixt-dataplane
+  newTag: performance-tests
+- name: ghcr.io/kong/blixt-controlplane
+  newTag: performance-tests
