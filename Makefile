@@ -121,6 +121,11 @@ test.integration: manifests generate fmt vet
 	go clean -testcache
 	GOFLAGS="-tags=integration_tests" go test -race -v ./test/integration/...
 
+.PHONY: test.performance
+test.performance: manifests generate fmt vet
+	go clean -testcache
+	GOFLAGS="-tags=performance_tests" go test -race -v ./test/performance/...
+
 ##@ Build
 
 .PHONY: build

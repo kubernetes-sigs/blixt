@@ -14,16 +14,15 @@ import (
 	"github.com/kong/kubernetes-testing-framework/pkg/clusters/addons/metallb"
 	"github.com/kong/kubernetes-testing-framework/pkg/clusters/types/kind"
 	"github.com/kong/kubernetes-testing-framework/pkg/environments"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 
-	"github.com/kong/blixt/pkg/vars"
+	testutils "github.com/kong/blixt/internal/test/utils"
 )
 
 var (
-	ctx    context.Context
-	cancel context.CancelFunc
-	env    environments.Environment
+	ctx     context.Context
+	cancel  context.CancelFunc
+	env     environments.Environment
 	cleanup map[string]([]func(context.Context) error)
 
 	gwclient *versioned.Clientset
@@ -41,7 +40,7 @@ var (
 
 const (
 	gwCRDsKustomize = "https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.5.1"
-	testKustomize   = "../../config/tests/blixt"
+	testKustomize   = "../../config/tests/integration"
 )
 
 func TestMain(m *testing.M) {
@@ -117,12 +116,12 @@ func TestMain(m *testing.M) {
 			return clusters.KustomizeDeleteForCluster(ctx, env.Cluster(), testKustomize)
 		})
 	}
-	exitOnErr(waitForBlixtReadiness(ctx, env))
+	exitOnErr(testutils.WaitForBlixtReadiness(ctx, env))
 
 	exit := m.Run()
 
 	exitOnErr(runCleanup(mainCleanupKey))
-	
+
 	os.Exit(exit)
 }
 
@@ -177,38 +176,4 @@ func runCleanup(cleanupKey string) (cleanupErr error) {
 	}
 	delete(cleanup, cleanupKey)
 	return
-}
-
-func waitForBlixtReadiness(ctx context.Context, env environments.Environment) error {
-	for {
-		select {
-		case <-ctx.Done():
-			if err := ctx.Err(); err != nil {
-				return fmt.Errorf("context completed while waiting for components: %w", err)
-			}
-			return fmt.Errorf("context completed while waiting for components")
-		default:
-			var controlplaneReady, dataplaneReady bool
-
-			controlplane, err := env.Cluster().Client().AppsV1().Deployments(vars.DefaultNamespace).Get(ctx, vars.DefaultControlPlaneDeploymentName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if controlplane.Status.AvailableReplicas > 0 {
-				controlplaneReady = true
-			}
-
-			dataplane, err := env.Cluster().Client().AppsV1().DaemonSets(vars.DefaultNamespace).Get(ctx, vars.DefaultDataPlaneDaemonSetName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if dataplane.Status.NumberAvailable > 0 {
-				dataplaneReady = true
-			}
-
-			if controlplaneReady && dataplaneReady {
-				return nil
-			}
-		}
-	}
 }
