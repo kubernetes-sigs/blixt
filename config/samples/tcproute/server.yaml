@@ -16,8 +16,11 @@ spec:
     spec:
       containers:
       - name: server
-        image: nginx
+        image: ghcr.io/shaneutt/malutki
         imagePullPolicy: IfNotPresent
+        env:
+        - name: LISTEN_PORT
+          value: "9080"
         ports:
         - containerPort: 9080
           protocol: TCP
