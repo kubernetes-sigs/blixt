@@ -28,3 +28,9 @@ spec:
         - name: RUST_LOG
           value: debug
         imagePullPolicy: IfNotPresent
+        livenessProbe:
+          grpc:
+            port: 9874
+        readinessProbe:
+          grpc:
+            port: 9874
