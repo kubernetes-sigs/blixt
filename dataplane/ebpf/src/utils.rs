@@ -3,6 +3,7 @@ use core::mem;
 use aya_bpf::{bindings::TC_ACT_OK, programs::TcContext};
 
 use crate::bindings::{ethhdr, iphdr};
+use memoffset::offset_of;
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -49,6 +50,15 @@ pub fn ip_from_int(ip: u32) -> [u8; 4] {
     addr[3] = ((ip >> 24) & 0xFF) as u8;
 
     addr
+}
+
+pub fn get_src_ip(ctx: &TcContext) -> Result<u32, i32> {
+    let source = u32::from_be(
+        ctx.load(ETH_HDR_LEN + offset_of!(iphdr, saddr))
+            .map_err(|_| TC_ACT_OK)?,
+    );
+
+    Ok(source)
 }
 
 // Converts a checksum into u16
