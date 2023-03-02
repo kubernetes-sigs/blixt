@@ -3,7 +3,6 @@ use core::mem;
 use aya_bpf::{bindings::TC_ACT_OK, programs::TcContext};
 
 use crate::bindings::{ethhdr, iphdr};
-use memoffset::offset_of;
 
 // -----------------------------------------------------------------------------
 // Constants
