@@ -5,11 +5,11 @@ use aya_bpf::{
     helpers::{bpf_csum_diff, bpf_redirect_neigh},
     programs::TcContext,
 };
-use aya_log_ebpf::{info, error};
+use aya_log_ebpf::info;
 
 use crate::{
     bindings::{iphdr, udphdr},
-    utils::{csum_fold_helper, get_src_ip, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
+    utils::{csum_fold_helper, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
     BACKENDS,
     BLIXT_CONNTRACK,
 };
@@ -31,15 +31,7 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
 
     let backend = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_PIPE)?;
     
-    match get_src_ip(&ctx) {
-        Ok(source) => {
-            info!(
-                &ctx,
-                "Received a UDP packet destined for svc ip:: {:ipv4} at Port: {} ", source, u16::from_be(unsafe { (*udp_hdr).dest }),
-            );
-        },
-        Err(error) => error!(&ctx, "Unable to parse Source IP : {}", error),
-    }
+    info!(&ctx, "Received a UDP packet destined for svc ip:: {:ipv4} at Port: {} ", u32::from_be(unsafe { (*ip_hdr).daddr }), u16::from_be(unsafe { (*udp_hdr).dest} ));
 
     unsafe {
         BLIXT_CONNTRACK.insert(&(*ip_hdr).saddr, &original_daddr, 0 as u64)?;

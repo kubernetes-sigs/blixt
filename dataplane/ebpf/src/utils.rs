@@ -36,30 +36,6 @@ pub unsafe fn ptr_at<T>(ctx: &TcContext, offset: usize) -> Result<*mut T, i64> {
     Ok((start + offset) as *mut T)
 }
 
-// Produces an IPv4 address as a [u8;4] which is easy to print out in
-// dot-decimal notation using the info!() macro.
-//
-// TODO: use a type alias and implement print formatting for this?
-#[inline(always)]
-pub fn ip_from_int(ip: u32) -> [u8; 4] {
-    let mut addr: [u8; 4] = [0; 4];
-
-    addr[0] = ((ip >> 0) & 0xFF) as u8;
-    addr[1] = ((ip >> 8) & 0xFF) as u8;
-    addr[2] = ((ip >> 16) & 0xFF) as u8;
-    addr[3] = ((ip >> 24) & 0xFF) as u8;
-
-    addr
-}
-
-pub fn get_src_ip(ctx: &TcContext) -> Result<u32, i32> {
-    let source = u32::from_be(
-        ctx.load(ETH_HDR_LEN + offset_of!(iphdr, saddr))
-            .map_err(|_| TC_ACT_OK)?,
-    );
-
-    Ok(source)
-}
 
 // Converts a checksum into u16
 #[inline(always)]
