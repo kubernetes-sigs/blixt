@@ -113,9 +113,10 @@ on [Kubernetes Slack][kslack] on the `#sig-network-gateway-api` channel.
 
 The Blixt control-plane components are licensed under [Apache License, Version
 2.0][apache2], which is everything _outside_ of the `dataplane/` directory. The
-data-plane components are licensed under the [General Public License, Version
-2.0 (only)][gplv2], which includes everything _inside_ the `dataplane/`
-directory.
+data-plane components are dual-licensed under the [General Public License,
+Version 2.0 (only)][gplv2] and the [2-Clause BSD License][bsd2c] (at your
+option) including everything _inside_ the `dataplane/` directory.
 
 [apache2]:https://github.com/Kong/blixt/blob/main/LICENSE
-[gplv2]:https://github.com/Kong/blixt/blob/main/dataplane/LICENSE
+[gplv2]:https://github.com/Kong/blixt/blob/main/dataplane/LICENSE.GPL-2.0
+[bsd2c]:https://github.com/Kong/blixt/blob/main/dataplane/LICENSE.BSD-2-Clause
