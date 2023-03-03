@@ -25,12 +25,13 @@ RUN --mount=type=cache,target=/workspace/target/ \
 FROM alpine
 
 LABEL org.opencontainers.image.source=https://github.com/kong/blixt
-LABEL org.opencontainers.image.licenses=GPL-2.0-only
+LABEL org.opencontainers.image.licenses=GPL-2.0-only,BSD-2-Clause
 
 WORKDIR /opt/blixt/
 
 COPY --from=builder /workspace/dataplane /opt/blixt/dataplane
 
-COPY LICENSE /opt/blixt/LICENSE
+COPY LICENSE.GPL-2.0 /opt/blixt/LICENSE.GPL-2.0
+COPY LICENSE.BSD-2-Clause /opt/blixt/LICENSE.BSD-2-Clause
 
 ENTRYPOINT ["/opt/blixt/dataplane"]
