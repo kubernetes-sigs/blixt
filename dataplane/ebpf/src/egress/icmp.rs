@@ -38,7 +38,7 @@ pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
     
     let new_src = unsafe { BLIXT_CONNTRACK.get(&dest_addr) }.ok_or(TC_ACT_PIPE)?;
 
-    info!(&ctx, "Received a ICMP Unreachable packet destined for svc ip:: {:ipv4} ", u32::from_be(unsafe { (*ip_hdr).daddr }));
+    info!(&ctx, "Received a ICMP Unreachable packet destined for svc ip: {:ipv4} ", u32::from_be(unsafe { (*ip_hdr).daddr }));
     
     // redirect icmp unreachable message back to client
     unsafe { 
