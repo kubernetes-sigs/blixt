@@ -28,7 +28,7 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
 
     let backend = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_OK)?;
 
-    info!(&ctx, "Received a TCP packet destined for svc ip:: {:ipv4} at Port: {} ", u32::from_be(unsafe { (*ip_hdr).daddr }), u16::from_be(unsafe { (*tcp_hdr).dest} ));
+    info!(&ctx, "Received a TCP packet destined for svc ip: {:ipv4} at Port: {} ", u32::from_be(unsafe { (*ip_hdr).daddr }), u16::from_be(unsafe { (*tcp_hdr).dest} ));
 
     unsafe {
         (*ip_hdr).daddr = backend.daddr.to_be();
