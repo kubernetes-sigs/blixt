@@ -31,7 +31,7 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
 
     let backend = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_PIPE)?;
     
-    info!(&ctx, "Received a UDP packet destined for svc ip:: {:ipv4} at Port: {} ", u32::from_be(unsafe { (*ip_hdr).daddr }), u16::from_be(unsafe { (*udp_hdr).dest} ));
+    info!(&ctx, "Received a UDP packet destined for svc ip: {:ipv4} at Port: {} ", u32::from_be(unsafe { (*ip_hdr).daddr }), u16::from_be(unsafe { (*udp_hdr).dest} ));
 
     unsafe {
         BLIXT_CONNTRACK.insert(&(*ip_hdr).saddr, &original_daddr, 0 as u64)?;
