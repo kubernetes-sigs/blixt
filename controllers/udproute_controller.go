@@ -77,13 +77,8 @@ func (r *UDPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	if !controllerutil.ContainsFinalizer(udproute, DataPlaneFinalizer) {
-		if udproute.DeletionTimestamp != nil {
-			// if the finalizer isn't set, AND the object is being deleted then there's
-			// no reason to bother with dataplane configuration for it its already
-			// handled.
-			return ctrl.Result{}, nil
-		}
+	if !controllerutil.ContainsFinalizer(udproute, DataPlaneFinalizer) && udproute.DeletionTimestamp.IsZero() {
+
 		// if the finalizer is not set, and the object is not being deleted, set the
 		// finalizer before we do anything else to ensure we don't lose track of
 		// dataplane configuration.
@@ -92,7 +87,16 @@ func (r *UDPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// if the UDPRoute is being deleted, remove it from the DataPlane
 	// TODO: enable deletion grace period https://github.com/Kong/blixt/issues/48
-	if udproute.DeletionTimestamp != nil {
+	if !udproute.DeletionTimestamp.IsZero() {
+
+		//If deletion timestamp is in future then requeue object and accept updates
+		if udproute.DeletionTimestamp.After(time.Now()) {
+			//Reque for object till the time it is being deleted.
+			r.log.Info("UDPRoute is set for deletion in future ", "namespace", req.Namespace, "name", req.Name)
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Until(udproute.DeletionTimestamp.Time)}, nil
+		}
+
+		r.log.Info("UDPRoute is being deleted ", "namespace", req.Namespace, "name", req.Name)
 		return ctrl.Result{}, r.ensureUDPRouteDeletedInDataPlane(ctx, udproute, gateway)
 	}
 
