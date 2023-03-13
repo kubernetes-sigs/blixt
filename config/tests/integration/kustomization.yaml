@@ -3,6 +3,6 @@ bases:
 
 images:
 - name: ghcr.io/kong/blixt-dataplane
-  newTag: integration-tests
+  # newTag: integration-tests
 - name: ghcr.io/kong/blixt-controlplane
-  newTag: integration-tests
+  # newTag: integration-tests

@@ -20,4 +20,4 @@ patchesStrategicMerge:
 
 images:
 - name: ghcr.io/kong/blixt-udp-test-server
-  newTag: integration-tests
+  # newTag: integration-tests

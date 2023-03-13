@@ -15,6 +15,7 @@ spec:
       labels:
         app: blixt-udproute-sample
     spec:
+      terminationGracePeriodSeconds: 5
       containers:
       - name: server
         image: ghcr.io/kong/blixt-udp-test-server:latest

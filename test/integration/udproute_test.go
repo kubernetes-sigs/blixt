@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	// gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	testutils "github.com/kong/blixt/internal/test/utils"
@@ -140,4 +141,82 @@ func TestUDPRouteNoReach(t *testing.T) {
 	require.NoError(t, err)
 	_, err = conn.Read(make([]byte, 2048))
 	require.ErrorContains(t, err, "read: connection refused")
+}
+
+func TestUDPDeletionGracePeriod(t *testing.T) {
+	/*
+		- Check if deployment is up
+		- Check if pods & service is ready
+		- if yes query service for UDPRoute
+			- and put delete timestamp of future
+		- Update some configuration, and check if its reflecting
+		- Delete
+	*/
+	udpRouteDeletionGracePeriodKey := "udproutedeletion"
+	defer func() {
+		testutils.DumpDiagnosticsIfFailed(ctx, t, env.Cluster())
+		runCleanup(udpRouteDeletionGracePeriodKey)
+	}()
+
+	t.Log("deploying config/samples/udproute kustomize")
+	require.NoError(t, clusters.KustomizeDeployForCluster(ctx, env.Cluster(), udprouteSampleKustomize))
+	// addCleanup(udpRouteDeletionGracePeriodKey, func(ctx context.Context) error {
+	// 	cleanupLog("cleaning up config/samples/udproute kustomize")
+	// 	return clusters.KustomizeDeleteForCluster(ctx, env.Cluster(), udprouteSampleKustomize)
+	// })
+
+	t.Log("waiting for Gateway to have an address")
+	var gw *gatewayv1beta1.Gateway
+	require.Eventually(t, func() bool {
+		var err error
+		gw, err = gwclient.GatewayV1beta1().Gateways(corev1.NamespaceDefault).Get(ctx, udprouteSampleName, metav1.GetOptions{})
+		require.NoError(t, err)
+		return len(gw.Status.Addresses) > 0
+	}, time.Minute, time.Second)
+	require.NotNil(t, gw.Status.Addresses[0].Type)
+	require.Equal(t, gatewayv1beta1.IPAddressType, *gw.Status.Addresses[0].Type)
+	gwaddr := fmt.Sprintf("%s:9875", gw.Status.Addresses[0].Value)
+	t.Log("Received address", gwaddr)
+
+	t.Log("waiting for udp server to be available")
+	require.Eventually(t, func() bool {
+		server, err := env.Cluster().Client().AppsV1().Deployments(corev1.NamespaceDefault).Get(ctx, udprouteSampleName, metav1.GetOptions{})
+		require.NoError(t, err)
+		return server.Status.AvailableReplicas > 0
+	}, time.Minute, time.Second)
+
+	//Query UDPRoute
+	t.Log("Retrieve configured udp route")
+	require.Eventually(t, func() bool {
+		udproute, err := gwclient.GatewayV1alpha2().UDPRoutes(corev1.NamespaceDefault).Get(ctx, udprouteSampleName, metav1.GetOptions{})
+		require.NoError(t, err)
+		return len(udproute.Spec.Rules[0].BackendRefs) > 0
+	}, time.Minute, time.Second*2)
+
+	t.Log("Deleting UDP Route for Grace Period")
+	require.Eventually(t, func() bool {
+		_ = gwclient.GatewayV1alpha2().UDPRoutes(corev1.NamespaceDefault).Delete(ctx, udprouteSampleName, metav1.DeleteOptions{})
+
+		t.Log("Retrieve object again to make sure its getting recoiled")
+		udproute, err := gwclient.GatewayV1alpha2().UDPRoutes(corev1.NamespaceDefault).Get(ctx, udprouteSampleName, metav1.GetOptions{})
+		require.NoError(t, err)
+
+		var portN gatewayv1alpha2.PortNumber = 9876
+		udproute.Spec.Rules[0].BackendRefs = append(udproute.Spec.Rules[0].BackendRefs, gatewayv1alpha2.BackendRef{BackendObjectReference: gatewayv1alpha2.BackendObjectReference{
+			Name: "blixt-udproute-deletion-test",
+			Port: &portN,
+		}})
+		t.Log("Updating the object, with new backend ref", "Updated UDPRoute", udproute)
+		udproute, err := gwclient.GatewayV1alpha2().UDPRoutes(corev1.NamespaceDefault).Update(ctx, udproute, metav1.UpdateOptions{})
+		require.NoError(t, err)
+		t.Log("Dumping retreived object", "BackendRefs", udproute.Spec.Rules[0].BackendRefs)
+		return len(udproute.Spec.Rules[0].BackendRefs) > 1
+	}, time.Minute, time.Second)
+
+	// require.Eventually(t, func() bool {
+	// 	udproute, err := gwclient.GatewayV1alpha2().UDPRoutes(corev1.NamespaceDefault).Get(ctx, udprouteSampleName, metav1.GetOptions{})
+	// 	require.NoError(t, err)
+	// 	t.Log("Recoild udproute", "route", udproute)
+	// 	return len(udproute.Spec.Rules[0].BackendRefs) > 0
+	// }, time.Minute, time.Second*2)
 }
