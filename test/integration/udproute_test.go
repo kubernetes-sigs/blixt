@@ -13,6 +13,7 @@ import (
 	"io"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	"net"
 	"os"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -201,7 +202,9 @@ func TestUDPDeletionGracePeriod(t *testing.T) {
 		// deletionTime := metav1.NewTime(time.Now().Add(30 * time.Second))
 		// udproute.ObjectMeta.DeletionTimestamp = &deletionTime
 
-		_ = gwclient.GatewayV1alpha2().UDPRoutes(corev1.NamespaceDefault).Delete(ctx, udprouteSampleName, metav1.DeleteOptions{})
+		_ = gwclient.GatewayV1alpha2().UDPRoutes(corev1.NamespaceDefault).Delete(ctx, udprouteSampleName, metav1.DeleteOptions{
+			GracePeriodSeconds: pointer.Int64(30),
+		})
 
 		t.Log("Retrieve object again to make sure its getting recoiled")
 		udproute, err = gwclient.GatewayV1alpha2().UDPRoutes(corev1.NamespaceDefault).Get(ctx, udprouteSampleName, metav1.GetOptions{})

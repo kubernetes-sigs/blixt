@@ -68,6 +68,7 @@ func (r *UDPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
+	r.log.Info("Printing UDPRoute", "UDPRoute", udproute.DeletionGracePeriodSeconds)
 	isManaged, gateway, err := r.isUDPRouteManaged(ctx, *udproute)
 	if err != nil {
 		return ctrl.Result{}, err
