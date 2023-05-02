@@ -35,7 +35,6 @@ pub unsafe fn ptr_at<T>(ctx: &TcContext, offset: usize) -> Result<*mut T, i64> {
     Ok((start + offset) as *mut T)
 }
 
-
 // Converts a checksum into u16
 #[inline(always)]
 pub fn csum_fold_helper(mut csum: u64) -> u16 {

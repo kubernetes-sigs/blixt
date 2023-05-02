@@ -6,14 +6,14 @@
 #[allow(non_camel_case_types)]
 #[allow(dead_code)]
 mod bindings;
+mod egress;
 mod ingress;
 mod utils;
-mod egress;
 
 use memoffset::offset_of;
 
 use aya_bpf::{
-    bindings::{TC_ACT_PIPE, TC_ACT_SHOT, TC_ACT_OK},
+    bindings::{TC_ACT_OK, TC_ACT_PIPE, TC_ACT_SHOT},
     macros::{classifier, map},
     maps::HashMap,
     programs::TcContext,
@@ -21,9 +21,9 @@ use aya_bpf::{
 
 use bindings::{ethhdr, iphdr};
 use common::{Backend, BackendKey};
+use egress::icmp::handle_icmp_egress;
 use ingress::{tcp::handle_tcp_ingress, udp::handle_udp_ingress};
-use egress::{icmp::handle_icmp_egress};
-use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_TCP, IPPROTO_UDP, IPPROTO_ICMP};
+use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_ICMP, IPPROTO_TCP, IPPROTO_UDP};
 
 // -----------------------------------------------------------------------------
 // Maps
@@ -33,9 +33,8 @@ use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_TCP, IPPROTO_UDP, IPPROTO_ICMP};
 static mut BACKENDS: HashMap<BackendKey, Backend> =
     HashMap::<BackendKey, Backend>::with_max_entries(128, 0);
 
-#[map(name = "BLIXT_CONNTRACK")] 
-static mut BLIXT_CONNTRACK: HashMap<u32, u32> =
-    HashMap::<u32, u32>::with_max_entries(128, 0);
+#[map(name = "BLIXT_CONNTRACK")]
+static mut BLIXT_CONNTRACK: HashMap<u32, u32> = HashMap::<u32, u32>::with_max_entries(128, 0);
 
 // -----------------------------------------------------------------------------
 // Ingress
