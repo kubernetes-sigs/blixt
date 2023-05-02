@@ -10,8 +10,7 @@ use aya_log_ebpf::info;
 use crate::{
     bindings::{iphdr, udphdr},
     utils::{csum_fold_helper, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
-    BACKENDS,
-    BLIXT_CONNTRACK,
+    BACKENDS, BLIXT_CONNTRACK,
 };
 use common::BackendKey;
 
@@ -30,14 +29,19 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
     };
 
     let backend = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_PIPE)?;
-    
-    info!(&ctx, "Received a UDP packet destined for svc ip: {:ipv4} at Port: {} ", u32::from_be(unsafe { (*ip_hdr).daddr }), u16::from_be(unsafe { (*udp_hdr).dest} ));
+
+    info!(
+        &ctx,
+        "Received a UDP packet destined for svc ip: {:ipv4} at Port: {} ",
+        u32::from_be(unsafe { (*ip_hdr).daddr }),
+        u16::from_be(unsafe { (*udp_hdr).dest })
+    );
 
     unsafe {
         BLIXT_CONNTRACK.insert(&(*ip_hdr).saddr, &original_daddr, 0 as u64)?;
         (*ip_hdr).daddr = backend.daddr.to_be();
     };
-    
+
     if (ctx.data() + ETH_HDR_LEN + mem::size_of::<iphdr>()) > ctx.data_end() {
         info!(&ctx, "Iphdr is out of bounds");
         return Ok(TC_ACT_PIPE);
