@@ -5,8 +5,8 @@ metadata:
 spec:
   parentRefs:
   - name: blixt-tcproute-sample
-    port: 9080
+    port: 8080
   rules:
   - backendRefs:
     - name: blixt-tcproute-sample
-      port: 9080
+      port: 8080
