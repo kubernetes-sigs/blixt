@@ -34,7 +34,8 @@ static mut BACKENDS: HashMap<BackendKey, Backend> =
     HashMap::<BackendKey, Backend>::with_max_entries(128, 0);
 
 #[map(name = "BLIXT_CONNTRACK")]
-static mut BLIXT_CONNTRACK: HashMap<u32, u32> = HashMap::<u32, u32>::with_max_entries(128, 0);
+static mut BLIXT_CONNTRACK: HashMap<u32, (u32, u32)> =
+    HashMap::<u32, (u32, u32)>::with_max_entries(128, 0);
 
 // -----------------------------------------------------------------------------
 // Ingress
