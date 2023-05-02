@@ -10,7 +10,7 @@ use aya_log_ebpf::info;
 use crate::{
     bindings::{iphdr, tcphdr},
     utils::{csum_fold_helper, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
-    BACKENDS,
+    BACKENDS, BLIXT_CONNTRACK,
 };
 use common::BackendKey;
 
@@ -21,8 +21,10 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
 
     let tcp_hdr: *mut tcphdr = unsafe { ptr_at(&ctx, tcp_header_offset)? };
 
+    let original_daddr = unsafe { (*ip_hdr).daddr };
+
     let key = BackendKey {
-        ip: u32::from_be(unsafe { (*ip_hdr).daddr }),
+        ip: u32::from_be(original_daddr),
         port: (u16::from_be(unsafe { (*tcp_hdr).dest })) as u32,
     };
 
@@ -31,7 +33,7 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
     info!(
         &ctx,
         "Received a TCP packet destined for svc ip: {:ipv4} at Port: {} ",
-        u32::from_be(unsafe { (*ip_hdr).daddr }),
+        u32::from_be(original_daddr),
         u16::from_be(unsafe { (*tcp_hdr).dest })
     );
 
@@ -70,6 +72,14 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
             0,
             0,
         )
+    };
+
+    unsafe {
+        BLIXT_CONNTRACK.insert(
+            &(*ip_hdr).saddr,
+            &(original_daddr, (*tcp_hdr).source.to_be() as u32),
+            0 as u64,
+        )?;
     };
 
     info!(&ctx, "redirect action: {}", action);
