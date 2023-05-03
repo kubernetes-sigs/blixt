@@ -38,7 +38,11 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
     );
 
     unsafe {
-        BLIXT_CONNTRACK.insert(&(*ip_hdr).saddr, &original_daddr, 0 as u64)?;
+        BLIXT_CONNTRACK.insert(
+            &(*ip_hdr).saddr,
+            &(original_daddr, (*udp_hdr).dest as u32),
+            0 as u64,
+        )?;
         (*ip_hdr).daddr = backend.daddr.to_be();
     };
 

@@ -21,7 +21,7 @@ use aya_bpf::{
 
 use bindings::{ethhdr, iphdr};
 use common::{Backend, BackendKey};
-use egress::icmp::handle_icmp_egress;
+use egress::{icmp::handle_icmp_egress, tcp::handle_tcp_egress};
 use ingress::{tcp::handle_tcp_ingress, udp::handle_udp_ingress};
 use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_ICMP, IPPROTO_TCP, IPPROTO_UDP};
 
@@ -34,7 +34,8 @@ static mut BACKENDS: HashMap<BackendKey, Backend> =
     HashMap::<BackendKey, Backend>::with_max_entries(128, 0);
 
 #[map(name = "BLIXT_CONNTRACK")]
-static mut BLIXT_CONNTRACK: HashMap<u32, u32> = HashMap::<u32, u32>::with_max_entries(128, 0);
+static mut BLIXT_CONNTRACK: HashMap<u32, (u32, u32)> =
+    HashMap::<u32, (u32, u32)>::with_max_entries(128, 0);
 
 // -----------------------------------------------------------------------------
 // Ingress
@@ -104,6 +105,7 @@ fn try_tc_egress(ctx: TcContext) -> Result<i32, i64> {
 
     match protocol {
         IPPROTO_ICMP => handle_icmp_egress(ctx),
+        IPPROTO_TCP => handle_tcp_egress(ctx),
         _ => Ok(TC_ACT_PIPE),
     }
 }

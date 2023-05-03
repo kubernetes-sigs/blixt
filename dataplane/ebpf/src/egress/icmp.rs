@@ -37,7 +37,7 @@ pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
 
     // redirect icmp unreachable message back to client
     unsafe {
-        (*ip_hdr).saddr = *new_src;
+        (*ip_hdr).saddr = new_src.0;
         (*ip_hdr).check = 0;
     }
 
@@ -56,7 +56,7 @@ pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
     let icmp_inner_ip_hdr: *mut iphdr = unsafe { ptr_at(&ctx, icmp_header_offset + ICMP_HDR_LEN) }?;
 
     unsafe {
-        (*icmp_inner_ip_hdr).daddr = *new_src;
+        (*icmp_inner_ip_hdr).daddr = new_src.0;
         (*icmp_inner_ip_hdr).check = 0;
     }
 
