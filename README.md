@@ -2,10 +2,12 @@
 
 # Blixt
 
-An experimental [layer 4][osi] load-balancer for [Kubernetes][k8s] with a
-control-plane built on [Gateway API][gwapi] in [Golang][go] with
-[Operator SDK][osdk]/[Controller Runtime][crn], and an [eBPF][ebpf]-based
-data-plane built in [Rust][rust] using [Aya][aya].
+An experimental [layer 4][osi] load-balancer for [Kubernetes][k8s].
+
+The control-plane is built using [Gateway API][gwapi] and written in
+[Golang][go] with [Operator SDK][osdk]/[Controller Runtime][crn]. The
+data-plane is built using [eBPF][ebpf] and is written in [Rust][rust] using
+[Aya][aya].
 
 > **Note**: The word "blixt" means "lightning" in Swedish.
 
@@ -21,7 +23,7 @@ data-plane built in [Rust][rust] using [Aya][aya].
 
 ## Current Status
 
-This is presently a work-in-progress. The project goals are currently:
+Current project goals are the following:
 
 - [ ] support [Gateway][gw]/[GatewayClass][gwc]
 - [ ] support [UDPRoute][udproute]
@@ -29,20 +31,14 @@ This is presently a work-in-progress. The project goals are currently:
 - [ ] use this as a basis for adding/improving [Gateway API Conformance Tests][gwcnf]
 - [ ] plug this into [Gateway API][gwapi] CI to run conformance tests on PRs
 
-After these goals are achieved, further goals will be decided.
+After these goals are achieved, further goals may be decided.
 
 > **Note**: [TLSRoute][tlsroute] support may be on the table, but we're looking
 > for someone from the community to champion this.
 
 > **Note**: The initial proof of concept was written as an XDP program, but
 > with more features (including access to ip conntrack in newer kernels)
-> available in TC, the maintainers are most likely going to be converting
-> this to a TC program soon.
-
-> **Note**: There is an open question as to whether the data-plane should be
-> implemented standalone behind the `Gateway` resources, or if it might make
-> any sense or be advantageous to implement it as a backend for [KPNG][kpng].
-> This is something the maintainers intend to determine before a `v1` release.
+> available in TC, we made a switch to TC.
 
 [gw]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.Gateway
 [gwc]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.GatewayClass
@@ -51,7 +47,6 @@ After these goals are achieved, further goals will be decided.
 [gwcnf]:https://github.com/kubernetes-sigs/gateway-api/tree/main/conformance
 [gwapi]:https://gateway-api.sigs.k8s.io
 [tlsroute]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.TLSRoute
-[kpng]:https://github.com/kubernetes-sigs/kpng
 
 ## Usage
 
@@ -84,6 +79,12 @@ blixt-dataplane-brsl9                1/1     Running   0          83s
 Check the `config/samples` directory for `Gateway` and `*Route` examples you
 can now deploy.
 
+> **Note**: When developing the dataplane you can make changes in your local
+> `dataplane/` directory, and within there quickly build an image and load it
+> into the cluster created in the above steps with `make load.image`. This will
+> build the eBPF loader and eBPF bytecode in a container image, load that image
+> into the cluster, and then restart the dataplane pods to use the new build.
+
 [kind]:https://github.com/kubernetes-sigs/kind
 [gwapi]:https://github.com/kubernetes-sigs/gateway-api
 [crds]:https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
@@ -93,13 +94,14 @@ can now deploy.
 This project originally started at [Kong][kong] but is being [donated to
 Kubernetes SIG Network][donation]. It is becoming a part of the [Gateway
 API][gwapi] project and as such is discussed in the [Gateway API weekly
-meetings][gwapi-meet].In particular, we do some discussion and paired
+meetings][gwapi-meet]. In particular, we do some discussion and paired
 programming of this project on the `Gateway API Code Jam` meeting which
 is on the [calendar][gwapi-meet] for every Friday.
 
 You can also reach out with problems or questions by creating an
 [issue][issues], or a [discussion][disc] on this repo. You can also reach out
-on [Kubernetes Slack][kslack] on the `#sig-network-gateway-api` channel.
+on [Kubernetes Slack][kslack] on the `#sig-network-gateway-api` channel. There
+is also a `#ebpf` channel on Kubernetes Slack for general eBPF related help.
 
 [kong]:https://github.com/kong
 [donation]:https://github.com/kong/blixt/discussions/42
