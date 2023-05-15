@@ -164,7 +164,7 @@ pub mod backends_client {
 pub mod backends_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    ///Generated trait containing gRPC methods that should be implemented for use with BackendsServer.
+    /// Generated trait containing gRPC methods that should be implemented for use with BackendsServer.
     #[async_trait]
     pub trait Backends: Send + Sync + 'static {
         async fn get_interface_index(

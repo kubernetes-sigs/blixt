@@ -5,15 +5,15 @@ edition = "2021"
 publish = false
 
 [dependencies]
-prost = "0.11.2"
-tonic = "0.8.2"
+prost = "0.11.9"
+tonic = "0.8.3"
 anyhow = "1"
 log = "0.4"
 aya = { version = ">=0.11", features=["async_tokio"] }
-tokio = { version = "1.18", features = ["macros", "rt", "rt-multi-thread", "net", "signal"] }
+tokio = { version = "1.28", features = ["macros", "rt", "rt-multi-thread", "net", "signal"] }
 common = { path = "../common", features=["user"] }
 regex = "1"
 libc = "0.2"
 
 [build-dependencies]
-tonic-build = "0.8.2"
+tonic-build = "0.8.4"
