@@ -1,3 +1,5 @@
+![blixt-logo](https://github.com/Kong/blixt/assets/5332524/a9f54ef0-db70-4b90-a6c0-3e21d1eac37a)
+
 > **Warning**: Experimental. There is no intention to ever make this viable for production. Do not use in production.
 
 # Blixt
