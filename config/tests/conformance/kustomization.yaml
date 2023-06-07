@@ -1,0 +1,10 @@
+bases:
+- ../../default
+
+images:
+- name: ghcr.io/kong/blixt-dataplane
+  newTag: conformance-tests
+- name: ghcr.io/kong/blixt-controlplane
+  newTag: conformance-tests
+- name: ghcr.io/kong/blixt-udp-test-server
+  newTag: conformance-tests
