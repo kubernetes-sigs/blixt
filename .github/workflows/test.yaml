@@ -54,6 +54,14 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-build-codegen-
 
+    - name: cache image builds
+      uses: actions/cache@v3
+      with:
+        path: /var/lib/docker/
+        key: ${{ runner.os }}-build-image-cache
+        restore-keys: |
+          ${{ runner.os }}-build-image-cache-
+
     - name: checkout repository
       uses: actions/checkout@v3
       with:
@@ -70,6 +78,55 @@ jobs:
         BLIXT_UDP_SERVER_IMAGE: "ghcr.io/kong/blixt-udp-test-server:integration-tests"
 
     ## Upload diagnostics if integration test step failed.
+    - name: upload diagnostics
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: blixt-integration-test-diag
+        path: /tmp/ktf-diag*
+        if-no-files-found: ignore
+
+  conformance-tests:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: setup golang
+      uses: actions/setup-go@v3
+      with:
+        go-version: '^1.19'
+
+    - name: cache go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-build-codegen-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-build-codegen-
+
+    - name: cache image builds
+      uses: actions/cache@v3
+      with:
+        path: /var/lib/docker/
+        key: ${{ runner.os }}-build-image-cache
+        restore-keys: |
+          ${{ runner.os }}-build-image-cache-
+
+    - name: checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: build images
+      run: make build.all.images TAG=conformance-tests
+
+    - name: run conformance tests
+      run: make test.conformance
+      env:
+        BLIXT_CONTROLPLANE_IMAGE: "ghcr.io/kong/blixt-controlplane:conformance-tests"
+        BLIXT_DATAPLANE_IMAGE: "ghcr.io/kong/blixt-dataplane:conformance-tests"
+        BLIXT_UDP_SERVER_IMAGE: "ghcr.io/kong/blixt-udp-test-server:conformance-tests"
+
+    ## Upload diagnostics if conformance test step failed.
     - name: upload diagnostics
       if: ${{ failure() }}
       uses: actions/upload-artifact@v3
