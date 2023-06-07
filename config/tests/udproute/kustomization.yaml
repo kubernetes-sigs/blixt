@@ -1,6 +1,7 @@
-bases:
-- ../../samples/udproute
-
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
 images:
 - name: ghcr.io/kong/blixt-udp-test-server
   newTag: integration-tests
+resources:
+- ../../samples/udproute
