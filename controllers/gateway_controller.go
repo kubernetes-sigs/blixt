@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
@@ -48,11 +47,11 @@ func (r *GatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(predicate.NewPredicateFuncs(r.gatewayHasMatchingGatewayClass)),
 		).
 		Watches(
-			&source.Kind{Type: &corev1.Service{}},
+			&corev1.Service{},
 			handler.EnqueueRequestsFromMapFunc(mapServiceToGateway),
 		).
 		Watches(
-			&source.Kind{Type: &gatewayv1beta1.GatewayClass{}},
+			&gatewayv1beta1.GatewayClass{},
 			handler.EnqueueRequestsFromMapFunc(r.mapGatewayClassToGateway),
 		).
 		Complete(r)
