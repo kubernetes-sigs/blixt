@@ -6,3 +6,5 @@ images:
   newTag: integration-tests
 - name: ghcr.io/kong/blixt-controlplane
   newTag: integration-tests
+- name: ghcr.io/kong/blixt-udp-test-server
+  newTag: integration-tests
