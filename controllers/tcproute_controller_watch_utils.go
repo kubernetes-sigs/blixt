@@ -18,7 +18,7 @@ import (
 // DaemonSet updates to TCPRoute reconcilations. This enables changes to the
 // DaemonSet such as adding new Pods for a new Node to result in new dataplane
 // instances getting fully configured.
-func (r *TCPRouteReconciler) mapDataPlaneDaemonsetToTCPRoutes(obj client.Object) (reqs []reconcile.Request) {
+func (r *TCPRouteReconciler) mapDataPlaneDaemonsetToTCPRoutes(ctx context.Context, obj client.Object) (reqs []reconcile.Request) {
 	daemonset, ok := obj.(*appsv1.DaemonSet)
 	if !ok {
 		return
@@ -38,7 +38,6 @@ func (r *TCPRouteReconciler) mapDataPlaneDaemonsetToTCPRoutes(obj client.Object)
 	}
 
 	tcproutes := &gatewayv1alpha2.TCPRouteList{}
-	ctx := context.Background()
 	if err := r.Client.List(ctx, tcproutes); err != nil {
 		// TODO: https://github.com/kubernetes-sigs/controller-runtime/issues/1996
 		r.log.Error(err, "could not enqueue TCPRoutes for DaemonSet update")
@@ -59,7 +58,7 @@ func (r *TCPRouteReconciler) mapDataPlaneDaemonsetToTCPRoutes(obj client.Object)
 
 // mapGatewayToTCPRoutes enqueues reconcilation for all TCPRoutes whenever
 // an event occurs on a relevant Gateway.
-func (r *TCPRouteReconciler) mapGatewayToTCPRoutes(obj client.Object) (reqs []reconcile.Request) {
+func (r *TCPRouteReconciler) mapGatewayToTCPRoutes(ctx context.Context, obj client.Object) (reqs []reconcile.Request) {
 	gateway, ok := obj.(*gatewayv1beta1.Gateway)
 	if !ok {
 		r.log.Error(fmt.Errorf("invalid type in map func"), "failed to map gateways to tcproutes", "expected", "*gatewayv1beta1.Gateway", "received", reflect.TypeOf(obj))

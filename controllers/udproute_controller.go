@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -46,11 +45,11 @@ func (r *UDPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gatewayv1alpha2.UDPRoute{}).
 		Watches(
-			&source.Kind{Type: &appsv1.DaemonSet{}},
+			&appsv1.DaemonSet{},
 			handler.EnqueueRequestsFromMapFunc(r.mapDataPlaneDaemonsetToUDPRoutes),
 		).
 		Watches(
-			&source.Kind{Type: &gatewayv1beta1.Gateway{}},
+			&gatewayv1beta1.Gateway{},
 			handler.EnqueueRequestsFromMapFunc(r.mapGatewayToUDPRoutes),
 		).
 		Complete(r)

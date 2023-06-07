@@ -18,7 +18,7 @@ import (
 // DaemonSet updates to UDPRoute reconcilations. This enables changes to the
 // DaemonSet such as adding new Pods for a new Node to result in new dataplane
 // instances getting fully configured.
-func (r *UDPRouteReconciler) mapDataPlaneDaemonsetToUDPRoutes(obj client.Object) (reqs []reconcile.Request) {
+func (r *UDPRouteReconciler) mapDataPlaneDaemonsetToUDPRoutes(ctx context.Context, obj client.Object) (reqs []reconcile.Request) {
 	daemonset, ok := obj.(*appsv1.DaemonSet)
 	if !ok {
 		return
@@ -38,7 +38,6 @@ func (r *UDPRouteReconciler) mapDataPlaneDaemonsetToUDPRoutes(obj client.Object)
 	}
 
 	udproutes := &gatewayv1alpha2.UDPRouteList{}
-	ctx := context.Background()
 	if err := r.Client.List(ctx, udproutes); err != nil {
 		// TODO: https://github.com/kubernetes-sigs/controller-runtime/issues/1996
 		r.log.Error(err, "could not enqueue UDPRoutes for DaemonSet update")
@@ -59,7 +58,7 @@ func (r *UDPRouteReconciler) mapDataPlaneDaemonsetToUDPRoutes(obj client.Object)
 
 // mapGatewayToUDPRoutes enqueues reconcilation for all UDPRoutes whenever
 // an event occurs on a relevant Gateway.
-func (r *UDPRouteReconciler) mapGatewayToUDPRoutes(obj client.Object) (reqs []reconcile.Request) {
+func (r *UDPRouteReconciler) mapGatewayToUDPRoutes(ctx context.Context, obj client.Object) (reqs []reconcile.Request) {
 	gateway, ok := obj.(*gatewayv1beta1.Gateway)
 	if !ok {
 		r.log.Error(fmt.Errorf("invalid type in map func"), "failed to map gateways to udproutes", "expected", "*gatewayv1beta1.Gateway", "received", reflect.TypeOf(obj))
