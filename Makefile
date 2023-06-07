@@ -126,6 +126,11 @@ test.performance: manifests generate fmt vet
 	go clean -testcache
 	GOFLAGS="-tags=performance_tests" go test -race -v ./test/performance/...
 
+.PHONY: test.conformance
+test.conformance: manifests generate fmt vet
+	go clean -testcache
+	GOFLAGS="-tags=conformance_tests" go test -race -v ./test/conformance/...
+
 ##@ Build
 
 .PHONY: build
@@ -185,7 +190,7 @@ KTF ?= $(LOCALBIN)/ktf
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v3.8.7
 CONTROLLER_TOOLS_VERSION ?= v0.9.2
-KIND_VERSION ?= v0.17.0
+KIND_VERSION ?= v0.19.0
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
