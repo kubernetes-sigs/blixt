@@ -58,7 +58,7 @@ func (r *TCPRouteReconciler) mapDataPlaneDaemonsetToTCPRoutes(ctx context.Contex
 
 // mapGatewayToTCPRoutes enqueues reconcilation for all TCPRoutes whenever
 // an event occurs on a relevant Gateway.
-func (r *TCPRouteReconciler) mapGatewayToTCPRoutes(ctx context.Context, obj client.Object) (reqs []reconcile.Request) {
+func (r *TCPRouteReconciler) mapGatewayToTCPRoutes(_ context.Context, obj client.Object) (reqs []reconcile.Request) {
 	gateway, ok := obj.(*gatewayv1beta1.Gateway)
 	if !ok {
 		r.log.Error(fmt.Errorf("invalid type in map func"), "failed to map gateways to tcproutes", "expected", "*gatewayv1beta1.Gateway", "received", reflect.TypeOf(obj))
