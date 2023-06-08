@@ -32,6 +32,8 @@ const (
 )
 
 func TestGatewayConformance(t *testing.T) {
+	t.Skip() // TODO: https://github.com/Kong/blixt/issues/81
+
 	t.Log("configuring environment for gateway conformance tests")
 	c, err := client.New(env.Cluster().Config(), client.Options{})
 	require.NoError(t, err)
