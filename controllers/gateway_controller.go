@@ -102,7 +102,7 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	gatewayReadyStatus, gatewayReadyStatusIsSet := isGatewayReady(gw)
+	gatewayReadyStatus, gatewayReadyStatusIsSet := isGatewayProgrammed(gw)
 	oldGateway := gw.DeepCopy()
 	initGatewayStatus(gw)
 	factorizeStatus(gw, oldGateway)
