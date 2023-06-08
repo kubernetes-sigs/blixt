@@ -12,7 +12,7 @@ import (
 // ready listeners's ready conditions to true, unless a resolvedRefs error is discovered. In
 // that case, the proper listener ready condition and the gateway one are set to false.
 // The addresses are updated as well.
-func updateGatewayStatus(ctx context.Context, gateway *gatewayv1beta1.Gateway, svc *corev1.Service) {
+func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc *corev1.Service) {
 	// gateway addresses
 	gwaddrs := make([]gatewayv1beta1.GatewayAddress, 0, len(svc.Status.LoadBalancer.Ingress))
 	for _, addr := range svc.Status.LoadBalancer.Ingress {

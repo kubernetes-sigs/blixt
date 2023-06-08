@@ -24,6 +24,7 @@ type GatewayClassReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+// SetupWithManager loads the controller into the provided controller manager.
 func (r *GatewayClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gatewayv1beta1.GatewayClass{}).
@@ -37,6 +38,7 @@ func (r *GatewayClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// Reconcile provisions (and de-provisions) resources relevant to this controller.
 func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 

@@ -63,7 +63,7 @@ func setOwnerReference(svc *corev1.Service, gw client.Object) {
 	}}
 }
 
-func (r *GatewayReconciler) ensureServiceConfiguration(ctx context.Context, svc *corev1.Service, gw *gatewayv1beta1.Gateway) (bool, error) {
+func (r *GatewayReconciler) ensureServiceConfiguration(_ context.Context, svc *corev1.Service, gw *gatewayv1beta1.Gateway) (bool, error) {
 	ports := make([]corev1.ServicePort, 0, len(gw.Spec.Listeners))
 	for _, listener := range gw.Spec.Listeners {
 		switch proto := listener.Protocol; proto {
@@ -163,7 +163,7 @@ func (r *GatewayReconciler) hackEnsureEndpoints(ctx context.Context, svc *corev1
 	return false, nil
 }
 
-func (r *GatewayReconciler) mapGatewayClassToGateway(ctx context.Context, obj client.Object) (recs []reconcile.Request) {
+func (r *GatewayReconciler) mapGatewayClassToGateway(_ context.Context, obj client.Object) (recs []reconcile.Request) {
 	gatewayClass, ok := obj.(*gatewayv1beta1.GatewayClass)
 	if !ok {
 		r.Log.Error(fmt.Errorf("unexpected object type in gateway watch predicates"), "expected", "*gatewayv1beta1.GatewayClass", "found", reflect.TypeOf(obj))
@@ -189,7 +189,7 @@ func (r *GatewayReconciler) mapGatewayClassToGateway(ctx context.Context, obj cl
 	return
 }
 
-func mapServiceToGateway(ctx context.Context, obj client.Object) (reqs []reconcile.Request) {
+func mapServiceToGateway(_ context.Context, obj client.Object) (reqs []reconcile.Request) {
 	svc, ok := obj.(*corev1.Service)
 	if !ok {
 		return

@@ -55,7 +55,7 @@ func (r *UDPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// UDProuteReconciler reconciles UDPRoute object
+// Reconcile reconciles UDPRoute object
 func (r *UDPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	udproute := new(gatewayv1alpha2.UDPRoute)
 	if err := r.Get(ctx, req.NamespacedName, udproute); err != nil {
@@ -169,7 +169,7 @@ func (r *UDPRouteReconciler) isUDPRouteManaged(ctx context.Context, udproute gat
 
 // verifyListener verifies that the provided gateway has at least one listener
 // matching the provided ParentReference.
-func (r *UDPRouteReconciler) verifyListener(ctx context.Context, gw *gatewayv1beta1.Gateway, udprouteSpec gatewayv1alpha2.ParentReference) error {
+func (r *UDPRouteReconciler) verifyListener(_ context.Context, gw *gatewayv1beta1.Gateway, udprouteSpec gatewayv1alpha2.ParentReference) error {
 	for _, listener := range gw.Spec.Listeners {
 		if (listener.Protocol == gatewayv1beta1.UDPProtocolType) && (listener.Port == gatewayv1beta1.PortNumber(*udprouteSpec.Port)) {
 			return nil

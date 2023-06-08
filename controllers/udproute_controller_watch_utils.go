@@ -58,7 +58,7 @@ func (r *UDPRouteReconciler) mapDataPlaneDaemonsetToUDPRoutes(ctx context.Contex
 
 // mapGatewayToUDPRoutes enqueues reconcilation for all UDPRoutes whenever
 // an event occurs on a relevant Gateway.
-func (r *UDPRouteReconciler) mapGatewayToUDPRoutes(ctx context.Context, obj client.Object) (reqs []reconcile.Request) {
+func (r *UDPRouteReconciler) mapGatewayToUDPRoutes(_ context.Context, obj client.Object) (reqs []reconcile.Request) {
 	gateway, ok := obj.(*gatewayv1beta1.Gateway)
 	if !ok {
 		r.log.Error(fmt.Errorf("invalid type in map func"), "failed to map gateways to udproutes", "expected", "*gatewayv1beta1.Gateway", "received", reflect.TypeOf(obj))

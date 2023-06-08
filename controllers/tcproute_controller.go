@@ -55,7 +55,7 @@ func (r *TCPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// TCProuteReconciler reconciles TCPRoute object
+// Reconcile reconciles TCPRoute object
 func (r *TCPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	tcproute := new(gatewayv1alpha2.TCPRoute)
 	if err := r.Get(ctx, req.NamespacedName, tcproute); err != nil {
@@ -169,7 +169,7 @@ func (r *TCPRouteReconciler) isTCPRouteManaged(ctx context.Context, tcproute gat
 
 // verifyListener verifies that the provided gateway has at least one listener
 // matching the provided ParentReference.
-func (r *TCPRouteReconciler) verifyListener(ctx context.Context, gw *gatewayv1beta1.Gateway, tcprouteSpec gatewayv1alpha2.ParentReference) error {
+func (r *TCPRouteReconciler) verifyListener(_ context.Context, gw *gatewayv1beta1.Gateway, tcprouteSpec gatewayv1alpha2.ParentReference) error {
 	for _, listener := range gw.Spec.Listeners {
 		if (listener.Protocol == gatewayv1beta1.TCPProtocolType) && (listener.Port == gatewayv1beta1.PortNumber(*tcprouteSpec.Port)) {
 			return nil

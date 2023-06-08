@@ -39,6 +39,7 @@ type GatewayReconciler struct {
 	Log    logr.Logger
 }
 
+// SetupWithManager loads the controller into the provided controller manager.
 func (r *GatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Log = log.FromContext(context.Background())
 
@@ -76,6 +77,7 @@ func (r *GatewayReconciler) gatewayHasMatchingGatewayClass(obj client.Object) bo
 	return gatewayClass.Spec.ControllerName == vars.GatewayClassControllerName
 }
 
+// Reconcile provisions (and de-provisions) resources relevant to this controller.
 func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
