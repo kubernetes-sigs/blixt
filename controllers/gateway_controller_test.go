@@ -443,6 +443,7 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 				NewClientBuilder().
 				WithScheme(scheme.Scheme).
 				WithObjects(objectsToAdd...).
+				WithStatusSubresource(objectsToAdd...).
 				Build()
 
 			reconciler := GatewayReconciler{
