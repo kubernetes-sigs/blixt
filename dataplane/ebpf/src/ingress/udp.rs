@@ -32,7 +32,7 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
 
     info!(
         &ctx,
-        "Received a UDP packet destined for svc ip: {:ipv4} at Port: {} ",
+        "Received a UDP packet destined for svc ip: {:i} at Port: {} ",
         u32::from_be(unsafe { (*ip_hdr).daddr }),
         u16::from_be(unsafe { (*udp_hdr).dest })
     );

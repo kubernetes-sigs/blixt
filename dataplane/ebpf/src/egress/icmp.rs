@@ -31,7 +31,7 @@ pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
 
     info!(
         &ctx,
-        "Received a ICMP Unreachable packet destined for svc ip: {:ipv4} ",
+        "Received a ICMP Unreachable packet destined for svc ip: {:i} ",
         u32::from_be(unsafe { (*ip_hdr).daddr })
     );
 
