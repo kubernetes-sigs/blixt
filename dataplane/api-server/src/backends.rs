@@ -1,3 +1,4 @@
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Vip {
     #[prost(uint32, tag = "1")]
@@ -5,6 +6,7 @@ pub struct Vip {
     #[prost(uint32, tag = "2")]
     pub port: u32,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Target {
     #[prost(uint32, tag = "1")]
@@ -14,6 +16,7 @@ pub struct Target {
     #[prost(uint32, optional, tag = "3")]
     pub ifindex: ::core::option::Option<u32>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Targets {
     #[prost(message, optional, tag = "1")]
@@ -21,16 +24,19 @@ pub struct Targets {
     #[prost(message, optional, tag = "2")]
     pub target: ::core::option::Option<Target>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Confirmation {
     #[prost(string, tag = "1")]
     pub confirmation: ::prost::alloc::string::String,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PodIp {
     #[prost(uint32, tag = "1")]
     pub ip: u32,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InterfaceIndexConfirmation {
     #[prost(uint32, tag = "1")]
