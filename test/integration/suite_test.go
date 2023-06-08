@@ -39,7 +39,7 @@ var (
 )
 
 const (
-	gwCRDsKustomize = "https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.5.1"
+	gwCRDsKustomize = "https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.7.1"
 	testKustomize   = "../../config/tests/integration"
 )
 

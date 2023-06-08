@@ -59,7 +59,7 @@ After these goals are achieved, further goals may be decided.
 Deploy [Gateway API][gwapi] [CRDs][crds]:
 
 ```console
-kubectl kustomize https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.5.1 | kubectl apply -f -
+kubectl kustomize https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.7.1 | kubectl apply -f -
 ```
 
 Deploy:
