@@ -31,7 +31,7 @@ pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
 
     info!(
         &ctx,
-        "Received TCP packet destined for tracked IP {:ipv4}:{} setting source IP to VIP {:ipv4}",
+        "Received TCP packet destined for tracked IP {:i}:{} setting source IP to VIP {:i}",
         u32::from_be(client_addr),
         ip_port_tuple.1 as u16,
         u32::from_be(ip_port_tuple.0),

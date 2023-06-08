@@ -32,7 +32,7 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
 
     info!(
         &ctx,
-        "Received a TCP packet destined for svc ip: {:ipv4} at Port: {} ",
+        "Received a TCP packet destined for svc ip: {:i} at Port: {} ",
         u32::from_be(original_daddr),
         u16::from_be(unsafe { (*tcp_hdr).dest })
     );
