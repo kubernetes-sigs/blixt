@@ -35,6 +35,7 @@ import (
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/kubernetes-sigs/blixt/controllers"
+	"github.com/kubernetes-sigs/blixt/internal/dataplane/client"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -93,6 +94,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	clientsManager := client.NewBackendsClientManager()
+
 	if err = (&controllers.GatewayReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -107,17 +110,23 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "GatewayClass")
 		os.Exit(1)
 	}
-	if err = (&controllers.UDPRouteReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+
+	udpReconciler := controllers.UDPRouteReconciler{
+		Client:                mgr.GetClient(),
+		Scheme:                mgr.GetScheme(),
+		BackendsClientManager: clientsManager,
+	}
+	if err = udpReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "UDPRoute")
 		os.Exit(1)
 	}
-	if err = (&controllers.TCPRouteReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+
+	tcpReconciler := controllers.TCPRouteReconciler{
+		Client:                mgr.GetClient(),
+		Scheme:                mgr.GetScheme(),
+		BackendsClientManager: clientsManager,
+	}
+	if err = tcpReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "TCPRoute")
 		os.Exit(1)
 	}
@@ -132,8 +141,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+
+	clientsManager.RegisterObservers(&tcpReconciler, &udpReconciler)
+	if err = clientsManager.ManageDataPlanePods(ctx); err != nil {
+		setupLog.Error(err, "unable to create backend clients manager")
+		os.Exit(1)
+	}
+
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
