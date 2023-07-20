@@ -85,7 +85,9 @@ func (r *TCPRouteReconciler) SetupReconciliation(ctx context.Context) {
 			},
 		}
 
-		r.Reconcile(ctx, req)
+		if _, err := r.Reconcile(ctx, req); err != nil {
+			r.log.Error(err, "TCPRoute reconciliation failed")
+		}
 	}
 }
 
