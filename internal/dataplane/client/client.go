@@ -29,15 +29,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/kubernetes-sigs/blixt/pkg/vars"
-)
-
-var (
-	config       = ctrl.GetConfigOrDie()
-	clientset, _ = kubernetes.NewForConfig(config)
 )
 
 // clientInfo encapsulates the gathered information about a BackendsClient
@@ -55,7 +50,8 @@ type observer interface {
 // BackendsClientManager is managing the connections and interactions with
 // the available BackendsClient servers.
 type BackendsClientManager struct {
-	log logr.Logger
+	log       logr.Logger
+	clientset *kubernetes.Clientset
 
 	mu      sync.RWMutex
 	clients map[string]clientInfo
@@ -64,13 +60,19 @@ type BackendsClientManager struct {
 }
 
 // NewBackendsClientManager returns an initialized instance of BackendsClientManager.
-func NewBackendsClientManager() *BackendsClientManager {
+func NewBackendsClientManager(config *rest.Config) (*BackendsClientManager, error) {
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
 	return &BackendsClientManager{
 		log:       log.FromContext(context.Background()),
+		clientset: clientset,
 		mu:        sync.RWMutex{},
 		clients:   map[string]clientInfo{},
 		observers: []observer{},
-	}
+	}, nil
 }
 
 // RegisterObservers adds new observer(s) to the observers list of BackendsClientManager.
@@ -120,7 +122,7 @@ func (c *BackendsClientManager) ManageDataPlanePods(ctx context.Context) error {
 			vars.DefaultDataPlaneAppLabel, vars.DefaultDataPlaneComponentLabel),
 	}
 
-	watcher, err := clientset.CoreV1().Pods(vars.DefaultNamespace).Watch(ctx, listOptions)
+	watcher, err := c.clientset.CoreV1().Pods(vars.DefaultNamespace).Watch(ctx, listOptions)
 	if err != nil {
 		return err
 	}
