@@ -98,7 +98,7 @@ Kubernetes SIG Network][donation]. It is becoming a part of the [Gateway
 API][gwapi] project and as such is discussed in the [Gateway API weekly
 meetings][gwapi-meet]. In particular, we do some discussion and paired
 programming of this project on the `Gateway API Code Jam` meeting which
-is on the [calendar][gwapi-meet] for every Friday.
+is on the [SIG Network calendar][gwapi-meet].
 
 You can also reach out with problems or questions by creating an
 [issue][issues], or a [discussion][disc] on this repo. You can also reach out
