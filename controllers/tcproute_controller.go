@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -50,8 +50,7 @@ import (
 // TCPRouteReconciler reconciles a TCPRoute object
 type TCPRouteReconciler struct {
 	client.Client
-	Scheme                *runtime.Scheme
-	BackendsClientManager *dataplane.BackendsClientManager
+	Scheme *runtime.Scheme
 
 	log logr.Logger
 }
@@ -63,32 +62,14 @@ func (r *TCPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gatewayv1alpha2.TCPRoute{}).
 		Watches(
+			&appsv1.DaemonSet{},
+			handler.EnqueueRequestsFromMapFunc(r.mapDataPlaneDaemonsetToTCPRoutes),
+		).
+		Watches(
 			&gatewayv1beta1.Gateway{},
 			handler.EnqueueRequestsFromMapFunc(r.mapGatewayToTCPRoutes),
 		).
 		Complete(r)
-}
-
-func (r *TCPRouteReconciler) SetupReconciliation(ctx context.Context) {
-	tcproutes := &gatewayv1alpha2.TCPRouteList{}
-	if err := r.Client.List(ctx, tcproutes); err != nil {
-		// TODO: https://github.com/kubernetes-sigs/controller-runtime/issues/1996
-		r.log.Error(err, "could not enqueue TCPRoutes for DaemonSet update")
-		return
-	}
-
-	for _, tcproute := range tcproutes.Items {
-		req := reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Namespace: tcproute.Namespace,
-				Name:      tcproute.Name,
-			},
-		}
-
-		if _, err := r.Reconcile(ctx, req); err != nil {
-			r.log.Error(err, "TCPRoute reconciliation failed")
-		}
-	}
 }
 
 // Reconcile reconciles TCPRoute object
@@ -221,11 +202,18 @@ func (r *TCPRouteReconciler) ensureTCPRouteConfiguredInDataPlane(ctx context.Con
 		return err
 	}
 
-	if _, err = r.BackendsClientManager.Update(ctx, targets); err != nil {
+	// TODO: add multiple endpoint support https://github.com/Kong/blixt/issues/46
+	dataplaneClient, err := dataplane.NewDataPlaneClient(context.Background(), r.Client)
+	if err != nil {
 		return err
 	}
 
-	r.log.Info("successful data-plane UPDATE")
+	confirmation, err := dataplaneClient.Update(context.Background(), targets)
+	if err != nil {
+		return err
+	}
+
+	r.log.Info(fmt.Sprintf("successful data-plane UPDATE, confirmation: %s", confirmation.String()))
 
 	return nil
 }
@@ -242,17 +230,24 @@ func (r *TCPRouteReconciler) ensureTCPRouteDeletedInDataPlane(ctx context.Contex
 		return err
 	}
 
-	vip := dataplane.Vip{
-		Ip:   gatewayIP,
-		Port: gwPort,
-	}
-
-	// delete the target from the dataplane
-	if _, err = r.BackendsClientManager.Delete(ctx, &vip); err != nil {
+	// TODO: add multiple endpoint support https://github.com/Kong/blixt/issues/46
+	dataplaneClient, err := dataplane.NewDataPlaneClient(context.Background(), r.Client)
+	if err != nil {
 		return err
 	}
 
-	r.log.Info("successful data-plane DELETE")
+	// since we currently only support one TCPRoute per Gateway, we can delete the vip (gateway)
+	// entry from the dataplane. this won't fly when we end up adding support for multiple TCPRoutes
+	// per Gateway.
+	confirmation, err := dataplaneClient.Delete(context.Background(), &dataplane.Vip{
+		Ip:   gatewayIP,
+		Port: gwPort,
+	})
+	if err != nil {
+		return err
+	}
+
+	r.log.Info(fmt.Sprintf("successful data-plane DELETE, confirmation: %s", confirmation.String()))
 
 	oldFinalizers := tcproute.GetFinalizers()
 	newFinalizers := make([]string, 0, len(oldFinalizers)-1)
