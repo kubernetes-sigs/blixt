@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -34,7 +35,12 @@ import (
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+<<<<<<< HEAD
 	"github.com/kubernetes-sigs/blixt/controllers"
+=======
+	"github.com/kong/blixt/controllers"
+	"github.com/kong/blixt/internal/dataplane/client"
+>>>>>>> 6573c27 (Add dataplane controller and multi gRPC clients manager)
 	//+kubebuilder:scaffold:imports
 )
 
@@ -68,7 +74,8 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	cfg := ctrl.GetConfigOrDie()
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
 			BindAddress: metricsAddr,
@@ -93,6 +100,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	clientsManager, err := client.NewBackendsClientManager(cfg)
+	if err != nil {
+		setupLog.Error(err, "unable to create backends client manager")
+	}
+	defer clientsManager.Close()
+
+	dataplaneReconciler := controllers.NewDataplaneReconciler(mgr.GetClient(), mgr.GetScheme(), clientsManager)
+	if err = dataplaneReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Dataplane")
+		os.Exit(1)
+	}
+
+	ctx := ctrl.SetupSignalHandler()
+	udpReconcileRequestChan, tcpReconcileRequestChan := Tee(ctx, dataplaneReconciler.GetUpdates())
+
 	if err = (&controllers.GatewayReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -108,15 +130,19 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controllers.UDPRouteReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:                mgr.GetClient(),
+		Scheme:                mgr.GetScheme(),
+		ReconcileRequestChan:  udpReconcileRequestChan,
+		BackendsClientManager: clientsManager,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "UDPRoute")
 		os.Exit(1)
 	}
 	if err = (&controllers.TCPRouteReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:                mgr.GetClient(),
+		Scheme:                mgr.GetScheme(),
+		ReconcileRequestChan:  tcpReconcileRequestChan,
+		BackendsClientManager: clientsManager,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "TCPRoute")
 		os.Exit(1)
@@ -133,8 +159,60 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+// Tee consumes the received channel and mirrors the messages into 2 new channels.
+func Tee[T any](ctx context.Context, in <-chan T) (_, _ <-chan T) {
+	out1, out2 := make(chan T), make(chan T)
+
+	OrDone := func(ctx context.Context, in <-chan T) <-chan T {
+		out := make(chan T)
+		go func() {
+			defer close(out)
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case i, ok := <-in:
+					if !ok {
+						return
+					}
+					select {
+					case out <- i:
+					case <-ctx.Done():
+					}
+				}
+			}
+		}()
+		return out
+	}
+
+	go func() {
+		defer close(out1)
+		defer close(out2)
+
+		for val := range OrDone(ctx, in) {
+			select {
+			case <-ctx.Done():
+
+			case out1 <- val:
+				select {
+				case <-ctx.Done():
+				case out2 <- val:
+				}
+
+			case out2 <- val:
+				select {
+				case <-ctx.Done():
+				case out1 <- val:
+				}
+			}
+		}
+	}()
+	return out1, out2
 }
