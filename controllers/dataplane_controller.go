@@ -45,7 +45,7 @@ func NewDataplaneReconciler(client client.Client, schema *runtime.Scheme, manage
 		Client:                client,
 		Scheme:                schema,
 		BackendsClientManager: manager,
-		updates:               make(chan event.GenericEvent, 1000),
+		updates:               make(chan event.GenericEvent, 1),
 	}
 }
 
@@ -85,6 +85,7 @@ func (r *DataplaneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *DataplaneReconciler) daemonsetHasMatchingAnnotations(obj client.Object) bool {
 	daemonset, ok := obj.(*appsv1.DaemonSet)
 	if !ok {
+		log.Error("received unexpected type in daemonset watch predicates: %T", obj)
 		return false
 	}
 

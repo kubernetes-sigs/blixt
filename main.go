@@ -103,6 +103,7 @@ func main() {
 	clientsManager, err := client.NewBackendsClientManager(cfg)
 	if err != nil {
 		setupLog.Error(err, "unable to create backends client manager")
+		os.Exit(1)
 	}
 	defer clientsManager.Close()
 
@@ -166,7 +167,7 @@ func main() {
 }
 
 // Tee consumes the received channel and mirrors the messages into 2 new channels.
-func Tee[T any](ctx context.Context, in <-chan T) (_, _ <-chan T) {
+func tee[T any](ctx context.Context, in <-chan T) (_, _ <-chan T) {
 	out1, out2 := make(chan T), make(chan T)
 
 	OrDone := func(ctx context.Context, in <-chan T) <-chan T {
