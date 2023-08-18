@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,9 +34,9 @@ import (
 // DataplaneReconciler reconciles the dataplane pods.
 type DataplaneReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	scheme *runtime.Scheme
 
-	BackendsClientManager *dataplane.BackendsClientManager
+	backendsClientManager *dataplane.BackendsClientManager
 
 	updates chan event.GenericEvent
 }
@@ -43,8 +44,8 @@ type DataplaneReconciler struct {
 func NewDataplaneReconciler(client client.Client, schema *runtime.Scheme, manager *dataplane.BackendsClientManager) *DataplaneReconciler {
 	return &DataplaneReconciler{
 		Client:                client,
-		Scheme:                schema,
-		BackendsClientManager: manager,
+		scheme:                schema,
+		backendsClientManager: manager,
 		updates:               make(chan event.GenericEvent, 1),
 	}
 }
@@ -57,6 +58,11 @@ var (
 // SetupWithManager loads the controller into the provided controller manager.
 func (r *DataplaneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
+	// In order to allow our reconciler to quickly look up Pods by their owner, we’ll
+	// need an index. We declare an index key that we can later use with the client
+	// as a pseudo-field name, and then describe how to extract the indexed value from
+	// the Pod object. The indexer will automatically take care of namespaces for us,
+	// so we just have to extract the owner name if the Pod has a DaemonSet owner.
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Pod{}, podOwnerKey, func(rawObj client.Object) []string {
 		// grab the pod object, extract the owner...
 		pod := rawObj.(*corev1.Pod)
@@ -83,9 +89,11 @@ func (r *DataplaneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *DataplaneReconciler) daemonsetHasMatchingAnnotations(obj client.Object) bool {
+	log := log.FromContext(context.Background())
+
 	daemonset, ok := obj.(*appsv1.DaemonSet)
 	if !ok {
-		log.Error("received unexpected type in daemonset watch predicates: %T", obj)
+		log.Error(fmt.Errorf("received unexpected type in daemonset watch predicates: %T", obj), "THIS SHOULD NEVER HAPPEN!")
 		return false
 	}
 
@@ -135,11 +143,15 @@ func (r *DataplaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	logger.Info("DataplaneReconciler", "reconcile status", "setting updated backends client list", "num ready pods", len(readyPodByNN))
-	updated, err := r.BackendsClientManager.SetClientsList(ctx, readyPodByNN)
+	updated, err := r.backendsClientManager.SetClientsList(ctx, readyPodByNN)
 	if updated {
 		logger.Info("DataplaneReconciler", "reconcile status", "backends client list updated, sending generic event")
-		r.updates <- event.GenericEvent{Object: ds}
-		logger.Info("DataplaneReconciler", "reconcile status", "generic event sent")
+		select {
+		case r.updates <- event.GenericEvent{Object: ds}:
+			logger.Info("DataplaneReconciler", "reconcile status", "generic event sent")
+		default:
+			logger.Info("DataplaneReconciler", "reconcile status", "generic event skipped - channel is full")
+		}
 	}
 	if err != nil {
 		logger.Error(err, "DataplaneReconciler", "reconcile status", "partial failure for backends client list update")
