@@ -85,6 +85,11 @@ func (r *DataplaneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appsv1.DaemonSet{},
 			builder.WithPredicates(predicate.NewPredicateFuncs(r.daemonsetHasMatchingAnnotations)),
 		).
+		WithEventFilter(predicate.Funcs{
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				return true
+			},
+		}).
 		Complete(r)
 }
 

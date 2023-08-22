@@ -53,9 +53,9 @@ type TCPRouteReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	log                   logr.Logger
-	ReconcileRequestChan  <-chan event.GenericEvent
-	BackendsClientManager *dataplane.BackendsClientManager
+	log                        logr.Logger
+	ClientReconcileRequestChan <-chan event.GenericEvent
+	BackendsClientManager      *dataplane.BackendsClientManager
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -65,7 +65,7 @@ func (r *TCPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gatewayv1alpha2.TCPRoute{}).
 		WatchesRawSource(
-			&source.Channel{Source: r.ReconcileRequestChan},
+			&source.Channel{Source: r.ClientReconcileRequestChan},
 			handler.EnqueueRequestsFromMapFunc(r.mapDataPlaneDaemonsetToTCPRoutes),
 		).
 		Watches(

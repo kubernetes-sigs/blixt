@@ -114,7 +114,7 @@ func main() {
 	}
 
 	ctx := ctrl.SetupSignalHandler()
-	udpReconcileRequestChan, tcpReconcileRequestChan := Tee(ctx, dataplaneReconciler.GetUpdates())
+	udpReconcileRequestChan, tcpReconcileRequestChan := tee(ctx, dataplaneReconciler.GetUpdates())
 
 	if err = (&controllers.GatewayReconciler{
 		Client: mgr.GetClient(),
@@ -131,19 +131,19 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controllers.UDPRouteReconciler{
-		Client:                mgr.GetClient(),
-		Scheme:                mgr.GetScheme(),
-		ReconcileRequestChan:  udpReconcileRequestChan,
-		BackendsClientManager: clientsManager,
+		Client:                     mgr.GetClient(),
+		Scheme:                     mgr.GetScheme(),
+		ClientReconcileRequestChan: udpReconcileRequestChan,
+		BackendsClientManager:      clientsManager,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "UDPRoute")
 		os.Exit(1)
 	}
 	if err = (&controllers.TCPRouteReconciler{
-		Client:                mgr.GetClient(),
-		Scheme:                mgr.GetScheme(),
-		ReconcileRequestChan:  tcpReconcileRequestChan,
-		BackendsClientManager: clientsManager,
+		Client:                     mgr.GetClient(),
+		Scheme:                     mgr.GetScheme(),
+		ClientReconcileRequestChan: tcpReconcileRequestChan,
+		BackendsClientManager:      clientsManager,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "TCPRoute")
 		os.Exit(1)
@@ -200,7 +200,7 @@ func tee[T any](ctx context.Context, in <-chan T) (_, _ <-chan T) {
 		for val := range OrDone(ctx, in) {
 			select {
 			case <-ctx.Done():
-
+				return
 			case out1 <- val:
 				select {
 				case <-ctx.Done():

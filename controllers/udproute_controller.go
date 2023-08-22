@@ -53,9 +53,9 @@ type UDPRouteReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	log                   logr.Logger
-	ReconcileRequestChan  <-chan event.GenericEvent
-	BackendsClientManager *dataplane.BackendsClientManager
+	log                        logr.Logger
+	ClientReconcileRequestChan <-chan event.GenericEvent
+	BackendsClientManager      *dataplane.BackendsClientManager
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -65,7 +65,7 @@ func (r *UDPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gatewayv1alpha2.UDPRoute{}).
 		WatchesRawSource(
-			&source.Channel{Source: r.ReconcileRequestChan},
+			&source.Channel{Source: r.ClientReconcileRequestChan},
 			handler.EnqueueRequestsFromMapFunc(r.mapDataPlaneDaemonsetToUDPRoutes),
 		).
 		Watches(
