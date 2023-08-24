@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -167,11 +168,11 @@ func main() {
 }
 
 // Tee consumes the received channel and mirrors the messages into 2 new channels.
-func tee[T any](ctx context.Context, in <-chan T) (_, _ <-chan T) {
-	out1, out2 := make(chan T), make(chan T)
+func tee(ctx context.Context, in <-chan event.GenericEvent) (_, _ <-chan event.GenericEvent) {
+	out1, out2 := make(chan event.GenericEvent), make(chan event.GenericEvent)
 
-	OrDone := func(ctx context.Context, in <-chan T) <-chan T {
-		out := make(chan T)
+	OrDone := func(ctx context.Context, in <-chan event.GenericEvent) <-chan event.GenericEvent {
+		out := make(chan event.GenericEvent)
 		go func() {
 			defer close(out)
 
