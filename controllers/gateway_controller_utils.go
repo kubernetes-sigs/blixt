@@ -42,6 +42,26 @@ func (r *GatewayReconciler) createServiceForGateway(ctx context.Context, gw *gat
 			},
 		},
 	}
+
+	if len(gw.Spec.Addresses) > 0 {
+		addr := gw.Spec.Addresses[0]
+
+		if *addr.Type != gatewayv1beta1.IPAddressType {
+			// TODO: update status https://github.com/Kong/blixt/issues/96
+			return fmt.Errorf("status addresses of type %s are not supported, only IP addresses are supported", *addr.Type)
+		}
+
+		svc.Spec.LoadBalancerIP = addr.Value
+	}
+
+	if len(gw.Spec.Addresses) > 1 {
+		// TODO: update status https://github.com/Kong/blixt/issues/96
+		r.Log.Error(
+			fmt.Errorf("assigning multiple static IPs for a Gateway is not currently supported"),
+			fmt.Sprintf("%d addresses were requested, only %s will be allocated", len(gw.Spec.Addresses), svc.Spec.LoadBalancerIP),
+		)
+	}
+
 	_, err := r.ensureServiceConfiguration(ctx, &svc, gw)
 	if err != nil {
 		return err
@@ -64,6 +84,15 @@ func setOwnerReference(svc *corev1.Service, gw client.Object) {
 }
 
 func (r *GatewayReconciler) ensureServiceConfiguration(_ context.Context, svc *corev1.Service, gw *gatewayv1beta1.Gateway) (bool, error) {
+	// TODO: handle removal and changes of addresses https://github.com/Kong/blixt/issues/96
+
+	// check whether there's been a problem allocating an IP address
+	for _, cond := range svc.Status.Conditions {
+		if cond.Type == corev1.EventTypeWarning && cond.Reason == "AllocationFailed" { // TODO: only handles metallb right now https://github.com/Kong/blixt/issues/96
+			return false, fmt.Errorf(cond.Message)
+		}
+	}
+
 	ports := make([]corev1.ServicePort, 0, len(gw.Spec.Listeners))
 	for _, listener := range gw.Spec.Listeners {
 		switch proto := listener.Protocol; proto {
