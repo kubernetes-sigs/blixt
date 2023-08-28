@@ -41,7 +41,7 @@ static mut BLIXT_CONNTRACK: HashMap<u32, (u32, u32)> =
 // Ingress
 // -----------------------------------------------------------------------------
 
-#[classifier(name = "tc_ingress")]
+#[classifier]
 pub fn tc_ingress(ctx: TcContext) -> i32 {
     match try_tc_ingress(ctx) {
         Ok(ret) => ret,
@@ -78,7 +78,7 @@ fn try_tc_ingress(ctx: TcContext) -> Result<i32, i64> {
 // Egress
 // -----------------------------------------------------------------------------
 
-#[classifier(name = "tc_egress")]
+#[classifier]
 pub fn tc_egress(ctx: TcContext) -> i32 {
     match try_tc_egress(ctx) {
         Ok(ret) => ret,
