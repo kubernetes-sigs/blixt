@@ -14,16 +14,16 @@ import (
 // The addresses are updated as well.
 func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc *corev1.Service) {
 	// gateway addresses
-	gwaddrs := make([]gatewayv1beta1.GatewayAddress, 0, len(svc.Status.LoadBalancer.Ingress))
+	gwaddrs := make([]gatewayv1beta1.GatewayStatusAddress, 0, len(svc.Status.LoadBalancer.Ingress))
 	for _, addr := range svc.Status.LoadBalancer.Ingress {
 		if addr.IP != "" {
-			gwaddrs = append(gwaddrs, gatewayv1beta1.GatewayAddress{
+			gwaddrs = append(gwaddrs, gatewayv1beta1.GatewayStatusAddress{
 				Type:  &ipAddrType,
 				Value: addr.IP,
 			})
 		}
 		if addr.Hostname != "" {
-			gwaddrs = append(gwaddrs, gatewayv1beta1.GatewayAddress{
+			gwaddrs = append(gwaddrs, gatewayv1beta1.GatewayStatusAddress{
 				Type:  &hostAddrType,
 				Value: addr.Hostname,
 			})
