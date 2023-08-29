@@ -116,6 +116,8 @@ func TestMain(m *testing.M) {
 			return clusters.KustomizeDeleteForCluster(ctx, env.Cluster(), testKustomize)
 		})
 	}
+
+	fmt.Println("INFO: waiting for Blixt component readiness")
 	exitOnErr(testutils.WaitForBlixtReadiness(ctx, env))
 
 	exit := m.Run()
