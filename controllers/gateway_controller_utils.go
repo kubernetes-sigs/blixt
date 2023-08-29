@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -59,7 +59,7 @@ func setOwnerReference(svc *corev1.Service, gw client.Object) {
 		Kind:       gvk.Kind,
 		Name:       gw.GetName(),
 		UID:        gw.GetUID(),
-		Controller: pointer.Bool(true),
+		Controller: ptr.To(true),
 	}}
 }
 
