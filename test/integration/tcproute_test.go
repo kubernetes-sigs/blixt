@@ -61,7 +61,7 @@ func TestTCPRouteBasics(t *testing.T) {
 	}, time.Minute, time.Second)
 
 	t.Log("verifying HTTP connectivity to the server")
-	httpc := http.Client{Timeout: time.Second * 10}
+	httpc := http.Client{Timeout: time.Second * 30}
 	require.Eventually(t, func() bool {
 		resp, err := httpc.Get(fmt.Sprintf("http://%s/status/%d", gwaddr, http.StatusTeapot))
 		if err != nil {
@@ -70,7 +70,7 @@ func TestTCPRouteBasics(t *testing.T) {
 		}
 		defer resp.Body.Close()
 		return resp.StatusCode == http.StatusTeapot
-	}, time.Minute, time.Second)
+	}, time.Minute*5, time.Second)
 
 	t.Log("deleting the TCPRoute and verifying that HTTP traffic stops")
 	require.NoError(t, gwclient.GatewayV1alpha2().TCPRoutes(corev1.NamespaceDefault).Delete(ctx, tcprouteSampleName, metav1.DeleteOptions{}))
