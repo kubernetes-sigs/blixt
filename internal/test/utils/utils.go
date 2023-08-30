@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/stdr"
@@ -73,18 +74,24 @@ func NewFakeClientWithGatewayClasses(initObjects ...client.Object) (gatewayv1bet
 // environment (but deploying Blixt is expected to have already been handled
 // elsewhere).
 func WaitForBlixtReadiness(ctx context.Context, env environments.Environment) error {
+	ticker := time.NewTicker(time.Minute * 3) // TODO: glob
 	for {
 		select {
+		case <-ticker.C:
+			fmt.Printf("ERROR: timed out waiting for blixt readiness for cluster %s. dumping diagnostics\n", env.Cluster().Name())
+			env.Cluster().DumpDiagnostics(ctx, "wait-for-blixt-readiness-timeout")
 		case <-ctx.Done():
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("context completed while waiting for components: %w", err)
 			}
+			env.Cluster().DumpDiagnostics(ctx, "wait-for-blixt-readiness-context-completed")
 			return fmt.Errorf("context completed while waiting for components")
 		default:
 			var controlplaneReady, dataplaneReady bool
 
 			controlplane, err := env.Cluster().Client().AppsV1().Deployments(vars.DefaultNamespace).Get(ctx, vars.DefaultControlPlaneDeploymentName, metav1.GetOptions{})
 			if err != nil {
+				fmt.Printf("Error while checking controlplane components: %s\n", err)
 				return err
 			}
 			if controlplane.Status.AvailableReplicas > 0 {
@@ -93,6 +100,7 @@ func WaitForBlixtReadiness(ctx context.Context, env environments.Environment) er
 
 			dataplane, err := env.Cluster().Client().AppsV1().DaemonSets(vars.DefaultNamespace).Get(ctx, vars.DefaultDataPlaneDaemonSetName, metav1.GetOptions{})
 			if err != nil {
+				fmt.Printf("Error while checking dataplane components: %s\n", err)
 				return err
 			}
 			if dataplane.Status.NumberAvailable > 0 {
