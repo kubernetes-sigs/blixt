@@ -27,9 +27,9 @@ data-plane is built using [eBPF][ebpf] and is written in [Rust][rust] using
 
 Current project goals are the following:
 
-- [ ] support [Gateway][gw]/[GatewayClass][gwc]
-- [ ] support [UDPRoute][udproute]
-- [ ] support [TCPRoute][tcproute]
+- [ ] support [Gateway][gw]/[GatewayClass][gwc] (partially complete)
+- [ ] support [UDPRoute][udproute] (partially complete)
+- [ ] support [TCPRoute][tcproute] (partially complete)
 - [ ] use this as a basis for adding/improving [Gateway API Conformance Tests][gwcnf]
 - [ ] plug this into [Gateway API][gwapi] CI to run conformance tests on PRs
 
