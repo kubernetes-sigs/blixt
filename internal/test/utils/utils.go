@@ -23,6 +23,8 @@ import (
 	"github.com/kong/blixt/pkg/vars"
 )
 
+const BlixtReadinessTimeout = time.Minute * 3
+
 // NewBytesBufferLogger creates a standard logger with a *bytes.Buffer as the
 // output wrapped in a logr.Logger implementation to provide to reconcilers.
 func NewBytesBufferLogger() (logr.Logger, *bytes.Buffer) {
@@ -74,18 +76,25 @@ func NewFakeClientWithGatewayClasses(initObjects ...client.Object) (gatewayv1bet
 // environment (but deploying Blixt is expected to have already been handled
 // elsewhere).
 func WaitForBlixtReadiness(ctx context.Context, env environments.Environment) error {
-	ticker := time.NewTicker(time.Minute * 3) // TODO: glob
+	ticker := time.NewTicker(BlixtReadinessTimeout)
 	for {
 		select {
 		case <-ticker.C:
 			fmt.Printf("ERROR: timed out waiting for blixt readiness for cluster %s. dumping diagnostics\n", env.Cluster().Name())
-			env.Cluster().DumpDiagnostics(ctx, "wait-for-blixt-readiness-timeout")
+			dir, err := env.Cluster().DumpDiagnostics(ctx, "wait-for-blixt-readiness-timeout")
+			if err != nil {
+				return fmt.Errorf("error after timeout waiting for blixt components when trying to dump diagnostics: %w", err)
+			}
+			return fmt.Errorf("timeout waiting for blixt components exceeded, diagnostics dumped to %s", dir)
 		case <-ctx.Done():
 			if err := ctx.Err(); err != nil {
 				return fmt.Errorf("context completed while waiting for components: %w", err)
 			}
-			env.Cluster().DumpDiagnostics(ctx, "wait-for-blixt-readiness-context-completed")
-			return fmt.Errorf("context completed while waiting for components")
+			dir, diagErr := env.Cluster().DumpDiagnostics(ctx, "wait-for-blixt-readiness-context-completed")
+			if diagErr != nil {
+				return fmt.Errorf("error after timeout waiting for blixt components when trying to dump diagnostics: %w", diagErr)
+			}
+			return fmt.Errorf("context completed while waiting for components, diagnostics dumped to %s", dir)
 		default:
 			var controlplaneReady, dataplaneReady bool
 

@@ -29,7 +29,9 @@ func TestTCPRouteBasics(t *testing.T) {
 	tcpRouteBasicsCleanupKey := "tcproutebasics"
 	defer func() {
 		testutils.DumpDiagnosticsIfFailed(ctx, t, env.Cluster())
-		runCleanup(tcpRouteBasicsCleanupKey)
+		if err := runCleanup(tcpRouteBasicsCleanupKey); err != nil {
+			t.Errorf("cleanup failed: %s", err)
+		}
 	}()
 
 	t.Log("deploying config/samples/tcproute kustomize")
