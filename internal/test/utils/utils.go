@@ -23,7 +23,7 @@ import (
 	"github.com/kong/blixt/pkg/vars"
 )
 
-const BlixtReadinessTimeout = time.Minute * 3
+const BlixtReadinessTimeout = time.Minute * 7
 
 // NewBytesBufferLogger creates a standard logger with a *bytes.Buffer as the
 // output wrapped in a logr.Logger implementation to provide to reconcilers.
