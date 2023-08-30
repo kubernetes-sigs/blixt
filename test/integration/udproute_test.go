@@ -33,7 +33,9 @@ func TestUDPRouteBasics(t *testing.T) {
 	udpRouteBasicsCleanupKey := "udproutebasics"
 	defer func() {
 		testutils.DumpDiagnosticsIfFailed(ctx, t, env.Cluster())
-		runCleanup(udpRouteBasicsCleanupKey)
+		if err := runCleanup(udpRouteBasicsCleanupKey); err != nil {
+			t.Errorf("cleanup failed: %s", err)
+		}
 	}()
 
 	t.Log("deploying config/samples/udproute kustomize")
@@ -96,7 +98,9 @@ func TestUDPRouteNoReach(t *testing.T) {
 	udpRouteNoReachCleanupKey := "udproutenoreach"
 	defer func() {
 		testutils.DumpDiagnosticsIfFailed(ctx, t, env.Cluster())
-		runCleanup(udpRouteNoReachCleanupKey)
+		if err := runCleanup(udpRouteNoReachCleanupKey); err != nil {
+			t.Errorf("cleanup failed: %s", err)
+		}
 	}()
 
 	t.Log("deploying config/samples/udproute-noreach kustomize")

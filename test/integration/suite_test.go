@@ -45,7 +45,7 @@ const (
 
 func TestMain(m *testing.M) {
 	mainCleanupKey = "main"
-	defer runCleanup(mainCleanupKey)
+	defer runCleanup(mainCleanupKey) //nolint:errcheck
 
 	// check that we have a controlplane and dataplane image to use for the tests.
 	// generally the runner of the tests should have built these from the latest
