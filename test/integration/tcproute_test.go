@@ -38,7 +38,7 @@ func TestTCPRouteBasics(t *testing.T) {
 	require.NoError(t, clusters.KustomizeDeployForCluster(ctx, env.Cluster(), tcprouteSampleKustomize))
 	addCleanup(tcpRouteBasicsCleanupKey, func(ctx context.Context) error {
 		cleanupLog("cleaning up config/samples/tcproute kustomize")
-		return clusters.KustomizeDeleteForCluster(ctx, env.Cluster(), tcprouteSampleKustomize)
+		return clusters.KustomizeDeleteForCluster(ctx, env.Cluster(), tcprouteSampleKustomize, "--ignore-not-found=true")
 	})
 
 	t.Log("waiting for Gateway to have an address")
