@@ -55,7 +55,8 @@ async fn main() -> Result<(), anyhow::Error> {
         .context("failed to attach the egress TC program")?;
 
     info!("starting api server");
-    let backends: HashMap<_, BackendKey, Backend> = HashMap::try_from(bpf.map_mut("BACKENDS")?)?;
+    let backends: HashMap<_, BackendKey, Backend> =
+        HashMap::try_from(bpf.take_map("BACKENDS").expect("no maps named BACKENDS"))?;
     start_api_server(Ipv4Addr::new(0, 0, 0, 0), 9874, backends).await?;
 
     info!("Exiting...");
