@@ -2,7 +2,7 @@ use std::net::Ipv4Addr;
 use std::sync::Arc;
 
 use anyhow::Error;
-use aya::maps::{HashMap, MapRefMut};
+use aya::maps::{HashMap, MapData};
 use tokio::sync::Mutex;
 use tonic::{Request, Response, Status};
 
@@ -12,11 +12,11 @@ use crate::netutils::{if_name_for_routing_ip, if_nametoindex};
 use common::{Backend, BackendKey};
 
 pub struct BackendService {
-    bpf_map: Arc<Mutex<HashMap<MapRefMut, BackendKey, Backend>>>,
+    bpf_map: Arc<Mutex<HashMap<MapData, BackendKey, Backend>>>,
 }
 
 impl BackendService {
-    pub fn new(bpf_map: HashMap<MapRefMut, BackendKey, Backend>) -> BackendService {
+    pub fn new(bpf_map: HashMap<MapData, BackendKey, Backend>) -> BackendService {
         BackendService {
             bpf_map: Arc::new(Mutex::new(bpf_map)),
         }

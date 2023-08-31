@@ -1,2 +1,6 @@
 [workspace]
 members = ["api-server", "loader", "common", "xtask"]
+
+[patch.crates-io]
+aya = { git = "https://github.com/aya-rs/aya", branch="main" }
+aya-log = { git = "https://github.com/aya-rs/aya", branch = "main" }
