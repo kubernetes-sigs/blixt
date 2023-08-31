@@ -73,9 +73,10 @@ jobs:
     - name: run integration tests
       run: make test.integration
       env:
-        BLIXT_CONTROLPLANE_IMAGE: "ghcr.io/kong/blixt-controlplane:integration-tests"
-        BLIXT_DATAPLANE_IMAGE: "ghcr.io/kong/blixt-dataplane:integration-tests"
-        BLIXT_UDP_SERVER_IMAGE: "ghcr.io/kong/blixt-udp-test-server:integration-tests"
+        BLIXT_CONTROLPLANE_IMAGE: "ghcr.io/kong/blixt-controlplane"
+        BLIXT_DATAPLANE_IMAGE: "ghcr.io/kong/blixt-dataplane"
+        BLIXT_UDP_SERVER_IMAGE: "ghcr.io/kong/blixt-udp-test-server"
+        TAG: "integration-tests"
 
     ## Upload diagnostics if integration test step failed.
     - name: upload diagnostics
