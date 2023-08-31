@@ -1,3 +1,11 @@
+# IMAGES used when running tests.
+BLIXT_CONTROLPLANE_IMAGE ?= ghcr.io/kong/blixt-controlplane
+BLIXT_DATAPLANE_IMAGE ?= ghcr.io/kong/blixt-dataplane
+BLIXT_UDP_SERVER_IMAGE ?= ghcr.io/kong/blixt-udp-test-server
+
+# Image URL to use all building/pushing image targets
+TAG ?= integration-tests
+
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -45,10 +53,6 @@ USE_IMAGE_DIGESTS ?= false
 ifeq ($(USE_IMAGE_DIGESTS), true)
 	BUNDLE_GEN_FLAGS += --use-image-digests
 endif
-
-# Image URL to use all building/pushing image targets
-IMAGE ?= ghcr.io/kong/blixt-controlplane
-TAG ?= latest
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.24.2
@@ -123,6 +127,9 @@ test: manifests generate fmt vet envtest ## Run tests.
 .PHONY: test.integration
 test.integration: manifests generate fmt vet
 	go clean -testcache
+	BLIXT_CONTROLPLANE_IMAGE=$(BLIXT_CONTROLPLANE_IMAGE):$(TAG) \
+	BLIXT_DATAPLANE_IMAGE=$(BLIXT_DATAPLANE_IMAGE):$(TAG) \
+	BLIXT_UDP_SERVER_IMAGE=$(BLIXT_UDP_SERVER_IMAGE):$(TAG) \
 	GOFLAGS="-tags=integration_tests" go test -race -v ./test/integration/...
 
 .PHONY: test.performance
@@ -147,7 +154,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: build.image
 build.image:
-	DOCKER_BUILDKIT=1 docker build -t $(IMAGE):$(TAG) .
+	DOCKER_BUILDKIT=1 docker build -t $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) .
 
 .PHONY: build.all.images
 build.all.images: build.image
@@ -286,5 +293,5 @@ build.cluster: $(KTF) # builds a KIND cluster which can be used for testing and 
 
 .PHONY: load.image
 load.image: build.image
-	kind load docker-image $(IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
+	kind load docker-image $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
 		kubectl -n blixt-system rollout restart deployment blixt-controlplane
