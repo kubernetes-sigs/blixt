@@ -15,7 +15,7 @@ build:
 
 .PHONY: build.release
 build.release:
-	cargo xtask build-ebpf
+	cargo xtask build-ebpf --release
 	cargo build --release
 
 .PHONY: build.image
