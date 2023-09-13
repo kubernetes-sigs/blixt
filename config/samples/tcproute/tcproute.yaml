@@ -2,6 +2,7 @@ apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: TCPRoute
 metadata:
   name: blixt-tcproute-sample
+  namespace: gwapi-ref-ns
 spec:
   parentRefs:
   - name: blixt-tcproute-sample
@@ -10,3 +11,18 @@ spec:
   - backendRefs:
     - name: blixt-tcproute-sample
       port: 8080
+      namespace: default
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: tcproute-sample-ref
+  namespace: default
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: TCPRoute
+      namespace: gwapi-ref-ns
+  to:
+    - group: ""
+      kind: Service

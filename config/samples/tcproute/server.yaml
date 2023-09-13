@@ -40,3 +40,8 @@ spec:
   selector:
     app: blixt-tcproute-sample
   type: ClusterIP
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gwapi-ref-ns

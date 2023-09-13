@@ -3,6 +3,7 @@ package client
 import (
 	context "context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 
@@ -40,7 +41,12 @@ func CompileUDPRouteToDataPlaneBackend(ctx context.Context, c client.Client, udp
 	// TODO only using one endpoint for now until https://github.com/Kong/blixt/issues/10
 	var target *Target
 	if udproute.DeletionTimestamp == nil {
-		endpoints, err := endpointsFromBackendRef(ctx, c, udproute.Namespace, backendRef)
+		from := objectKindNamespacedName{
+			kind:      udproute.Kind,
+			namespace: udproute.Namespace,
+			name:      udproute.Name,
+		}
+		endpoints, err := endpointsFromBackendRef(ctx, from, c, udproute.Namespace, backendRef)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +118,12 @@ func CompileTCPRouteToDataPlaneBackend(ctx context.Context, c client.Client, tcp
 	// TODO only using one endpoint for now until https://github.com/Kong/blixt/issues/10
 	var target *Target
 	if tcproute.DeletionTimestamp == nil {
-		endpoints, err := endpointsFromBackendRef(ctx, c, tcproute.Namespace, backendRef)
+		from := objectKindNamespacedName{
+			kind:      tcproute.Kind,
+			namespace: tcproute.Namespace,
+			name:      tcproute.Name,
+		}
+		endpoints, err := endpointsFromBackendRef(ctx, from, c, tcproute.Namespace, backendRef)
 		if err != nil {
 			return nil, err
 		}
@@ -156,9 +167,46 @@ func CompileTCPRouteToDataPlaneBackend(ctx context.Context, c client.Client, tcp
 	return targets, nil
 }
 
-func endpointsFromBackendRef(ctx context.Context, c client.Client, namespace string, backendRef gatewayv1alpha2.BackendRef) (*corev1.Endpoints, error) {
-	if backendRef.Namespace != nil {
-		namespace = string(*backendRef.Namespace)
+type objectKindNamespacedName struct {
+	kind      string
+	namespace string
+	name      string
+}
+
+func endpointsFromBackendRef(ctx context.Context, from objectKindNamespacedName, c client.Client, namespace string, backendRef gatewayv1alpha2.BackendRef) (*corev1.Endpoints, error) {
+	refGrantFoundOrNotNeeded := false
+	if backendRef.Namespace != nil && from.namespace != string(*backendRef.Namespace) {
+		refGrantList := &gatewayv1beta1.ReferenceGrantList{}
+		err := c.List(ctx, refGrantList, &client.ListOptions{Namespace: string(*backendRef.Namespace)})
+		for _, refGrant := range refGrantList.Items {
+			useRefGrant := false
+			for _, dest := range refGrant.Spec.To {
+				if dest.Group == "" && dest.Kind == "Service" {
+					useRefGrant = true
+					break
+				}
+			}
+			if !useRefGrant {
+				continue
+			}
+			for _, src := range refGrant.Spec.From {
+				if src.Kind == gatewayv1alpha2.Kind(from.kind) && string(src.Namespace) == from.namespace {
+					refGrantFoundOrNotNeeded = true
+					namespace = string(*backendRef.Namespace)
+					break
+				}
+			}
+		}
+		if err != nil {
+			return nil, errors.New("not able to list reference grant")
+		}
+
+	} else if backendRef.Namespace == nil {
+		refGrantFoundOrNotNeeded = true
+	}
+
+	if !refGrantFoundOrNotNeeded {
+		return nil, errors.New("route does not have reference grant for endpoints")
 	}
 
 	endpoints := new(corev1.Endpoints)
