@@ -32,6 +32,14 @@ func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc
 	gateway.Status.Addresses = gwaddrs
 
 	// gateway conditions
+	newGatewayAcceptedCondition := metav1.Condition{
+		Type:               string(gatewayv1beta1.GatewayConditionAccepted),
+		Status:             metav1.ConditionTrue,
+		Reason:             string(gatewayv1beta1.GatewayReasonAccepted),
+		ObservedGeneration: gateway.Generation,
+		LastTransitionTime: metav1.Now(),
+		Message:            "blixt controlplane accepts responsibility for the Gateway",
+	}
 	newGatewayProgrammedCondition := metav1.Condition{
 		Type:               string(gatewayv1beta1.GatewayConditionProgrammed),
 		Status:             metav1.ConditionTrue,
@@ -73,6 +81,7 @@ func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc
 	}
 
 	gateway.Status.Conditions = []metav1.Condition{
+		newGatewayAcceptedCondition,
 		newGatewayProgrammedCondition,
 	}
 	gateway.Status.Listeners = listenersStatus
@@ -83,6 +92,14 @@ func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc
 func initGatewayStatus(gateway *gatewayv1beta1.Gateway) {
 	gateway.Status = gatewayv1beta1.GatewayStatus{
 		Conditions: []metav1.Condition{
+			{
+				Type:               string(gatewayv1beta1.GatewayConditionAccepted),
+				Status:             metav1.ConditionTrue,
+				Reason:             string(gatewayv1beta1.GatewayReasonAccepted),
+				ObservedGeneration: gateway.Generation,
+				LastTransitionTime: metav1.Now(),
+				Message:            "blixt controlplane accepts responsibility for the Gateway",
+			},
 			{
 				Type:               string(gatewayv1beta1.GatewayConditionProgrammed),
 				Status:             metav1.ConditionFalse,
