@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	"sigs.k8s.io/gateway-api/conformance/apis/v1alpha1"
 	"sigs.k8s.io/gateway-api/conformance/tests"
 	"sigs.k8s.io/gateway-api/conformance/utils/suite"
 
@@ -32,8 +33,6 @@ const (
 )
 
 func TestGatewayConformance(t *testing.T) {
-	t.Skip() // TODO: https://github.com/Kong/blixt/issues/81
-
 	t.Log("configuring environment for gateway conformance tests")
 	c, err := client.New(env.Cluster().Config(), client.Options{})
 	require.NoError(t, err)
@@ -61,17 +60,29 @@ func TestGatewayConformance(t *testing.T) {
 	require.NoError(t, c.Create(ctx, gatewayClass))
 	t.Cleanup(func() { assert.NoError(t, c.Delete(ctx, gatewayClass)) })
 
-	t.Log("starting the gateway conformance test suite")
-	cSuite := suite.New(suite.Options{
-		Client:               c,
-		GatewayClassName:     gatewayClass.Name,
-		Debug:                showDebug,
-		CleanupBaseResources: shouldCleanup,
-		BaseManifests:        conformanceTestsBaseManifests,
-	})
+	t.Log("configuring the gateway conformance test suite")
+	cSuite, err := suite.NewExperimentalConformanceTestSuite(
+		suite.ExperimentalConformanceOptions{
+			Options: suite.Options{
+				Client:               c,
+				GatewayClassName:     gatewayClass.Name,
+				Debug:                showDebug,
+				CleanupBaseResources: shouldCleanup,
+				BaseManifests:        conformanceTestsBaseManifests,
+				SupportedFeatures:    suite.GatewayCoreFeatures,
+			},
+			Implementation: v1alpha1.Implementation{
+				Organization: "kong",
+				Project:      "blixt",
+				URL:          "https://github.com/kong/blixt",
+				Version:      "v0.2.0",
+				Contact:      []string{"https://github.com/Kong/blixt/issues/new"},
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	t.Log("executing the gateway conformance test suite")
 	cSuite.Setup(t)
-	if false {
-		// TODO: enable L4 profiles and run test suite
-		cSuite.Run(t, tests.ConformanceTests)
-	}
+	cSuite.Run(t, tests.ConformanceTests)
 }
