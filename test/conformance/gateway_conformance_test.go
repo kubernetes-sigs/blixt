@@ -70,6 +70,12 @@ func TestGatewayConformance(t *testing.T) {
 				CleanupBaseResources: shouldCleanup,
 				BaseManifests:        conformanceTestsBaseManifests,
 				SupportedFeatures:    suite.GatewayCoreFeatures,
+				SkipTests: []string{
+					// TODO: these tests are broken because they incorrectly require HTTP support
+					// see https://github.com/kubernetes-sigs/gateway-api/issues/2403
+					"GatewayInvalidRouteKind",
+					"GatewayInvalidTLSConfiguration",
+				},
 			},
 			Implementation: v1alpha1.Implementation{
 				Organization: "kong",
