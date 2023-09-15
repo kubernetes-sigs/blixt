@@ -140,6 +140,9 @@ test.performance: manifests generate fmt vet
 .PHONY: test.conformance
 test.conformance: manifests generate fmt vet
 	go clean -testcache
+	BLIXT_CONTROLPLANE_IMAGE=$(BLIXT_CONTROLPLANE_IMAGE):$(TAG) \
+	BLIXT_DATAPLANE_IMAGE=$(BLIXT_DATAPLANE_IMAGE):$(TAG) \
+	BLIXT_UDP_SERVER_IMAGE=$(BLIXT_UDP_SERVER_IMAGE):$(TAG) \
 	GOFLAGS="-tags=conformance_tests" go test -race -v ./test/conformance/...
 
 ##@ Build
