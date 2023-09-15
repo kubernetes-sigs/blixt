@@ -46,7 +46,7 @@ func TestGatewayConformance(t *testing.T) {
 	require.NoError(t, clusters.ApplyManifestByURL(ctx, env.Cluster(), conformanceTestsBaseManifests))
 
 	t.Log("starting the controller manager")
-	require.NoError(t, clusters.KustomizeDeployForCluster(ctx, env.Cluster(), "../../config/default/"))
+	require.NoError(t, clusters.KustomizeDeployForCluster(ctx, env.Cluster(), "../../config/tests/conformance/"))
 
 	t.Log("creating GatewayClass for gateway conformance tests")
 	gatewayClass := &gatewayv1beta1.GatewayClass{
