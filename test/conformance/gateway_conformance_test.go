@@ -27,8 +27,8 @@ const (
 )
 
 const (
-	gatewayAPICRDKustomize        = "https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.7.1"
-	conformanceTestsBaseManifests = "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v0.7.1/conformance/base/manifests.yaml"
+	gatewayAPICRDKustomize        = "https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.8.1"
+	conformanceTestsBaseManifests = "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v0.8.1/conformance/base/manifests.yaml"
 )
 
 func TestGatewayConformance(t *testing.T) {
