@@ -152,6 +152,10 @@ build: generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
+.PHONY: debug
+debug: manifests generate fmt vet ## Run a controller from your host via debugger.
+	dlv debug ./main.go
+
 .PHONY: build.image
 build.image:
 	DOCKER_BUILDKIT=1 docker build -t $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) .
