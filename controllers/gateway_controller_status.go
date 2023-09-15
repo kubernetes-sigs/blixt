@@ -32,7 +32,7 @@ func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc
 	gateway.Status.Addresses = gwaddrs
 
 	// gateway conditions
-	newGatewayCondition := metav1.Condition{
+	newGatewayProgrammedCondition := metav1.Condition{
 		Type:               string(gatewayv1beta1.GatewayConditionProgrammed),
 		Status:             metav1.ConditionTrue,
 		Reason:             string(gatewayv1beta1.GatewayReasonProgrammed),
@@ -66,14 +66,14 @@ func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc
 			},
 		})
 		if resolvedRefsCondition.Status == metav1.ConditionFalse {
-			newGatewayCondition.Status = metav1.ConditionFalse
-			newGatewayCondition.Reason = string(gatewayv1beta1.GatewayReasonAddressNotAssigned)
-			newGatewayCondition.Message = "the gateway is not ready to route traffic"
+			newGatewayProgrammedCondition.Status = metav1.ConditionFalse
+			newGatewayProgrammedCondition.Reason = string(gatewayv1beta1.GatewayReasonAddressNotAssigned)
+			newGatewayProgrammedCondition.Message = "the gateway is not ready to route traffic"
 		}
 	}
 
 	gateway.Status.Conditions = []metav1.Condition{
-		newGatewayCondition,
+		newGatewayProgrammedCondition,
 	}
 	gateway.Status.Listeners = listenersStatus
 }
