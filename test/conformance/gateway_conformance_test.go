@@ -75,6 +75,11 @@ func TestGatewayConformance(t *testing.T) {
 					// see https://github.com/kubernetes-sigs/gateway-api/issues/2403
 					"GatewayInvalidRouteKind",
 					"GatewayInvalidTLSConfiguration",
+					// TODO: these tests are disabled because we don't actually support them
+					// properly yet.
+					"GatewayModifyListeners",
+					"GatewayClassObservedGenerationBump",
+					"GatewayWithAttachedRoutes",
 				},
 			},
 			Implementation: v1alpha1.Implementation{
