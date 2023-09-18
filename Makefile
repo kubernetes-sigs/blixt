@@ -140,6 +140,9 @@ test.performance: manifests generate fmt vet
 .PHONY: test.conformance
 test.conformance: manifests generate fmt vet
 	go clean -testcache
+	BLIXT_CONTROLPLANE_IMAGE=$(BLIXT_CONTROLPLANE_IMAGE):$(TAG) \
+	BLIXT_DATAPLANE_IMAGE=$(BLIXT_DATAPLANE_IMAGE):$(TAG) \
+	BLIXT_UDP_SERVER_IMAGE=$(BLIXT_UDP_SERVER_IMAGE):$(TAG) \
 	GOFLAGS="-tags=conformance_tests" go test -race -v ./test/conformance/...
 
 ##@ Build
@@ -151,6 +154,10 @@ build: generate fmt vet ## Build manager binary.
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
+
+.PHONY: debug
+debug: manifests generate fmt vet ## Run a controller from your host via debugger.
+	dlv debug ./main.go
 
 .PHONY: build.image
 build.image:

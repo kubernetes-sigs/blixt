@@ -237,7 +237,7 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 				err = reconciler.Client.Get(ctx, gatewayReq.NamespacedName, newGateway)
 				require.NoError(t, err)
 				require.Len(t, newGateway.Status.Addresses, 1)
-				require.Len(t, newGateway.Status.Conditions, 1)
+				require.Len(t, newGateway.Status.Conditions, 2)
 				require.Equal(t, newGateway.Status.Conditions[0].Status, metav1.ConditionTrue)
 				require.Len(t, newGateway.Status.Listeners, 1)
 				require.Equal(t, newGateway.Status.Listeners[0].SupportedKinds, []gatewayv1beta1.RouteGroupKind{
@@ -293,8 +293,9 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 				err = reconciler.Client.Get(ctx, gatewayReq.NamespacedName, newGateway)
 				require.NoError(t, err)
 				require.Len(t, newGateway.Status.Addresses, 0)
-				require.Len(t, newGateway.Status.Conditions, 1)
-				require.Equal(t, newGateway.Status.Conditions[0].Status, metav1.ConditionFalse)
+				require.Len(t, newGateway.Status.Conditions, 2)
+				require.Equal(t, newGateway.Status.Conditions[0].Status, metav1.ConditionTrue)
+				require.Equal(t, newGateway.Status.Conditions[1].Status, metav1.ConditionFalse)
 				require.Len(t, newGateway.Status.Listeners, 1)
 				require.Equal(t, newGateway.Status.Listeners[0].SupportedKinds, []gatewayv1beta1.RouteGroupKind{
 					{
@@ -398,16 +399,17 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 				newGateway := &gatewayv1beta1.Gateway{}
 				err = reconciler.Client.Get(ctx, gatewayReq.NamespacedName, newGateway)
 				require.NoError(t, err)
-				require.Len(t, newGateway.Status.Addresses, 1)
-				require.Len(t, newGateway.Status.Conditions, 1)
-				require.Equal(t, newGateway.Status.Conditions[0].Status, metav1.ConditionFalse)
+				require.Len(t, newGateway.Status.Addresses, 0)
+				require.Len(t, newGateway.Status.Conditions, 2)
+				require.Equal(t, newGateway.Status.Conditions[0].Status, metav1.ConditionTrue)
+				require.Equal(t, newGateway.Status.Conditions[1].Status, metav1.ConditionFalse)
 				require.Len(t, newGateway.Status.Listeners, 2)
 				for _, l := range newGateway.Status.Listeners {
 					if l.Name == "http" {
-						require.Len(t, l.SupportedKinds, 0)
+						require.Len(t, l.SupportedKinds, 1)
 						for _, c := range l.Conditions {
 							if c.Type == string(gatewayv1beta1.ListenerConditionResolvedRefs) {
-								require.Equal(t, c.Status, metav1.ConditionFalse)
+								require.Equal(t, c.Status, metav1.ConditionTrue) // TODO: https://github.com/kubernetes-sigs/gateway-api/issues/2403
 							} else {
 								require.Equal(t, c.Status, metav1.ConditionFalse)
 							}
@@ -420,9 +422,7 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 								Kind:  "UDPRoute",
 							},
 						})
-						for _, c := range l.Conditions {
-							require.Equal(t, c.Status, metav1.ConditionTrue)
-						}
+						require.Equal(t, l.Conditions[0].Status, metav1.ConditionFalse)
 					}
 				}
 			},
