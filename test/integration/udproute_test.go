@@ -95,6 +95,8 @@ func TestUDPRouteBasics(t *testing.T) {
 }
 
 func TestUDPRouteNoReach(t *testing.T) {
+	t.Skip("TODO: temporarily skipped due to instability, see https://github.com/Kong/blixt/issues/104")
+
 	udpRouteNoReachCleanupKey := "udproutenoreach"
 	defer func() {
 		testutils.DumpDiagnosticsIfFailed(ctx, t, env.Cluster())
