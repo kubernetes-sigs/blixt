@@ -78,6 +78,7 @@ func (r *GatewayReconciler) gatewayHasMatchingGatewayClass(obj client.Object) bo
 }
 
 // Reconcile provisions (and de-provisions) resources relevant to this controller.
+// TODO: this whole thing needs a rewrite
 func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
@@ -102,12 +103,25 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	gatewayReadyStatus, gatewayReadyStatusIsSet := isGatewayProgrammed(gw)
+	// determine if the Gateway has been accepted, and if it has not then
+	// determine whether we will accept it, and if not drop it until it has
+	// been corrected.
 	oldGateway := gw.DeepCopy()
-	initGatewayStatus(gw)
-	factorizeStatus(gw, oldGateway)
-	if !gatewayReadyStatusIsSet {
-		return ctrl.Result{}, r.Status().Patch(ctx, gw, client.MergeFrom(oldGateway))
+	isAccepted := isGatewayAccepted(gw)
+	if !isAccepted {
+		initGatewayStatus(gw)
+		setGatewayAcceptance(gw)
+		factorizeStatus(gw, oldGateway)
+
+		oldAccepted := getAcceptedConditionForGateway(oldGateway)
+		accepted := getAcceptedConditionForGateway(gw)
+
+		if !sameConditions(oldAccepted, accepted) {
+			return ctrl.Result{}, r.Status().Patch(ctx, gw, client.MergeFrom(oldGateway))
+		}
+
+		log.Info("gateway %s/%s is not accepted and will not be provisioned", gw.Namespace, gw.Name)
+		return ctrl.Result{}, nil
 	}
 
 	log.Info("checking for Service for Gateway")
@@ -116,10 +130,6 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 	if svc == nil {
-		// if the ready status is not set, or the gateway is marked as ready, mark it as not ready
-		if gatewayReadyStatus {
-			return ctrl.Result{}, r.Status().Patch(ctx, gw, client.MergeFrom(oldGateway)) // status patch will requeue gateway
-		}
 		log.Info("creating Service for Gateway")
 		return ctrl.Result{}, r.createServiceForGateway(ctx, gw) // service creation will requeue gateway
 	}
@@ -133,10 +143,6 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 	if needsUpdate {
-		// if the ready status is not set, or the gateway is marked as ready, mark it as not ready
-		if gatewayReadyStatus {
-			return ctrl.Result{}, r.Status().Patch(ctx, gw, client.MergeFrom(oldGateway)) // status patch will requeue gateway
-		}
 		return ctrl.Result{}, r.Client.Update(ctx, svc)
 	}
 
@@ -144,18 +150,10 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	switch t := svc.Spec.Type; t {
 	case corev1.ServiceTypeLoadBalancer:
 		if svc.Spec.ClusterIP == "" || len(svc.Status.LoadBalancer.Ingress) < 1 {
-			// if the ready status is not set, or the gateway is marked as ready, mark it as not ready
-			if gatewayReadyStatus {
-				return ctrl.Result{}, r.Status().Patch(ctx, gw, client.MergeFrom(oldGateway)) // status patch will requeue gateway
-			}
 			log.Info("waiting for Service to be ready")
 			return ctrl.Result{Requeue: true}, nil
 		}
 	default:
-		// if the ready status is not set, or the gateway is marked as ready, mark it as not ready
-		if gatewayReadyStatus {
-			return ctrl.Result{}, r.Status().Patch(ctx, gw, client.MergeFrom(oldGateway)) // status patch will requeue gateway
-		}
 		return ctrl.Result{}, fmt.Errorf("found unsupported Service type: %s (only LoadBalancer type is currently supported)", t)
 	}
 
