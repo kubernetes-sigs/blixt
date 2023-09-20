@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,16 +91,28 @@ func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc
 // initGatewayStatus initializes the GatewayStatus, setting the ready condition to
 // not ready and all the listeners ready status to not ready as well.
 func initGatewayStatus(gateway *gatewayv1beta1.Gateway) {
+	accepted := metav1.Condition{
+		Type:               string(gatewayv1beta1.GatewayConditionAccepted),
+		Status:             metav1.ConditionTrue,
+		Reason:             string(gatewayv1beta1.GatewayReasonAccepted),
+		ObservedGeneration: gateway.Generation,
+		LastTransitionTime: metav1.Now(),
+		Message:            "blixt controlplane accepts responsibility for the Gateway",
+	}
+	if unsupportedAddr, addrType := gatewayHasUnsupportedAddresses(gateway); unsupportedAddr {
+		accepted = metav1.Condition{
+			Type:               string(gatewayv1beta1.GatewayConditionAccepted),
+			Status:             metav1.ConditionFalse,
+			Reason:             string(gatewayv1beta1.GatewayReasonUnsupportedAddress),
+			ObservedGeneration: gateway.Generation,
+			LastTransitionTime: metav1.Now(),
+			Message:            fmt.Sprintf("blixt only supports Gateway addresses of type IPAddress, %s is not supported", addrType),
+		}
+	}
+
 	gateway.Status = gatewayv1beta1.GatewayStatus{
 		Conditions: []metav1.Condition{
-			{
-				Type:               string(gatewayv1beta1.GatewayConditionAccepted),
-				Status:             metav1.ConditionTrue,
-				Reason:             string(gatewayv1beta1.GatewayReasonAccepted),
-				ObservedGeneration: gateway.Generation,
-				LastTransitionTime: metav1.Now(),
-				Message:            "blixt controlplane accepts responsibility for the Gateway",
-			},
+			accepted,
 			{
 				Type:               string(gatewayv1beta1.GatewayConditionProgrammed),
 				Status:             metav1.ConditionFalse,
@@ -229,4 +242,13 @@ func isGatewayProgrammed(gateway *gatewayv1beta1.Gateway) (status bool, isSet bo
 		}
 	}
 	return false, false
+}
+
+func gatewayHasUnsupportedAddresses(gateway *gatewayv1beta1.Gateway) (bool, string) {
+	for _, addr := range gateway.Spec.Addresses {
+		if addr.Type != nil && *addr.Type != gatewayv1beta1.IPAddressType {
+			return false, string(*addr.Type)
+		}
+	}
+	return true, ""
 }
