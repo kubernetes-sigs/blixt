@@ -61,6 +61,8 @@ func TestGatewayConformance(t *testing.T) {
 	t.Cleanup(func() { assert.NoError(t, c.Delete(ctx, gatewayClass)) })
 
 	t.Log("configuring the gateway conformance test suite")
+	supportedFeatures := suite.GatewayCoreFeatures.Clone()
+	supportedFeatures.Insert(suite.SupportGatewayStaticAddresses)
 	cSuite, err := suite.NewExperimentalConformanceTestSuite(
 		suite.ExperimentalConformanceOptions{
 			Options: suite.Options{
@@ -69,7 +71,7 @@ func TestGatewayConformance(t *testing.T) {
 				Debug:                showDebug,
 				CleanupBaseResources: shouldCleanup,
 				BaseManifests:        conformanceTestsBaseManifests,
-				SupportedFeatures:    suite.GatewayCoreFeatures,
+				SupportedFeatures:    supportedFeatures,
 				SkipTests: []string{
 					// TODO: these tests are broken because they incorrectly require HTTP support
 					// see https://github.com/kubernetes-sigs/gateway-api/issues/2403
@@ -81,6 +83,8 @@ func TestGatewayConformance(t *testing.T) {
 					"GatewayClassObservedGenerationBump",
 					"GatewayWithAttachedRoutes",
 				},
+				UsableNetworkAddresses:   []gatewayv1beta1.GatewayAddress{{Value: "172.18.0.242"}},
+				UnusableNetworkAddresses: []gatewayv1beta1.GatewayAddress{{Value: "1.1.1.1"}},
 			},
 			Implementation: v1alpha1.Implementation{
 				Organization: "kong",

@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,28 +90,16 @@ func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc
 // initGatewayStatus initializes the GatewayStatus, setting the ready condition to
 // not ready and all the listeners ready status to not ready as well.
 func initGatewayStatus(gateway *gatewayv1beta1.Gateway) {
-	accepted := metav1.Condition{
-		Type:               string(gatewayv1beta1.GatewayConditionAccepted),
-		Status:             metav1.ConditionTrue,
-		Reason:             string(gatewayv1beta1.GatewayReasonAccepted),
-		ObservedGeneration: gateway.Generation,
-		LastTransitionTime: metav1.Now(),
-		Message:            "blixt controlplane accepts responsibility for the Gateway",
-	}
-	if unsupportedAddr, addrType := gatewayHasUnsupportedAddresses(gateway); unsupportedAddr {
-		accepted = metav1.Condition{
-			Type:               string(gatewayv1beta1.GatewayConditionAccepted),
-			Status:             metav1.ConditionFalse,
-			Reason:             string(gatewayv1beta1.GatewayReasonUnsupportedAddress),
-			ObservedGeneration: gateway.Generation,
-			LastTransitionTime: metav1.Now(),
-			Message:            fmt.Sprintf("blixt only supports Gateway addresses of type IPAddress, %s is not supported", addrType),
-		}
-	}
-
 	gateway.Status = gatewayv1beta1.GatewayStatus{
 		Conditions: []metav1.Condition{
-			accepted,
+			{
+				Type:               string(gatewayv1beta1.GatewayConditionAccepted),
+				Status:             metav1.ConditionTrue,
+				Reason:             string(gatewayv1beta1.GatewayReasonAccepted),
+				ObservedGeneration: gateway.Generation,
+				LastTransitionTime: metav1.Now(),
+				Message:            "blixt controlplane accepts responsibility for the Gateway",
+			},
 			{
 				Type:               string(gatewayv1beta1.GatewayConditionProgrammed),
 				Status:             metav1.ConditionFalse,
@@ -214,6 +201,10 @@ func factorizeStatus(gateway, oldGateway *gatewayv1beta1.Gateway) {
 		}
 	}
 
+	for i := 0; i < len(gateway.Status.Conditions); i++ {
+		gateway.Status.Conditions[0].ObservedGeneration = gateway.Generation
+	}
+
 	for i, l := range gateway.Status.Listeners {
 		for j, lc := range l.Conditions {
 			for _, ol := range oldGateway.Status.Listeners {
@@ -232,6 +223,23 @@ func factorizeStatus(gateway, oldGateway *gatewayv1beta1.Gateway) {
 	}
 }
 
+func isGatewayAccepted(gateway *gatewayv1beta1.Gateway) bool {
+	accepted := getAcceptedConditionForGateway(gateway)
+	if accepted == nil {
+		return false
+	}
+	return accepted.Status == metav1.ConditionTrue
+}
+
+func getAcceptedConditionForGateway(gateway *gatewayv1beta1.Gateway) *metav1.Condition {
+	for _, c := range gateway.Status.Conditions {
+		if c.Type == string(gatewayv1beta1.GatewayConditionAccepted) {
+			return &c
+		}
+	}
+	return nil
+}
+
 // isGatewayProgrammed returns two boolean values:
 // - the status of the programmed condition
 // - a boolean flag to check if the condition exists
@@ -244,11 +252,8 @@ func isGatewayProgrammed(gateway *gatewayv1beta1.Gateway) (status bool, isSet bo
 	return false, false
 }
 
-func gatewayHasUnsupportedAddresses(gateway *gatewayv1beta1.Gateway) (bool, string) {
-	for _, addr := range gateway.Spec.Addresses {
-		if addr.Type != nil && *addr.Type != gatewayv1beta1.IPAddressType {
-			return false, string(*addr.Type)
-		}
-	}
-	return true, ""
+// sameConditions returns true if the type, status and reason match for
+// the two provided metav1.Conditions.
+func sameConditions(cond1, cond2 *metav1.Condition) bool {
+	return cond1.Type == cond2.Type && cond1.Status == cond2.Status && cond1.Reason == cond2.Reason && cond1.Message == cond2.Message && cond1.ObservedGeneration == cond2.ObservedGeneration
 }

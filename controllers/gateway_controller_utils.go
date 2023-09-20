@@ -255,6 +255,45 @@ func mapServiceToGateway(_ context.Context, obj client.Object) (reqs []reconcile
 	return
 }
 
+func setGatewayAcceptance(gateway *gatewayv1beta1.Gateway) {
+	var conditions []metav1.Condition
+	for _, cond := range gateway.Status.Conditions {
+		if cond.Type != string(gatewayv1beta1.GatewayConditionAccepted) {
+			conditions = append(conditions, cond)
+		}
+	}
+
+	accepted := determineGatewayAcceptance(gateway)
+	gateway.Status.Conditions = append(
+		[]metav1.Condition{accepted},
+		conditions...,
+	)
+}
+
+func determineGatewayAcceptance(gateway *gatewayv1beta1.Gateway) metav1.Condition {
+	// this is the default accepted condition, it may get overidden if there are
+	// unsupported values in the specification.
+	accepted := metav1.Condition{
+		Type:               string(gatewayv1beta1.GatewayConditionAccepted),
+		Status:             metav1.ConditionTrue,
+		Reason:             string(gatewayv1beta1.GatewayReasonAccepted),
+		ObservedGeneration: gateway.Generation,
+		LastTransitionTime: metav1.Now(),
+		Message:            "blixt controlplane accepts responsibility for the Gateway",
+	}
+
+	// verify that all addresses are supported
+	for _, addr := range gateway.Spec.Addresses {
+		if addr.Type != nil && *addr.Type != gatewayv1beta1.IPAddressType {
+			accepted.Status = metav1.ConditionFalse
+			accepted.Reason = string(gatewayv1beta1.GatewayReasonUnsupportedAddress)
+			accepted.Message = fmt.Sprintf("found an address of type %s, only IPAddress is supported", *addr.Type)
+		}
+	}
+
+	return accepted
+}
+
 type portAndProtocol struct {
 	port     int32
 	protocol corev1.Protocol
