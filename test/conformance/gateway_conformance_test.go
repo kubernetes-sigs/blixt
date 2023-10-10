@@ -99,5 +99,5 @@ func TestGatewayConformance(t *testing.T) {
 
 	t.Log("executing the gateway conformance test suite")
 	cSuite.Setup(t)
-	cSuite.Run(t, tests.ConformanceTests)
+	cSuite.Run(t, tests.ConformanceTests) //nolint:errcheck
 }
