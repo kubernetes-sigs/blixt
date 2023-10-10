@@ -6,12 +6,14 @@ package conformance
 import (
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	"github.com/kong/kubernetes-testing-framework/pkg/clusters"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	"sigs.k8s.io/gateway-api/conformance/apis/v1alpha1"
@@ -34,6 +36,7 @@ const (
 
 func TestGatewayConformance(t *testing.T) {
 	t.Log("configuring environment for gateway conformance tests")
+	log.SetLogger(logr.FromContextOrDiscard(ctx))
 	c, err := client.New(env.Cluster().Config(), client.Options{})
 	require.NoError(t, err)
 	require.NoError(t, gatewayv1alpha2.AddToScheme(c.Scheme()))
