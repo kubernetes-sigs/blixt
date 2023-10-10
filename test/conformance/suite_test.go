@@ -11,6 +11,7 @@ import (
 
 	"github.com/kong/kubernetes-testing-framework/pkg/clusters/addons/loadimage"
 	"github.com/kong/kubernetes-testing-framework/pkg/clusters/addons/metallb"
+	"github.com/kong/kubernetes-testing-framework/pkg/clusters/types/kind"
 	"github.com/kong/kubernetes-testing-framework/pkg/environments"
 )
 
@@ -21,6 +22,8 @@ var (
 	controlplaneImage = os.Getenv("BLIXT_CONTROLPLANE_IMAGE")
 	dataplaneImage    = os.Getenv("BLIXT_DATAPLANE_IMAGE")
 	udpServerImage    = os.Getenv("BLIXT_UDP_SERVER_IMAGE")
+
+	useExistingCluster = os.Getenv("BLIXT_USE_EXISTING_CLUSTER")
 )
 
 func TestMain(m *testing.M) {
@@ -28,22 +31,31 @@ func TestMain(m *testing.M) {
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	fmt.Println("INFO: loading custom images for conformance tests")
-	imageLoader, err := loadimage.NewBuilder().WithImage(controlplaneImage)
-	exitOnErr(err)
-	imageLoader, err = imageLoader.WithImage(dataplaneImage)
-	exitOnErr(err)
-	imageLoader, err = imageLoader.WithImage(udpServerImage)
-	exitOnErr(err)
+	if useExistingCluster != "" {
+		fmt.Printf("INFO: using existing kind cluster %s for test environment\n", useExistingCluster)
+		cluster, err := kind.NewFromExisting(useExistingCluster)
+		exitOnErr(err)
+		env, err = environments.NewBuilder().WithExistingCluster(cluster).Build(ctx)
+		exitOnErr(err)
+	} else {
+		fmt.Println("INFO: loading custom images for conformance tests")
+		imageLoader, err := loadimage.NewBuilder().WithImage(controlplaneImage)
+		exitOnErr(err)
+		imageLoader, err = imageLoader.WithImage(dataplaneImage)
+		exitOnErr(err)
+		imageLoader, err = imageLoader.WithImage(udpServerImage)
+		exitOnErr(err)
 
-	fmt.Println("INFO: building the test environment and cluster")
-	env, err = environments.NewBuilder().WithAddons(metallb.New(), imageLoader.Build()).Build(ctx)
-	exitOnErr(err)
-	addCleanup(env.Cleanup)
+		fmt.Println("INFO: building the test environment and cluster")
+		env, err = environments.NewBuilder().WithAddons(metallb.New(), imageLoader.Build()).Build(ctx)
+		exitOnErr(err)
+		addCleanup(env.Cleanup)
+	}
 
-	fmt.Println("INFO: waiting for cluster and addons to be ready")
+	fmt.Println("INFO: waiting for testing environment to be ready")
 	exitOnErr(<-env.WaitForReady(ctx))
 
+	fmt.Println("INFO: running tests")
 	code := m.Run()
 	os.Exit(code)
 }
