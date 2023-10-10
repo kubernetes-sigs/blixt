@@ -27,7 +27,7 @@ func TestGatewayBasics(t *testing.T) {
 	gatewayBasicsCleanupKey := "gatewaybasics"
 	defer func() {
 		testutils.DumpDiagnosticsIfFailed(ctx, t, env.Cluster())
-		runCleanup(gatewayBasicsCleanupKey)
+		runCleanup(gatewayBasicsCleanupKey) //nolint:errcheck
 	}()
 
 	t.Log("deploying GatewayClass")
