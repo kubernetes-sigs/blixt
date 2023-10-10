@@ -3,6 +3,9 @@ BLIXT_CONTROLPLANE_IMAGE ?= ghcr.io/kong/blixt-controlplane
 BLIXT_DATAPLANE_IMAGE ?= ghcr.io/kong/blixt-dataplane
 BLIXT_UDP_SERVER_IMAGE ?= ghcr.io/kong/blixt-udp-test-server
 
+# Other testing variables
+EXISTING_CLUSTER ?=
+
 # Image URL to use all building/pushing image targets
 TAG ?= integration-tests
 
@@ -143,7 +146,17 @@ test.conformance: manifests generate fmt vet
 	BLIXT_CONTROLPLANE_IMAGE=$(BLIXT_CONTROLPLANE_IMAGE):$(TAG) \
 	BLIXT_DATAPLANE_IMAGE=$(BLIXT_DATAPLANE_IMAGE):$(TAG) \
 	BLIXT_UDP_SERVER_IMAGE=$(BLIXT_UDP_SERVER_IMAGE):$(TAG) \
+	BLIXT_USE_EXISTING_CLUSTER=$(EXISTING_CLUSTER) \
 	GOFLAGS="-tags=conformance_tests" go test -race -v ./test/conformance/...
+
+.PHONY: debug.conformance
+debug.conformance: manifests generate fmt vet
+	go clean -testcache
+	BLIXT_CONTROLPLANE_IMAGE=$(BLIXT_CONTROLPLANE_IMAGE):$(TAG) \
+	BLIXT_DATAPLANE_IMAGE=$(BLIXT_DATAPLANE_IMAGE):$(TAG) \
+	BLIXT_UDP_SERVER_IMAGE=$(BLIXT_UDP_SERVER_IMAGE):$(TAG) \
+	BLIXT_USE_EXISTING_CLUSTER=$(EXISTING_CLUSTER) \
+	GOFLAGS="-tags=conformance_tests" dlv test ./test/conformance/...
 
 ##@ Build
 
