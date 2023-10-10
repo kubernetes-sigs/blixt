@@ -30,6 +30,8 @@ import (
 //+kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=endpoints/status,verbs=get
 
+//+kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch
+
 const gatewayServiceLabel = "konghq.com/owned-by-gateway"
 
 // GatewayReconciler reconciles a Gateway object
