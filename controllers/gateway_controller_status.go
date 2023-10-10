@@ -1,20 +1,13 @@
 package controllers
 
 import (
-	"context"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-// updateGatewayStatus computes the new Gateway status, setting its ready condition and all the
-// ready listeners's ready conditions to true, unless a resolvedRefs error is discovered. In
-// that case, the proper listener ready condition and the gateway one are set to false.
-// The addresses are updated as well.
-func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc *corev1.Service) {
-	// gateway addresses
-	gwaddrs := make([]gatewayv1beta1.GatewayStatusAddress, 0, len(svc.Status.LoadBalancer.Ingress))
+func setGatewayStatusAddresses(gateway *gatewayv1beta1.Gateway, svc *corev1.Service) {
+	gwaddrs := []gatewayv1beta1.GatewayStatusAddress{}
 	for _, addr := range svc.Status.LoadBalancer.Ingress {
 		if addr.IP != "" {
 			gwaddrs = append(gwaddrs, gatewayv1beta1.GatewayStatusAddress{
@@ -30,17 +23,10 @@ func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc
 		}
 	}
 	gateway.Status.Addresses = gwaddrs
+}
 
-	// gateway conditions
-	newGatewayAcceptedCondition := metav1.Condition{
-		Type:               string(gatewayv1beta1.GatewayConditionAccepted),
-		Status:             metav1.ConditionTrue,
-		Reason:             string(gatewayv1beta1.GatewayReasonAccepted),
-		ObservedGeneration: gateway.Generation,
-		LastTransitionTime: metav1.Now(),
-		Message:            "blixt controlplane accepts responsibility for the Gateway",
-	}
-	newGatewayProgrammedCondition := metav1.Condition{
+func setGatewayListenerConditionsAndProgrammed(gateway *gatewayv1beta1.Gateway) {
+	programmed := metav1.Condition{
 		Type:               string(gatewayv1beta1.GatewayConditionProgrammed),
 		Status:             metav1.ConditionTrue,
 		Reason:             string(gatewayv1beta1.GatewayReasonProgrammed),
@@ -49,7 +35,6 @@ func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc
 		Message:            "the gateway is ready to route traffic",
 	}
 
-	// gateway listeners conditions
 	listenersStatus := make([]gatewayv1beta1.ListenerStatus, 0, len(gateway.Spec.Listeners))
 	for _, l := range gateway.Spec.Listeners {
 		supportedKinds, resolvedRefsCondition := getSupportedKinds(gateway.Generation, l)
@@ -64,6 +49,13 @@ func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc
 			SupportedKinds: supportedKinds,
 			Conditions: []metav1.Condition{
 				{
+					Type:               string(gatewayv1beta1.ListenerConditionAccepted),
+					Status:             metav1.ConditionTrue,
+					Reason:             string(gatewayv1beta1.ListenerReasonAccepted),
+					ObservedGeneration: gateway.Generation,
+					LastTransitionTime: metav1.Now(),
+				},
+				{
 					Type:               string(gatewayv1beta1.ListenerConditionProgrammed),
 					Status:             metav1.ConditionStatus(listenerProgrammedStatus),
 					Reason:             string(listenerProgrammedReason),
@@ -74,42 +66,16 @@ func updateGatewayStatus(_ context.Context, gateway *gatewayv1beta1.Gateway, svc
 			},
 		})
 		if resolvedRefsCondition.Status == metav1.ConditionFalse {
-			newGatewayProgrammedCondition.Status = metav1.ConditionFalse
-			newGatewayProgrammedCondition.Reason = string(gatewayv1beta1.GatewayReasonAddressNotAssigned)
-			newGatewayProgrammedCondition.Message = "the gateway is not ready to route traffic"
+			programmed.Status = metav1.ConditionFalse
+			programmed.Reason = string(gatewayv1beta1.GatewayReasonAddressNotAssigned)
+			programmed.Message = "the gateway is not ready to route traffic"
 		}
 	}
-
-	gateway.Status.Conditions = []metav1.Condition{
-		newGatewayAcceptedCondition,
-		newGatewayProgrammedCondition,
-	}
 	gateway.Status.Listeners = listenersStatus
+	setCond(gateway, programmed)
 }
 
-// initGatewayStatus initializes the GatewayStatus, setting the ready condition to
-// not ready and all the listeners ready status to not ready as well.
-func initGatewayStatus(gateway *gatewayv1beta1.Gateway) {
-	gateway.Status = gatewayv1beta1.GatewayStatus{
-		Conditions: []metav1.Condition{
-			{
-				Type:               string(gatewayv1beta1.GatewayConditionAccepted),
-				Status:             metav1.ConditionTrue,
-				Reason:             string(gatewayv1beta1.GatewayReasonAccepted),
-				ObservedGeneration: gateway.Generation,
-				LastTransitionTime: metav1.Now(),
-				Message:            "blixt controlplane accepts responsibility for the Gateway",
-			},
-			{
-				Type:               string(gatewayv1beta1.GatewayConditionProgrammed),
-				Status:             metav1.ConditionFalse,
-				Reason:             string(gatewayv1beta1.GatewayReasonAddressNotAssigned),
-				ObservedGeneration: gateway.Generation,
-				LastTransitionTime: metav1.Now(),
-				Message:            "the gateway is not ready to route traffic",
-			},
-		},
-	}
+func setGatewayListenerStatus(gateway *gatewayv1beta1.Gateway) {
 	gateway.Status.Listeners = make([]gatewayv1beta1.ListenerStatus, 0, len(gateway.Spec.Listeners))
 	for _, l := range gateway.Spec.Listeners {
 		supportedKinds, resolvedRefsCondition := getSupportedKinds(gateway.Generation, l)
@@ -160,12 +126,12 @@ func getSupportedKinds(generation int64, listener gatewayv1beta1.Listener) (supp
 		case gatewayv1beta1.HTTPProtocolType:
 			supportedKinds = append(supportedKinds, gatewayv1beta1.RouteGroupKind{
 				Group: (*gatewayv1beta1.Group)(&gatewayv1beta1.GroupVersion.Group),
-				Kind:  "TCPRoute",
+				Kind:  "HTTPRoute",
 			})
 		case gatewayv1beta1.HTTPSProtocolType:
 			supportedKinds = append(supportedKinds, gatewayv1beta1.RouteGroupKind{
 				Group: (*gatewayv1beta1.Group)(&gatewayv1beta1.GroupVersion.Group),
-				Kind:  "TCPRoute",
+				Kind:  "HTTPRoute",
 			})
 		default:
 			resolvedRefsCondition.Status = metav1.ConditionFalse
@@ -188,38 +154,20 @@ func getSupportedKinds(generation int64, listener gatewayv1beta1.Listener) (supp
 	return supportedKinds, resolvedRefsCondition
 }
 
-// factorizeStatus takes the old gateway conditions not transitioned and copies them
+// updateConditionGeneration takes the old gateway conditions not transitioned and copies them
 // into the new gateway status, so that only the transitioning conditions gets actually patched.
-func factorizeStatus(gateway, oldGateway *gatewayv1beta1.Gateway) {
-	for i, c := range gateway.Status.Conditions {
-		for _, oldC := range oldGateway.Status.Conditions {
-			if c.Type == oldC.Type {
-				if c.Status == oldC.Status && c.Reason == oldC.Reason {
-					gateway.Status.Conditions[i] = oldC
-				}
-			}
-		}
-	}
-
+func updateConditionGeneration(gateway *gatewayv1beta1.Gateway) {
 	for i := 0; i < len(gateway.Status.Conditions); i++ {
 		gateway.Status.Conditions[0].ObservedGeneration = gateway.Generation
 	}
 
-	for i, l := range gateway.Status.Listeners {
-		for j, lc := range l.Conditions {
-			for _, ol := range oldGateway.Status.Listeners {
-				if ol.Name != l.Name {
-					continue
-				}
-				for _, olc := range ol.Conditions {
-					if lc.Type == olc.Type {
-						if lc.Status == olc.Status && lc.Reason == olc.Reason {
-							gateway.Status.Listeners[i].Conditions[j] = olc
-						}
-					}
-				}
-			}
+	for i := 0; i < len(gateway.Status.Listeners); i++ {
+		updatedListenerConditions := []metav1.Condition{}
+		for _, cond := range gateway.Status.Listeners[0].Conditions {
+			cond.ObservedGeneration = gateway.Generation
+			updatedListenerConditions = append(updatedListenerConditions, cond)
 		}
+		gateway.Status.Listeners[0].Conditions = updatedListenerConditions
 	}
 }
 
@@ -232,28 +180,34 @@ func isGatewayAccepted(gateway *gatewayv1beta1.Gateway) bool {
 }
 
 func getAcceptedConditionForGateway(gateway *gatewayv1beta1.Gateway) *metav1.Condition {
-	for _, c := range gateway.Status.Conditions {
-		if c.Type == string(gatewayv1beta1.GatewayConditionAccepted) {
-			return &c
+	return getCond(gateway, string(gatewayv1beta1.GatewayConditionAccepted))
+}
+
+func setCond(gateway *gatewayv1beta1.Gateway, setCond metav1.Condition) {
+	updatedConditions := make([]metav1.Condition, 0, len(gateway.Status.Conditions))
+
+	found := false
+	for _, oldCond := range gateway.Status.Conditions {
+		if oldCond.Type == setCond.Type {
+			found = true
+			updatedConditions = append(updatedConditions, setCond)
+		} else {
+			updatedConditions = append(updatedConditions, oldCond)
+		}
+	}
+
+	if !found {
+		updatedConditions = append(updatedConditions, setCond)
+	}
+
+	gateway.Status.Conditions = updatedConditions
+}
+
+func getCond(gateway *gatewayv1beta1.Gateway, requestedType string) *metav1.Condition {
+	for _, cond := range gateway.Status.Conditions {
+		if cond.Type == requestedType {
+			return &cond
 		}
 	}
 	return nil
-}
-
-// isGatewayProgrammed returns two boolean values:
-// - the status of the programmed condition
-// - a boolean flag to check if the condition exists
-func isGatewayProgrammed(gateway *gatewayv1beta1.Gateway) (status bool, isSet bool) {
-	for _, c := range gateway.Status.Conditions {
-		if c.Type == string(gatewayv1beta1.GatewayConditionProgrammed) {
-			return c.Status == metav1.ConditionTrue, true
-		}
-	}
-	return false, false
-}
-
-// sameConditions returns true if the type, status and reason match for
-// the two provided metav1.Conditions.
-func sameConditions(cond1, cond2 *metav1.Condition) bool {
-	return cond1.Type == cond2.Type && cond1.Status == cond2.Status && cond1.Reason == cond2.Reason && cond1.Message == cond2.Message && cond1.ObservedGeneration == cond2.ObservedGeneration
 }

@@ -83,14 +83,80 @@ func setOwnerReference(svc *corev1.Service, gw client.Object) {
 	}}
 }
 
-func (r *GatewayReconciler) ensureServiceConfiguration(_ context.Context, svc *corev1.Service, gw *gatewayv1beta1.Gateway) (bool, error) {
-	// TODO: handle removal and changes of addresses https://github.com/Kong/blixt/issues/96
+func (r *GatewayReconciler) svcIsHealthy(ctx context.Context, svc *corev1.Service) error {
+	if len(svc.Status.LoadBalancer.Ingress) > 0 {
+		return nil
+	}
 
-	// check whether there's been a problem allocating an IP address
-	for _, cond := range svc.Status.Conditions {
-		if cond.Type == corev1.EventTypeWarning && cond.Reason == "AllocationFailed" { // TODO: only handles metallb right now https://github.com/Kong/blixt/issues/96
-			return false, fmt.Errorf(cond.Message)
+	// FIXME: the following is a hack to use metallb events to determine if the
+	// service is having trouble getting an IP allocated for it. This was created
+	// in a hurry and needs to be replaced with something robust.
+	events := &corev1.EventList{}
+	if err := r.Client.List(ctx, events, &client.ListOptions{
+		// TODO: add a field selector
+		Namespace: svc.Namespace,
+	}); err != nil {
+		return err
+	}
+
+	var allocationFailed *corev1.Event
+	var allocationSucceeded *corev1.Event
+
+	for _, event := range events.Items {
+		currentEvent := event
+
+		if currentEvent.InvolvedObject.Name == svc.Name && currentEvent.Reason == "AllocationFailed" { // TODO: only handles metallb right now https://github.com/Kong/blixt/issues/96
+			if allocationFailed != nil {
+				if currentEvent.EventTime.After(allocationFailed.EventTime.Time) {
+					allocationFailed = &currentEvent
+				}
+			} else {
+				allocationFailed = &currentEvent
+			}
 		}
+
+		if currentEvent.InvolvedObject.Name == svc.Name && currentEvent.Reason == "IPAllocated" {
+			if allocationSucceeded != nil {
+				if currentEvent.EventTime.After(allocationSucceeded.EventTime.Time) {
+					allocationSucceeded = &currentEvent
+				}
+			} else {
+				allocationSucceeded = &currentEvent
+			}
+		}
+	}
+
+	if allocationFailed != nil {
+		if allocationSucceeded != nil && allocationSucceeded.EventTime.After(allocationFailed.EventTime.Time) {
+			return nil
+		}
+		return fmt.Errorf(allocationFailed.Message)
+	}
+
+	return nil
+}
+
+func (r *GatewayReconciler) ensureServiceConfiguration(ctx context.Context, svc *corev1.Service, gw *gatewayv1beta1.Gateway) (bool, error) {
+	updated := false
+
+	if len(gw.Spec.Addresses) > 0 && svc.Spec.LoadBalancerIP != gw.Spec.Addresses[0].Value {
+		if len(gw.Spec.Addresses) > 1 {
+			r.Log.Info(fmt.Sprintf("found %d addresses on gateway, but currently we only support 1", len(gw.Spec.Addresses)), gw.Namespace, gw.Name)
+		}
+		r.Log.Info(fmt.Sprintf("using address %s for gateway", gw.Spec.Addresses[0].Value), gw.Namespace, gw.Name)
+		svc.Spec.LoadBalancerIP = gw.Spec.Addresses[0].Value
+		updated = true
+	}
+
+	if svc.Spec.LoadBalancerIP != "" && len(gw.Spec.Addresses) == 0 {
+		r.Log.Info("service for gateway had a left over address that's no longer specified, removing", gw.Namespace, gw.Name)
+		svc.Spec.LoadBalancerIP = ""
+		updated = true
+	}
+
+	if svc.Spec.Type != corev1.ServiceTypeLoadBalancer {
+		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
+		updated = true
 	}
 
 	ports := make([]corev1.ServicePort, 0, len(gw.Spec.Listeners))
@@ -126,12 +192,6 @@ func (r *GatewayReconciler) ensureServiceConfiguration(_ context.Context, svc *c
 				Port:     int32(listener.Port),
 			})
 		}
-	}
-
-	updated := false
-	if svc.Spec.Type != corev1.ServiceTypeLoadBalancer {
-		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
-		updated = true
 	}
 
 	newPorts := make(map[string]portAndProtocol, len(ports))
@@ -255,19 +315,11 @@ func mapServiceToGateway(_ context.Context, obj client.Object) (reqs []reconcile
 	return
 }
 
-func setGatewayAcceptance(gateway *gatewayv1beta1.Gateway) {
-	var conditions []metav1.Condition
-	for _, cond := range gateway.Status.Conditions {
-		if cond.Type != string(gatewayv1beta1.GatewayConditionAccepted) {
-			conditions = append(conditions, cond)
-		}
-	}
-
-	accepted := determineGatewayAcceptance(gateway)
-	gateway.Status.Conditions = append(
-		[]metav1.Condition{accepted},
-		conditions...,
-	)
+func setGatewayStatus(gateway *gatewayv1beta1.Gateway) {
+	newAccepted := determineGatewayAcceptance(gateway)
+	newProgrammed := determineGatewayProgrammed(gateway)
+	setCond(gateway, newAccepted)
+	setCond(gateway, newProgrammed)
 }
 
 func determineGatewayAcceptance(gateway *gatewayv1beta1.Gateway) metav1.Condition {
@@ -292,6 +344,27 @@ func determineGatewayAcceptance(gateway *gatewayv1beta1.Gateway) metav1.Conditio
 	}
 
 	return accepted
+}
+
+func determineGatewayProgrammed(gateway *gatewayv1beta1.Gateway) metav1.Condition {
+	// TODO: give this client access and make it dynamic
+	return metav1.Condition{
+		Type:               string(gatewayv1beta1.GatewayConditionProgrammed),
+		ObservedGeneration: gateway.Generation,
+		Status:             metav1.ConditionFalse,
+		LastTransitionTime: metav1.Now(),
+		Reason:             string(gatewayv1beta1.GatewayReasonPending),
+		Message:            "dataplane not yet configured",
+	}
+}
+
+// cmpCond returns true if the conditions are the same, minus the timestamp.
+func cmpCond(cond1, cond2 metav1.Condition) bool { //nolint:unused
+	return cond1.Type == cond2.Type &&
+		cond1.Status == cond2.Status &&
+		cond1.ObservedGeneration == cond2.ObservedGeneration &&
+		cond1.Reason == cond2.Reason &&
+		cond1.Message == cond2.Message
 }
 
 type portAndProtocol struct {

@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/kong/blixt/pkg/vars"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -84,8 +87,8 @@ func (r *GatewayReconciler) gatewayHasMatchingGatewayClass(obj client.Object) bo
 func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	gw := new(gatewayv1beta1.Gateway)
-	if err := r.Client.Get(ctx, req.NamespacedName, gw); err != nil {
+	gateway := new(gatewayv1beta1.Gateway)
+	if err := r.Client.Get(ctx, req.NamespacedName, gateway); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("object enqueued no longer exists, skipping")
 			return ctrl.Result{}, nil
@@ -93,54 +96,40 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	gwc := new(gatewayv1beta1.GatewayClass)
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: string(gw.Spec.GatewayClassName)}, gwc); err != nil {
+	gatewayClass := new(gatewayv1beta1.GatewayClass)
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, gatewayClass); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
 	}
 
-	if gwc.Spec.ControllerName != vars.GatewayClassControllerName {
+	if gatewayClass.Spec.ControllerName != vars.GatewayClassControllerName {
 		return ctrl.Result{}, nil
 	}
 
-	// determine if the Gateway has been accepted, and if it has not then
-	// determine whether we will accept it, and if not drop it until it has
-	// been corrected.
-	oldGateway := gw.DeepCopy()
-	isAccepted := isGatewayAccepted(gw)
-	if !isAccepted {
-		initGatewayStatus(gw)
-		setGatewayAcceptance(gw)
-		factorizeStatus(gw, oldGateway)
-
-		oldAccepted := getAcceptedConditionForGateway(oldGateway)
-		accepted := getAcceptedConditionForGateway(gw)
-
-		if !sameConditions(oldAccepted, accepted) {
-			return ctrl.Result{}, r.Status().Patch(ctx, gw, client.MergeFrom(oldGateway))
-		}
-
-		log.Info("gateway %s/%s is not accepted and will not be provisioned", gw.Namespace, gw.Name)
-		return ctrl.Result{}, nil
+	log.Info("found a supported Gateway, determining whether the gateway has been accepted")
+	oldGateway := gateway.DeepCopy()
+	if !isGatewayAccepted(gateway) {
+		log.Info("gateway not yet accepted")
+		setGatewayListenerStatus(gateway)
+		setGatewayStatus(gateway)
+		updateConditionGeneration(gateway)
+		return ctrl.Result{}, r.Status().Patch(ctx, gateway, client.MergeFrom(oldGateway))
 	}
 
 	log.Info("checking for Service for Gateway")
-	svc, err := r.getServiceForGateway(ctx, gw)
+	svc, err := r.getServiceForGateway(ctx, gateway)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if svc == nil {
 		log.Info("creating Service for Gateway")
-		return ctrl.Result{}, r.createServiceForGateway(ctx, gw) // service creation will requeue gateway
+		return ctrl.Result{}, r.createServiceForGateway(ctx, gateway) // service creation will requeue gateway
 	}
 
 	log.Info("checking Service configuration")
-	needsUpdate, err := r.ensureServiceConfiguration(ctx, svc, gw)
-	// in both cases when the service does not exist or an error has been triggered, the Gateway
-	// must be not ready. This OR condition is redundant, as (needsUpdate == true AND err == nil)
-	// should never happen, but useful to highlight the purpose.
+	needsUpdate, err := r.ensureServiceConfiguration(ctx, svc, gateway)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -151,9 +140,27 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	log.Info("checking Service status", "namespace", svc.Namespace, "name", svc.Name)
 	switch t := svc.Spec.Type; t {
 	case corev1.ServiceTypeLoadBalancer:
+		if err := r.svcIsHealthy(ctx, svc); err != nil {
+			// TODO: only handles metallb right now https://github.com/Kong/blixt/issues/96
+			if strings.Contains(err.Error(), "Failed to allocate IP") {
+				r.Log.Info("failed to allocate IP for Gateway", gateway.Namespace, gateway.Name)
+				setCond(gateway, metav1.Condition{
+					Type:               string(gatewayv1beta1.GatewayConditionProgrammed),
+					ObservedGeneration: gateway.Generation,
+					Status:             metav1.ConditionFalse,
+					LastTransitionTime: metav1.Now(),
+					Reason:             string(gatewayv1beta1.GatewayReasonAddressNotUsable),
+					Message:            err.Error(),
+				})
+				updateConditionGeneration(gateway)
+				return ctrl.Result{Requeue: true}, r.Status().Patch(ctx, gateway, client.MergeFrom(oldGateway))
+			}
+			return ctrl.Result{}, err
+		}
+
 		if svc.Spec.ClusterIP == "" || len(svc.Status.LoadBalancer.Ingress) < 1 {
 			log.Info("waiting for Service to be ready")
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 	default:
 		return ctrl.Result{}, fmt.Errorf("found unsupported Service type: %s (only LoadBalancer type is currently supported)", t)
@@ -170,8 +177,9 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	log.Info("Service is ready, updating Gateway")
-	updateGatewayStatus(ctx, gw, svc)
-	factorizeStatus(gw, oldGateway)
-	return ctrl.Result{}, r.Status().Patch(ctx, gw, client.MergeFrom(oldGateway))
+	log.Info("Service is ready, setting Gateway as programmed")
+	setGatewayStatusAddresses(gateway, svc)
+	setGatewayListenerConditionsAndProgrammed(gateway)
+	updateConditionGeneration(gateway)
+	return ctrl.Result{}, r.Status().Patch(ctx, gateway, client.MergeFrom(oldGateway))
 }
