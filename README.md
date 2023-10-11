@@ -4,6 +4,8 @@
 
 # Blixt
 
+> TODO: README needs cleaning up now that we've moved to Kubernetes SIGs.
+
 An experimental [layer 4][osi] load-balancer for [Kubernetes][k8s].
 
 The control-plane is built using [Gateway API][gwapi] and written in
