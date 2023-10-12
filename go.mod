@@ -7,7 +7,7 @@ require (
 	github.com/go-logr/stdr v1.2.2
 	github.com/google/uuid v1.3.1
 	github.com/kong/kubernetes-testing-framework v0.38.0
-	github.com/onsi/ginkgo/v2 v2.11.0
+	github.com/onsi/ginkgo/v2 v2.13.0
 	github.com/onsi/gomega v1.27.10
 	github.com/stretchr/testify v1.8.4
 	google.golang.org/grpc v1.58.3
