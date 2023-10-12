@@ -1,10 +1,8 @@
-![blixt-logo](https://github.com/Kong/blixt/assets/5332524/a9f54ef0-db70-4b90-a6c0-3e21d1eac37a)
+![blixt](https://github.com/kubernetes-sigs/blixt/assets/5332524/387ce94a-88fd-43a9-bde9-73fb9005564d)
 
 > **Warning**: Experimental. There is no intention to ever make this viable for production. Do not use in production.
 
 # Blixt
-
-> TODO: README needs cleaning up now that we've moved to Kubernetes SIGs.
 
 An experimental [layer 4][osi] load-balancer for [Kubernetes][k8s].
 
@@ -34,10 +32,14 @@ Current project goals are the following:
 - [ ] support [TCPRoute][tcproute] (partially complete)
 - [ ] use this as a basis for adding/improving [Gateway API Conformance Tests][gwcnf]
 - [ ] plug this into [Gateway API][gwapi] CI to run conformance tests on PRs
+- [ ] use as a reference implementation for Gateway API (don't use it this way yet!)
 
 After these goals are achieved, further goals may be decided.
 
 > **Note**: [TLSRoute][tlsroute] support may be on the table, but we're looking
+> for someone from the community to champion this.
+
+> **Note**: [HTTPRoute][httproute] support may be on the table, but we're looking
 > for someone from the community to champion this.
 
 > **Note**: The initial proof of concept was written as an XDP program, but
@@ -51,6 +53,7 @@ After these goals are achieved, further goals may be decided.
 [gwcnf]:https://github.com/kubernetes-sigs/gateway-api/tree/main/conformance
 [gwapi]:https://gateway-api.sigs.k8s.io
 [tlsroute]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.TLSRoute
+[httproute]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.HTTPRoute
 
 ## Usage
 
@@ -95,24 +98,16 @@ can now deploy.
 
 ## Community
 
-This project originally started at [Kong][kong] but is being [donated to
-Kubernetes SIG Network][donation]. It is becoming a part of the [Gateway
-API][gwapi] project and as such is discussed in the [Gateway API weekly
-meetings][gwapi-meet]. In particular, we do some discussion and paired
-programming of this project on the `Gateway API Code Jam` meeting which
-is on the [SIG Network calendar][gwapi-meet].
+You can reach out to the community by creating [issue][issues] or
+[discussions][disc]. You can also reach out on [Kubernetes Slack][kslack] on the
+`#sig-network-gateway-api` channel. There is also a `#ebpf` channel on
+Kubernetes Slack for general eBPF related help.
 
-You can also reach out with problems or questions by creating an
-[issue][issues], or a [discussion][disc] on this repo. You can also reach out
-on [Kubernetes Slack][kslack] on the `#sig-network-gateway-api` channel. There
-is also a `#ebpf` channel on Kubernetes Slack for general eBPF related help.
-
-[kong]:https://github.com/kong
-[donation]:https://github.com/kong/blixt/discussions/42
+[donation]:https://github.com/kubernetes/org/issues/3875
 [gwapi]:https://gateway-api.sigs.k8s.io/
 [gwapi-meet]:https://gateway-api.sigs.k8s.io/contributing/#meetings
-[issues]:https://github.com/kong/blixt/issues
-[disc]:https://github.com/kong/blixt/discussions
+[issues]:https://github.com/kubernetes-sigs/blixt/issues
+[disc]:https://github.com/kubernetes-sigs/blixt/discussions
 [kslack]:https://kubernetes.slack.com
 
 # License
@@ -123,6 +118,6 @@ data-plane components are dual-licensed under the [General Public License,
 Version 2.0 (only)][gplv2] and the [2-Clause BSD License][bsd2c] (at your
 option) including everything _inside_ the `dataplane/` directory.
 
-[apache2]:https://github.com/Kong/blixt/blob/main/LICENSE
-[gplv2]:https://github.com/Kong/blixt/blob/main/dataplane/LICENSE.GPL-2.0
-[bsd2c]:https://github.com/Kong/blixt/blob/main/dataplane/LICENSE.BSD-2-Clause
+[apache2]:https://github.com/kubernetes-sigs/blixt/blob/main/LICENSE
+[gplv2]:https://github.com/kubernetes-sigs/blixt/blob/main/dataplane/LICENSE.GPL-2.0
+[bsd2c]:https://github.com/kubernetes-sigs/blixt/blob/main/dataplane/LICENSE.BSD-2-Clause
