@@ -109,6 +109,7 @@ generate.grpc-client:
 		--go_opt=module=github.com/kong/blixt \
 		--go-grpc_out=. --go-grpc_opt=paths=import \
 		--go-grpc_opt=module=github.com/kong/blixt \
+		--experimental_allow_proto3_optional \
 		dataplane/api-server/proto/backends.proto
 
 .PHONY: fmt

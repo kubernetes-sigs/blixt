@@ -33,8 +33,10 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
         ip: u32::from_be(original_daddr),
         port: (u16::from_be(unsafe { (*tcp_hdr).dest })) as u32,
     };
-
-    let backend = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_OK)?;
+    let backend_list = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_OK)?;
+    // Only a single backend is supported for TCP connections.
+    // TODO(aryan9600): Add support for multiple backends (https://github.com/kubernetes-sigs/blixt/issues/119)
+    let backend = backend_list.backends[0];
 
     info!(
         &ctx,

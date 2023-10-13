@@ -11,14 +11,14 @@ use aya_bpf::{
     helpers::{bpf_csum_diff, bpf_redirect_neigh},
     programs::TcContext,
 };
-use aya_log_ebpf::info;
+use aya_log_ebpf::{debug, info};
 
 use crate::{
     bindings::{iphdr, udphdr},
     utils::{csum_fold_helper, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
-    BACKENDS, BLIXT_CONNTRACK,
+    BACKENDS, BLIXT_CONNTRACK, GATEWAY_INDEXES,
 };
-use common::BackendKey;
+use common::{BackendKey, BACKENDS_ARRAY_CAPACITY};
 
 pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
     let ip_hdr: *mut iphdr = unsafe { ptr_at(&ctx, ETH_HDR_LEN) }?;
@@ -33,8 +33,8 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
         ip: u32::from_be(original_daddr),
         port: (u16::from_be(unsafe { (*udp_hdr).dest })) as u32,
     };
-
-    let backend = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_PIPE)?;
+    let backend_list = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_PIPE)?;
+    let backend_index = unsafe { GATEWAY_INDEXES.get(&key) }.ok_or(TC_ACT_PIPE)?;
 
     info!(
         &ctx,
@@ -42,6 +42,31 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
         u32::from_be(unsafe { (*ip_hdr).daddr }),
         u16::from_be(unsafe { (*udp_hdr).dest })
     );
+
+    debug!(&ctx, "Destination backend index: {}", *backend_index);
+    debug!(&ctx, "Backends length: {}", backend_list.backends_len);
+
+    // this check asserts that we don't use a "zero-value" Backend
+    if backend_list.backends_len <= *backend_index {
+        return Ok(TC_ACT_PIPE);
+    }
+    // this check is to make the verifier happy
+    if *backend_index as usize >= BACKENDS_ARRAY_CAPACITY {
+        return Ok(TC_ACT_PIPE);
+    }
+
+    let mut backend = backend_list.backends[0];
+    match backend_list.backends.get(*backend_index as usize) {
+        Some(bk) => backend = *bk,
+        None => {
+            debug!(
+                &ctx,
+                "Failed to find backend in backends_list at index {}, using 0th index; backends_len: {} ",
+                *backend_index,
+                backend_list.backends_len
+            )
+        }
+    }
 
     unsafe {
         BLIXT_CONNTRACK.insert(
@@ -84,6 +109,15 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
             0,
         )
     };
+
+    // move the index to the next backend in our list
+    let mut next = *backend_index + 1;
+    if next >= backend_list.backends_len {
+        next = 0;
+    }
+    unsafe {
+        GATEWAY_INDEXES.insert(&key, &next, 0 as u64)?;
+    }
 
     info!(&ctx, "redirect action: {}", action);
 
