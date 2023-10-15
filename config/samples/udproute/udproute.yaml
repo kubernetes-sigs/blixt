@@ -10,3 +10,9 @@ spec:
   - backendRefs:
     - name: blixt-udproute-sample
       port: 9875
+  - backendRefs:
+    - name: blixt-udproute-sample
+      port: 9876
+  - backendRefs:
+    - name: blixt-udproute-sample
+      port: 9877

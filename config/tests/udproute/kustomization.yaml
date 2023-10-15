@@ -5,3 +5,14 @@ images:
   newTag: integration-tests
 resources:
 - ../../samples/udproute
+patches:
+- patch: |-
+    - op: remove
+      path: /spec/rules/2
+    - op: remove
+      path: /spec/rules/1
+  target:
+    group: gateway.networking.k8s.io
+    kind: UDPRoute
+    name: blixt-udproute-sample
+    version: v1alpha2
