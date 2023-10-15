@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"time"
 
@@ -218,8 +219,13 @@ func (r *TCPRouteReconciler) ensureTCPRouteConfiguredInDataPlane(ctx context.Con
 }
 
 func (r *TCPRouteReconciler) ensureTCPRouteDeletedInDataPlane(ctx context.Context, tcproute *gatewayv1alpha2.TCPRoute, gateway *gatewayv1beta1.Gateway) error {
-	// build the dataplane configuration from the TCPRoute and its Gateway
-	targets, err := dataplane.CompileTCPRouteToDataPlaneBackend(ctx, r.Client, tcproute, gateway)
+	// get the gateway IP and port.
+	gwIP, err := dataplane.GetGatewayIP(gateway)
+	if err != nil {
+		return err
+	}
+	gatewayIP := binary.BigEndian.Uint32(gwIP.To4())
+	gwPort, err := dataplane.GetGatewayPort(gateway, tcproute.Spec.ParentRefs)
 	if err != nil {
 		return err
 	}
@@ -230,8 +236,13 @@ func (r *TCPRouteReconciler) ensureTCPRouteDeletedInDataPlane(ctx context.Contex
 		return err
 	}
 
-	// delete the target from the dataplane
-	confirmation, err := dataplaneClient.Delete(context.Background(), targets.Vip)
+	// since we currently only support one TCPRoute per Gateway, we can delete the vip (gateway)
+	// entry from the dataplane. this won't fly when we end up adding support for multiple TCPRoutes
+	// per Gateway.
+	confirmation, err := dataplaneClient.Delete(context.Background(), &dataplane.Vip{
+		Ip:   gatewayIP,
+		Port: gwPort,
+	})
 	if err != nil {
 		return err
 	}
