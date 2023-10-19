@@ -26,7 +26,7 @@ use aya_bpf::{
 };
 
 use bindings::{ethhdr, iphdr};
-use common::{Backend, BackendKey};
+use common::{BackendKey, BackendList, BPF_MAPS_CAPACITY};
 use egress::{icmp::handle_icmp_egress, tcp::handle_tcp_egress};
 use ingress::{tcp::handle_tcp_ingress, udp::handle_udp_ingress};
 use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_ICMP, IPPROTO_TCP, IPPROTO_UDP};
@@ -36,12 +36,16 @@ use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_ICMP, IPPROTO_TCP, IPPROTO_UDP};
 // -----------------------------------------------------------------------------
 
 #[map(name = "BACKENDS")]
-static mut BACKENDS: HashMap<BackendKey, Backend> =
-    HashMap::<BackendKey, Backend>::with_max_entries(128, 0);
+static mut BACKENDS: HashMap<BackendKey, BackendList> =
+    HashMap::<BackendKey, BackendList>::with_max_entries(BPF_MAPS_CAPACITY, 0);
+
+#[map(name = "GATEWAY_INDEXES")]
+static mut GATEWAY_INDEXES: HashMap<BackendKey, u16> =
+    HashMap::<BackendKey, u16>::with_max_entries(BPF_MAPS_CAPACITY, 0);
 
 #[map(name = "BLIXT_CONNTRACK")]
 static mut BLIXT_CONNTRACK: HashMap<u32, (u32, u32)> =
-    HashMap::<u32, (u32, u32)>::with_max_entries(128, 0);
+    HashMap::<u32, (u32, u32)>::with_max_entries(BPF_MAPS_CAPACITY, 0);
 
 // -----------------------------------------------------------------------------
 // Ingress

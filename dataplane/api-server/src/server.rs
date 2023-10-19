@@ -15,28 +15,42 @@ use tonic::{Request, Response, Status};
 use crate::backends::backends_server::Backends;
 use crate::backends::{Confirmation, InterfaceIndexConfirmation, PodIp, Targets, Vip};
 use crate::netutils::{if_name_for_routing_ip, if_nametoindex};
-use common::{Backend, BackendKey};
+use common::{Backend, BackendKey, BackendList, BACKENDS_ARRAY_CAPACITY};
 
 pub struct BackendService {
-    bpf_map: Arc<Mutex<HashMap<MapData, BackendKey, Backend>>>,
+    backends_map: Arc<Mutex<HashMap<MapData, BackendKey, BackendList>>>,
+    gateway_indexes_map: Arc<Mutex<HashMap<MapData, BackendKey, u16>>>,
 }
 
 impl BackendService {
-    pub fn new(bpf_map: HashMap<MapData, BackendKey, Backend>) -> BackendService {
+    pub fn new(
+        backends_map: HashMap<MapData, BackendKey, BackendList>,
+        gateway_indexes_map: HashMap<MapData, BackendKey, u16>,
+    ) -> BackendService {
         BackendService {
-            bpf_map: Arc::new(Mutex::new(bpf_map)),
+            backends_map: Arc::new(Mutex::new(backends_map)),
+            gateway_indexes_map: Arc::new(Mutex::new(gateway_indexes_map)),
         }
     }
 
-    async fn insert(&self, key: BackendKey, bk: Backend) -> Result<(), Error> {
-        let mut bpf_map = self.bpf_map.lock().await;
-        bpf_map.insert(key, bk, 0)?;
+    async fn insert(&self, key: BackendKey, bks: BackendList) -> Result<(), Error> {
+        let mut backends_map = self.backends_map.lock().await;
+        backends_map.insert(key, bks, 0)?;
+        Ok(())
+    }
+
+    async fn insert_and_reset_index(&self, key: BackendKey, bks: BackendList) -> Result<(), Error> {
+        self.insert(key, bks).await?;
+        let mut gateway_indexes_map = self.gateway_indexes_map.lock().await;
+        gateway_indexes_map.insert(key, 0, 0)?;
         Ok(())
     }
 
     async fn remove(&self, key: BackendKey) -> Result<(), Error> {
-        let mut bpf_map = self.bpf_map.lock().await;
-        bpf_map.remove(&key)?;
+        let mut backends_map = self.backends_map.lock().await;
+        backends_map.remove(&key)?;
+        let mut gateway_indexes_map = self.gateway_indexes_map.lock().await;
+        gateway_indexes_map.remove(&key)?;
         Ok(())
     }
 }
@@ -72,49 +86,62 @@ impl Backends for BackendService {
             None => return Err(Status::invalid_argument("missing vip ip and port")),
         };
 
-        let target = match targets.target {
-            Some(target) => target,
-            None => return Err(Status::invalid_argument("missing targets for vip")),
-        };
-
         let key = BackendKey {
             ip: vip.ip,
             port: vip.port,
         };
+        let mut backends: [Backend; BACKENDS_ARRAY_CAPACITY] =
+            [Backend::default(); BACKENDS_ARRAY_CAPACITY];
+        let mut count: u16 = 0;
+        let backend_targets = targets.targets;
 
-        let ifindex = match target.ifindex {
-            Some(ifindex) => ifindex,
-            None => {
-                let ip_addr = Ipv4Addr::from(target.daddr);
-                let ifname = match if_name_for_routing_ip(ip_addr) {
-                    Ok(ifname) => ifname,
-                    Err(err) => {
-                        return Err(Status::internal(format!(
-                            "failed to determine ifname: {}",
-                            err
-                        )))
-                    }
-                };
+        for backend_target in backend_targets {
+            let ifindex = match backend_target.ifindex {
+                Some(ifindex) => ifindex,
+                None => {
+                    let ip_addr = Ipv4Addr::from(backend_target.daddr);
+                    let ifname = match if_name_for_routing_ip(ip_addr) {
+                        Ok(ifname) => ifname,
+                        Err(err) => {
+                            return Err(Status::internal(format!(
+                                "failed to determine ifname: {}",
+                                err
+                            )))
+                        }
+                    };
 
-                match if_nametoindex(ifname) {
-                    Ok(ifindex) => ifindex,
-                    Err(err) => {
-                        return Err(Status::internal(format!(
-                            "failed to determine ifindex: {}",
-                            err
-                        )))
+                    match if_nametoindex(ifname) {
+                        Ok(ifindex) => ifindex,
+                        Err(err) => {
+                            return Err(Status::internal(format!(
+                                "failed to determine ifindex: {}",
+                                err
+                            )))
+                        }
                     }
                 }
+            };
+
+            if (count as usize) < BACKENDS_ARRAY_CAPACITY {
+                let bk = Backend {
+                    daddr: backend_target.daddr,
+                    dport: backend_target.dport,
+                    ifindex: ifindex as u16,
+                };
+                backends[count as usize] = bk;
+                count += 1;
+            } else {
+                return Err(Status::resource_exhausted(
+                    "BPF map value capacity exceeded, only 128 backends supported per Gateway",
+                ));
             }
-        };
+        }
 
-        let bk = Backend {
-            daddr: target.daddr,
-            dport: target.dport,
-            ifindex: ifindex as u16,
+        let backend_list = BackendList {
+            backends,
+            backends_len: count,
         };
-
-        match self.insert(key, bk).await {
+        match self.insert_and_reset_index(key, backend_list).await {
             Ok(_) => Ok(Response::new(Confirmation {
                 confirmation: format!(
                     "success, vip {}:{} was updated",

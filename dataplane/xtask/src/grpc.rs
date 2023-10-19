@@ -47,13 +47,14 @@ pub async fn update(opts: Options) -> Result<(), Error> {
         port: opts.vip_port,
     };
 
+    // TODO: add support for multiple targets
     let req = Request::new(Targets {
         vip: Some(vip.clone()),
-        target: Some(Target {
+        targets: vec![Target {
             daddr: daddr.into(),
             dport: opts.dport,
             ifindex: Some(opts.ifindex),
-        }),
+        }],
     });
 
     if opts.delete {
