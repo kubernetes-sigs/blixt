@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dataplane
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - name: dataplane
+        securityContext:
+          privileged: false
+        volumeMounts:
+        - name: bpf-maps
+          mountPath: /run/bpfd/fs/maps
+          readOnly: true
+      volumes:
+      - name: bpf-maps
+        csi:
+          driver: csi.bpfd.dev
+          volumeAttributes:
+            csi.bpfd.dev/program: blixt-tc-egress
+            csi.bpfd.dev/maps: AYA_LOGS,AYA_LOG_BUF,BACKENDS,BLIXT_CONNTRACK,GATEWAY_INDEXES

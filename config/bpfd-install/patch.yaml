@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config
+data:
+  ## Can be configured at runtime
+  bpfd.log.level: "debug"
+  bpfd.agent.log.level: "debug"
+  bpfd.enable.csi: "true"
+  ## Custom temporary blixt build
+  bpfd.image: quay.io/bpfd/bpfd:blixt

@@ -77,6 +77,15 @@ jobs:
         BLIXT_DATAPLANE_IMAGE: "ghcr.io/kong/blixt-dataplane"
         BLIXT_UDP_SERVER_IMAGE: "ghcr.io/kong/blixt-udp-test-server"
         TAG: "integration-tests"
+    
+    - name: run integration tests with bpfd
+      run: make test.integration
+      env:
+        BLIXT_CONTROLPLANE_IMAGE: "ghcr.io/kong/blixt-controlplane"
+        BLIXT_DATAPLANE_IMAGE: "ghcr.io/kong/blixt-dataplane"
+        BLIXT_UDP_SERVER_IMAGE: "ghcr.io/kong/blixt-udp-test-server"
+        BLIXT_USE_BPFD: true
+        TAG: "integration-tests"
 
     ## Upload diagnostics if integration test step failed.
     - name: upload diagnostics
