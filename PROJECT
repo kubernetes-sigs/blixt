@@ -1,4 +1,4 @@
-domain: konghq.com
+domain: blixt.gateway.networking.k8s.io
 layout:
 - go.kubebuilder.io/v3
 plugins:

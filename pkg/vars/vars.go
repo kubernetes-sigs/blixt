@@ -23,7 +23,7 @@ package vars
 const (
 	// GatewayClassControllerName is the unique identifier indicating controller
 	// responsible for relevant resources.
-	GatewayClassControllerName = "konghq.com/blixt"
+	GatewayClassControllerName = "gateway.networking.k8s.io/blixt"
 )
 
 // -----------------------------------------------------------------------------

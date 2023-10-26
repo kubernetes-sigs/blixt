@@ -3,7 +3,7 @@ apiVersion: gateway.networking.k8s.io/v1beta1
 metadata:
   name: blixt-udproute-sample
 spec:
-  controllerName: konghq.com/blixt
+  controllerName: gateway.networking.k8s.io/blixt
 ---
 kind: Gateway
 apiVersion: gateway.networking.k8s.io/v1beta1

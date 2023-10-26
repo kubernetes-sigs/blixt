@@ -51,7 +51,7 @@ import (
 
 //+kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch
 
-const gatewayServiceLabel = "konghq.com/owned-by-gateway"
+const gatewayServiceLabel = "blixt.gateway.networking.k8s.io/owned-by-gateway"
 
 // GatewayReconciler reconciles a Gateway object
 type GatewayReconciler struct {
