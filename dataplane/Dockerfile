@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/workspace/target/ \
 
 FROM alpine
 
-LABEL org.opencontainers.image.source=https://github.com/kong/blixt
+LABEL org.opencontainers.image.source=https://github.com/kubernetes-sigs/blixt
 LABEL org.opencontainers.image.licenses=GPL-2.0-only,BSD-2-Clause
 
 WORKDIR /opt/blixt/

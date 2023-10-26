@@ -1,6 +1,6 @@
 FROM alpine
 
-LABEL org.opencontainers.image.source https://github.com/kong/blixt
+LABEL org.opencontainers.image.source https://github.com/kubernetes-sigs/blixt
 
 RUN apk --no-cache add iperf3
 

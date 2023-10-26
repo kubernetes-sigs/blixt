@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/workspace/target/ \
 
 FROM alpine
 
-LABEL org.opencontainers.image.source https://github.com/kong/blixt-udp-test-server
+LABEL org.opencontainers.image.source https://github.com/kubernetes-sigs/blixt
 
 WORKDIR /
 
