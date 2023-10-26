@@ -107,7 +107,7 @@ jobs:
     name: Main branch Docker build
     needs: [ get-changed-files ]
     if: >-
-      github.event_name == 'push' 
+      github.event_name == 'push'
       && (
         needs.get-changed-files.outputs.control-plane-changed == 'true'
         || needs.get-changed-files.outputs.dataplane-changed == 'true'
@@ -130,7 +130,7 @@ jobs:
       uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
       with:
         context: .
-        push: true
+        push: false # TODO: https://github.com/kubernetes-sigs/blixt/issues/106
         cache-from: type=gha
         cache-to: type=gha,mode=max
         tags: ghcr.io/kubernetes-sigs/blixt-controlplane:latest
@@ -138,7 +138,7 @@ jobs:
       uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
       with:
         context: dataplane
-        push: true
+        push: false # TODO: https://github.com/kubernetes-sigs/blixt/issues/106
         cache-from: type=gha
         cache-to: type=gha,mode=max
         tags: ghcr.io/kubernetes-sigs/blixt-dataplane:latest
