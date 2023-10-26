@@ -20,7 +20,6 @@ import (
 	"context"
 	"flag"
 	"os"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -30,18 +29,15 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-<<<<<<< HEAD
 	"github.com/kubernetes-sigs/blixt/controllers"
-=======
-	"github.com/kong/blixt/controllers"
-	"github.com/kong/blixt/internal/dataplane/client"
->>>>>>> 6573c27 (Add dataplane controller and multi gRPC clients manager)
+	"github.com/kubernetes-sigs/blixt/internal/dataplane/client"
 	//+kubebuilder:scaffold:imports
 )
 

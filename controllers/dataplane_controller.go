@@ -17,8 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	dataplane "github.com/kong/blixt/internal/dataplane/client"
-	"github.com/kong/blixt/pkg/vars"
+	dataplane "github.com/kubernetes-sigs/blixt/internal/dataplane/client"
+	"github.com/kubernetes-sigs/blixt/pkg/vars"
 )
 
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways,verbs=get;list;watch;create;update;patch;delete
