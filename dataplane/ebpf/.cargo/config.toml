@@ -1,6 +1,7 @@
 [build]
 target-dir = "../target"
 target = "bpfel-unknown-none"
+rustflags = ["-C", "save-temps"]
 
 [unstable]
 build-std = ["core"]

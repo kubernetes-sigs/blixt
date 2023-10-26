@@ -1,2 +1,6 @@
 [alias]
 xtask = "run --package xtask --"
+
+## Needed to build blixt's programs with BTF + custom bpf-linker build.
+[build]
+rustflags = ["-C", "debuginfo=2"]

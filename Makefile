@@ -188,6 +188,10 @@ ifndef ignore-not-found
   ignore-not-found = false
 endif
 
+.PHONY: install-bpfd
+install-bpfd: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/bpfd | kubectl apply -f -
+
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
@@ -315,4 +319,11 @@ build.cluster: $(KTF) # builds a KIND cluster which can be used for testing and 
 .PHONY: load.image
 load.image: build.image
 	kind load docker-image $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
+		kubectl -n blixt-system rollout restart deployment blixt-controlplane
+
+.PHONY: load.all.images
+load.all.images: build.all.images
+	kind load docker-image $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
+	kind load docker-image $(BLIXT_DATAPLANE_IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
+	kind load docker-image $(BLIXT_UDP_SERVER_IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
 		kubectl -n blixt-system rollout restart deployment blixt-controlplane
