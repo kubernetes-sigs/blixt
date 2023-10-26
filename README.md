@@ -11,6 +11,10 @@ The control-plane is built using [Gateway API][gwapi] and written in
 data-plane is built using [eBPF][ebpf] and is written in [Rust][rust] using
 [Aya][aya].
 
+This project's main purposes are to help facilitate the development of the
+[Gateway API][gwapi] project and to be a fun and safe place for contributors to
+contribute and try out newer technologies.
+
 > **Note**: The word "blixt" means "lightning" in Swedish.
 
 [osi]:https://en.wikipedia.org/wiki/OSI_model
