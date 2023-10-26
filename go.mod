@@ -1,4 +1,4 @@
-module github.com/kong/blixt
+module github.com/kubernetes-sigs/blixt
 
 go 1.21
 

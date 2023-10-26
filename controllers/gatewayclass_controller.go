@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 
-	"github.com/kong/blixt/pkg/vars"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,6 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/kubernetes-sigs/blixt/pkg/vars"
 )
 
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses,verbs=get;list;watch;create;update;patch;delete

@@ -35,7 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 
-	testutils "github.com/kong/blixt/internal/test/utils"
+	testutils "github.com/kubernetes-sigs/blixt/internal/test/utils"
 )
 
 var (

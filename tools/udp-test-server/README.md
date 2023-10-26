@@ -14,7 +14,7 @@ $ echo "test" | nc -u 172.17.0.2 9875
 The server would log this:
 
 ```console
-$ docker run -it ghcr.io/kong/blixt-udp-test-server
+$ docker run -it ghcr.io/kubernetes-sigs/blixt-udp-test-server
 waiting for listeners...
 UDP worker listening on port 9876
 UDP worker listening on port 9875

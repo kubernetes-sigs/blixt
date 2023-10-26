@@ -35,8 +35,8 @@ import (
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	dataplane "github.com/kong/blixt/internal/dataplane/client"
-	"github.com/kong/blixt/pkg/vars"
+	dataplane "github.com/kubernetes-sigs/blixt/internal/dataplane/client"
+	"github.com/kubernetes-sigs/blixt/pkg/vars"
 )
 
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=udproutes,verbs=get;list;watch;create;update;patch;delete
@@ -89,7 +89,7 @@ func (r *UDPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 	if !isManaged {
-		// TODO: enable orphan checking https://github.com/Kong/blixt/issues/47
+		// TODO: enable orphan checking https://github.com/kubernetes-sigs/blixt/issues/47
 		return ctrl.Result{}, nil
 	}
 
@@ -107,7 +107,7 @@ func (r *UDPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// if the UDPRoute is being deleted, remove it from the DataPlane
-	// TODO: enable deletion grace period https://github.com/Kong/blixt/issues/48
+	// TODO: enable deletion grace period https://github.com/kubernetes-sigs/blixt/issues/48
 	if udproute.DeletionTimestamp != nil {
 		return ctrl.Result{}, r.ensureUDPRouteDeletedInDataPlane(ctx, udproute, gateway)
 	}
@@ -177,7 +177,7 @@ func (r *UDPRouteReconciler) isUDPRouteManaged(ctx context.Context, udproute gat
 		return false, nil, nil
 	}
 
-	// TODO: support multiple gateways https://github.com/Kong/blixt/issues/40
+	// TODO: support multiple gateways https://github.com/kubernetes-sigs/blixt/issues/40
 	referredGateway := &supportedGateways[0]
 	r.log.Info("UDP Route appeared referring to Gateway", "Gateway ", referredGateway.Name, "GatewayClass Name", referredGateway.Spec.GatewayClassName)
 
@@ -202,7 +202,7 @@ func (r *UDPRouteReconciler) ensureUDPRouteConfiguredInDataPlane(ctx context.Con
 		return err
 	}
 
-	// TODO: add multiple endpoint support https://github.com/Kong/blixt/issues/46
+	// TODO: add multiple endpoint support https://github.com/kubernetes-sigs/blixt/issues/46
 	dataplaneClient, err := dataplane.NewDataPlaneClient(context.Background(), r.Client)
 	if err != nil {
 		return err
@@ -230,7 +230,7 @@ func (r *UDPRouteReconciler) ensureUDPRouteDeletedInDataPlane(ctx context.Contex
 		return err
 	}
 
-	// TODO: add multiple endpoint support https://github.com/Kong/blixt/issues/46
+	// TODO: add multiple endpoint support https://github.com/kubernetes-sigs/blixt/issues/46
 	dataplaneClient, err := dataplane.NewDataPlaneClient(context.Background(), r.Client)
 	if err != nil {
 		return err

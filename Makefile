@@ -1,7 +1,7 @@
 # IMAGES used when running tests.
-BLIXT_CONTROLPLANE_IMAGE ?= ghcr.io/kong/blixt-controlplane
-BLIXT_DATAPLANE_IMAGE ?= ghcr.io/kong/blixt-dataplane
-BLIXT_UDP_SERVER_IMAGE ?= ghcr.io/kong/blixt-udp-test-server
+BLIXT_CONTROLPLANE_IMAGE ?= ghcr.io/kubernetes-sigs/blixt-controlplane
+BLIXT_DATAPLANE_IMAGE ?= ghcr.io/kubernetes-sigs/blixt-dataplane
+BLIXT_UDP_SERVER_IMAGE ?= ghcr.io/kubernetes-sigs/blixt-udp-test-server
 
 # Other testing variables
 EXISTING_CLUSTER ?=
@@ -106,9 +106,9 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 generate.grpc-client:
 	protoc \
 		--go_out=. --go_opt=paths=import \
-		--go_opt=module=github.com/kong/blixt \
+		--go_opt=module=github.com/kubernetes-sigs/blixt \
 		--go-grpc_out=. --go-grpc_opt=paths=import \
-		--go-grpc_opt=module=github.com/kong/blixt \
+		--go-grpc_opt=module=github.com/kubernetes-sigs/blixt \
 		--experimental_allow_proto3_optional \
 		dataplane/api-server/proto/backends.proto
 

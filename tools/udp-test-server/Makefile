@@ -1,4 +1,4 @@
-IMAGE ?= ghcr.io/kong/blixt-udp-test-server
+IMAGE ?= ghcr.io/kubernetes-sigs/blixt-udp-test-server
 TAG ?= latest
 
 .PHONY: build.image

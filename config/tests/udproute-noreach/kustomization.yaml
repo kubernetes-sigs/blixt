@@ -7,7 +7,7 @@ resources:
             # data, and trigger ICMP port failure responses from the kernel
 
 images:
-- name: ghcr.io/kong/blixt-udp-test-server
+- name: ghcr.io/kubernetes-sigs/blixt-udp-test-server
   newTag: integration-tests
               # --dry-run disables UDP listeners in order to test failures to send
               # data, and trigger ICMP port failure responses from the kernel

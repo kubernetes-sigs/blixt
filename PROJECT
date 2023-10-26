@@ -5,7 +5,7 @@ plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: blixt
-repo: github.com/kong/blixt
+repo: github.com/kubernetes-sigs/blixt
 resources:
 - controller: true
   domain: networking.k8s.io

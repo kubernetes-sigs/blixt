@@ -35,8 +35,8 @@ import (
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	testutils "github.com/kong/blixt/internal/test/utils"
-	"github.com/kong/blixt/pkg/vars"
+	testutils "github.com/kubernetes-sigs/blixt/internal/test/utils"
+	"github.com/kubernetes-sigs/blixt/pkg/vars"
 )
 
 func TestGatewayBasics(t *testing.T) {

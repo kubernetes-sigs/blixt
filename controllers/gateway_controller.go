@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/kong/blixt/pkg/vars"
+	"github.com/kubernetes-sigs/blixt/pkg/vars"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -157,7 +157,7 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	switch t := svc.Spec.Type; t {
 	case corev1.ServiceTypeLoadBalancer:
 		if err := r.svcIsHealthy(ctx, svc); err != nil {
-			// TODO: only handles metallb right now https://github.com/Kong/blixt/issues/96
+			// TODO: only handles metallb right now https://github.com/kubernetes-sigs/blixt/issues/96
 			if strings.Contains(err.Error(), "Failed to allocate IP") {
 				r.Log.Info("failed to allocate IP for Gateway", gateway.Namespace, gateway.Name)
 				setCond(gateway, metav1.Condition{

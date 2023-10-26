@@ -2,9 +2,9 @@ bases:
 - ../../default
 
 images:
-- name: ghcr.io/kong/blixt-dataplane
+- name: ghcr.io/kubernetes-sigs/blixt-dataplane
   newTag: conformance-tests
-- name: ghcr.io/kong/blixt-controlplane
+- name: ghcr.io/kubernetes-sigs/blixt-controlplane
   newTag: conformance-tests
-- name: ghcr.io/kong/blixt-udp-test-server
+- name: ghcr.io/kubernetes-sigs/blixt-udp-test-server
   newTag: conformance-tests

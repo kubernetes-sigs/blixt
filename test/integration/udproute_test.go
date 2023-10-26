@@ -37,7 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	testutils "github.com/kong/blixt/internal/test/utils"
+	testutils "github.com/kubernetes-sigs/blixt/internal/test/utils"
 )
 
 const (
@@ -233,7 +233,7 @@ func sendUDPPacket(t *testing.T, msg, gwaddr string) int {
 }
 
 func TestUDPRouteNoReach(t *testing.T) {
-	t.Skip("TODO: temporarily skipped due to instability, see https://github.com/Kong/blixt/issues/104")
+	t.Skip("TODO: temporarily skipped due to instability, see https://github.com/kubernetes-sigs/blixt/issues/104")
 
 	udpRouteNoReachCleanupKey := "udproutenoreach"
 	defer func() {

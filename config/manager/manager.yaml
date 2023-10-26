@@ -38,7 +38,7 @@ spec:
         - /manager
         args:
         - --leader-elect
-        image: ghcr.io/kong/blixt-controlplane:latest
+        image: ghcr.io/kubernetes-sigs/blixt-controlplane:latest
         imagePullPolicy: IfNotPresent
         name: manager
         securityContext:

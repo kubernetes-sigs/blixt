@@ -35,8 +35,8 @@ import (
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	dataplane "github.com/kong/blixt/internal/dataplane/client"
-	"github.com/kong/blixt/pkg/vars"
+	dataplane "github.com/kubernetes-sigs/blixt/internal/dataplane/client"
+	"github.com/kubernetes-sigs/blixt/pkg/vars"
 )
 
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=tcproutes,verbs=get;list;watch;create;update;patch;delete
@@ -89,7 +89,7 @@ func (r *TCPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 	if !isManaged {
-		// TODO: enable orphan checking https://github.com/Kong/blixt/issues/47
+		// TODO: enable orphan checking https://github.com/kubernetes-sigs/blixt/issues/47
 		return ctrl.Result{}, nil
 	}
 

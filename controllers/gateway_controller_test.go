@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	"github.com/kong/blixt/internal/test/utils"
-	"github.com/kong/blixt/pkg/vars"
+	"github.com/kubernetes-sigs/blixt/internal/test/utils"
+	"github.com/kubernetes-sigs/blixt/pkg/vars"
 )
 
 func init() {

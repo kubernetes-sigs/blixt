@@ -1,4 +1,4 @@
-IMAGE ?= ghcr.io/kong/blixt-perf-test-server
+IMAGE ?= ghcr.io/kubernetes-sigs/blixt-perf-test-server
 TAG ?= latest
 
 all: build.image

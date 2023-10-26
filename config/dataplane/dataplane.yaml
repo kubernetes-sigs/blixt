@@ -20,7 +20,7 @@ spec:
       hostNetwork: true
       containers:
       - name: dataplane
-        image: ghcr.io/kong/blixt-dataplane:latest
+        image: ghcr.io/kubernetes-sigs/blixt-dataplane:latest
         securityContext:
           privileged: true
         args: ["-i", "eth0"]

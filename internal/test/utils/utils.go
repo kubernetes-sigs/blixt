@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	"github.com/kong/blixt/pkg/vars"
+	"github.com/kubernetes-sigs/blixt/pkg/vars"
 )
 
 const BlixtReadinessTimeout = time.Minute * 7

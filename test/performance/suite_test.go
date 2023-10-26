@@ -32,7 +32,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 
-	testutils "github.com/kong/blixt/internal/test/utils"
+	testutils "github.com/kubernetes-sigs/blixt/internal/test/utils"
 )
 
 var (

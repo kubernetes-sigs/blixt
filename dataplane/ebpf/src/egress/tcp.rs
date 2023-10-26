@@ -65,7 +65,7 @@ pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
     unsafe { (*ip_hdr).check = csum_fold_helper(full_cksum) };
     unsafe { (*tcp_hdr).check = 0 };
 
-    // TODO: connection tracking cleanup https://github.com/kong/blixt/issues/85
+    // TODO: connection tracking cleanup https://github.com/kubernetes-sigs/blixt/issues/85
 
     Ok(TC_ACT_PIPE)
 }

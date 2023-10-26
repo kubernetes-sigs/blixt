@@ -1,4 +1,4 @@
-IMAGE ?= ghcr.io/kong/blixt-dataplane
+IMAGE ?= ghcr.io/kubernetes-sigs/blixt-dataplane
 TAG ?= latest
 KIND_CLUSTER ?= blixt-dev
 

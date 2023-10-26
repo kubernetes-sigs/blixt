@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kong/blixt/pkg/vars"
+	"github.com/kubernetes-sigs/blixt/pkg/vars"
 )
 
 // NewDataPlaneClient provides a new client for communicating with the grpc API

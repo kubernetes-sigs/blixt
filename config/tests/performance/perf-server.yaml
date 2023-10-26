@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: server
-        image: ghcr.io/kong/blixt-perf-test-server:latest
+        image: ghcr.io/kubernetes-sigs/blixt-perf-test-server:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5201

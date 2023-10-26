@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/gateway-api/conformance/tests"
 	"sigs.k8s.io/gateway-api/conformance/utils/suite"
 
-	"github.com/kong/blixt/pkg/vars"
+	"github.com/kubernetes-sigs/blixt/pkg/vars"
 )
 
 const (
@@ -106,11 +106,11 @@ func TestGatewayConformance(t *testing.T) {
 				UnusableNetworkAddresses: []gatewayv1beta1.GatewayAddress{{Value: "1.1.1.1"}},
 			},
 			Implementation: v1alpha1.Implementation{
-				Organization: "kong",
+				Organization: "kubernetes-sigs",
 				Project:      "blixt",
-				URL:          "https://github.com/kong/blixt",
+				URL:          "https://github.com/kubernetes-sigs/blixt",
 				Version:      "v0.2.0",
-				Contact:      []string{"https://github.com/Kong/blixt/issues/new"},
+				Contact:      []string{"https://github.com/kubernetes-sigs/blixt/issues/new"},
 			},
 		},
 	)
