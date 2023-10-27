@@ -120,6 +120,8 @@ github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnr
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
+github.com/kong/blixt v0.2.1 h1:QMBmHziwPhxgbUDl+Be+5cbQ6tbOT9JqGJJF8GtZs0U=
+github.com/kong/blixt v0.2.1/go.mod h1:N6gFG9pVhbrva7dzadaWJycGDkG6EBFgybE1hJQoIR0=
 github.com/kong/kubernetes-testing-framework v0.39.1 h1:30dTVe0Muda3r6NAMQHvdGLuB+nkhZRXnJA8AJjuvO4=
 github.com/kong/kubernetes-testing-framework v0.39.1/go.mod h1:12TQ5gAkZhuxh47IJcW03iumky1X/T7ZCStuClQ1vzs=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=

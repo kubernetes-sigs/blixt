@@ -23,15 +23,16 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -52,7 +53,9 @@ type TCPRouteReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	log logr.Logger
+	log                        logr.Logger
+	ClientReconcileRequestChan <-chan event.GenericEvent
+	BackendsClientManager      *dataplane.BackendsClientManager
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -61,8 +64,8 @@ func (r *TCPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gatewayv1alpha2.TCPRoute{}).
-		Watches(
-			&appsv1.DaemonSet{},
+		WatchesRawSource(
+			&source.Channel{Source: r.ClientReconcileRequestChan},
 			handler.EnqueueRequestsFromMapFunc(r.mapDataPlaneDaemonsetToTCPRoutes),
 		).
 		Watches(
@@ -202,18 +205,11 @@ func (r *TCPRouteReconciler) ensureTCPRouteConfiguredInDataPlane(ctx context.Con
 		return err
 	}
 
-	// TODO: add multiple endpoint support https://github.com/Kong/blixt/issues/46
-	dataplaneClient, err := dataplane.NewDataPlaneClient(context.Background(), r.Client)
-	if err != nil {
+	if _, err = r.BackendsClientManager.Update(ctx, targets); err != nil {
 		return err
 	}
 
-	confirmation, err := dataplaneClient.Update(context.Background(), targets)
-	if err != nil {
-		return err
-	}
-
-	r.log.Info(fmt.Sprintf("successful data-plane UPDATE, confirmation: %s", confirmation.String()))
+	r.log.Info("successful data-plane UPDATE")
 
 	return nil
 }
@@ -230,24 +226,17 @@ func (r *TCPRouteReconciler) ensureTCPRouteDeletedInDataPlane(ctx context.Contex
 		return err
 	}
 
-	// TODO: add multiple endpoint support https://github.com/Kong/blixt/issues/46
-	dataplaneClient, err := dataplane.NewDataPlaneClient(context.Background(), r.Client)
-	if err != nil {
-		return err
-	}
-
-	// since we currently only support one TCPRoute per Gateway, we can delete the vip (gateway)
-	// entry from the dataplane. this won't fly when we end up adding support for multiple TCPRoutes
-	// per Gateway.
-	confirmation, err := dataplaneClient.Delete(context.Background(), &dataplane.Vip{
+	vip := dataplane.Vip{
 		Ip:   gatewayIP,
 		Port: gwPort,
-	})
-	if err != nil {
+	}
+
+	// delete the target from the dataplane
+	if _, err = r.BackendsClientManager.Delete(ctx, &vip); err != nil {
 		return err
 	}
 
-	r.log.Info(fmt.Sprintf("successful data-plane DELETE, confirmation: %s", confirmation.String()))
+	r.log.Info("successful data-plane DELETE")
 
 	oldFinalizers := tcproute.GetFinalizers()
 	newFinalizers := make([]string, 0, len(oldFinalizers)-1)
@@ -259,4 +248,5 @@ func (r *TCPRouteReconciler) ensureTCPRouteDeletedInDataPlane(ctx context.Contex
 	tcproute.SetFinalizers(newFinalizers)
 
 	return r.Client.Update(ctx, tcproute)
+
 }

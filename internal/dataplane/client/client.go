@@ -18,64 +18,212 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 
+	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/kubernetes-sigs/blixt/pkg/vars"
 )
 
-// NewDataPlaneClient provides a new client for communicating with the grpc API
-// of the data-plane given a function which can provide the API endpoint.
-func NewDataPlaneClient(ctx context.Context, c client.Client) (BackendsClient, error) {
-	endpoints, err := GetDataPlaneEndpointsFromDefaultPods(ctx, c)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(endpoints) < 1 {
-		return nil, fmt.Errorf("no endpoints could be found for the dataplane API")
-	}
-
-	if len(endpoints) > 1 {
-		return nil, fmt.Errorf("TODO: multiple endpoints not currently supported")
-	}
-
-	endpoint := endpoints[0]
-	// TODO: mTLS https://github.com/Kong/blixt/issues/50
-	conn, err := grpc.Dial(endpoint, grpc.WithInsecure(), grpc.WithBlock()) //nolint:staticcheck
-	if err != nil {
-		return nil, err
-	}
-
-	client := NewBackendsClient(conn)
-
-	return client, nil
+// clientInfo encapsulates the gathered information about a BackendsClient
+// along with the gRPC client connection.
+type clientInfo struct {
+	conn   *grpc.ClientConn
+	client BackendsClient
+	name   string
 }
 
-// GetDataPlaneEndpointsFromDefaultPods provides a list of endpoints for the
-// dataplane API assuming all the default deployment settings (e.g., namespace,
-// API port, e.t.c.).
-func GetDataPlaneEndpointsFromDefaultPods(ctx context.Context, c client.Client) (endpoints []string, err error) {
-	pods := new(corev1.PodList)
-	if err = c.List(context.Background(), pods, client.MatchingLabels{
-		"app":       vars.DefaultDataPlaneAppLabel,
-		"component": vars.DefaultDataPlaneComponentLabel,
-	}, client.InNamespace(vars.DefaultNamespace)); err != nil {
-		return
+// BackendsClientManager is managing the connections and interactions with
+// the available BackendsClient servers.
+type BackendsClientManager struct {
+	log       logr.Logger
+	clientset *kubernetes.Clientset
+
+	mu      sync.RWMutex
+	clients map[types.NamespacedName]clientInfo
+}
+
+// NewBackendsClientManager returns an initialized instance of BackendsClientManager.
+func NewBackendsClientManager(config *rest.Config) (*BackendsClientManager, error) {
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, pod := range pods.Items {
-		if pod.Status.PodIP == "" {
-			err = fmt.Errorf("pod %s/%s doesn't have an IP yet", pod.Namespace, pod.Name)
-			return
+	return &BackendsClientManager{
+		log:       log.FromContext(context.Background()),
+		clientset: clientset,
+		mu:        sync.RWMutex{},
+		clients:   map[types.NamespacedName]clientInfo{},
+	}, nil
+}
+
+func (c *BackendsClientManager) SetClientsList(ctx context.Context, readyPods map[types.NamespacedName]corev1.Pod) (bool, error) {
+	// TODO: close and connect to the different clients concurrently.
+
+	clientListUpdated := false
+	var err error
+
+	// Remove old clients
+	for nn, backendInfo := range c.clients {
+		if _, ok := readyPods[nn]; !ok {
+			c.mu.Lock()
+			delete(c.clients, nn)
+			c.mu.Unlock()
+
+			if closeErr := backendInfo.conn.Close(); closeErr != nil {
+				err = errors.Join(err, closeErr)
+				continue
+			}
+			clientListUpdated = true
 		}
-
-		newEndpoint := fmt.Sprintf("%s:%d", pod.Status.PodIP, vars.DefaultDataPlaneAPIPort)
-		endpoints = append(endpoints, newEndpoint)
 	}
 
-	return
+	// Add new clients
+	for _, pod := range readyPods {
+		key := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+		if _, ok := c.clients[key]; !ok {
+
+			if pod.Status.PodIP == "" {
+				continue
+			}
+
+			endpoint := fmt.Sprintf("%s:%d", pod.Status.PodIP, vars.DefaultDataPlaneAPIPort)
+			c.log.Info("BackendsClientManager", "status", "connecting", "pod", pod.GetName(), "endpoint", endpoint)
+
+			conn, dialErr := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+			if dialErr != nil {
+				c.log.Error(dialErr, "BackendsClientManager", "status", "connection failure", "pod", pod.GetName())
+				err = errors.Join(err, dialErr)
+				continue
+			}
+
+			c.mu.Lock()
+			c.clients[key] = clientInfo{
+				conn:   conn,
+				client: NewBackendsClient(conn),
+				name:   pod.Name,
+			}
+			c.mu.Unlock()
+
+			c.log.Info("BackendsClientManager", "status", "connected", "pod", pod.GetName())
+
+			clientListUpdated = true
+		}
+	}
+
+	return clientListUpdated, err
+}
+
+func (c *BackendsClientManager) Close() {
+	c.log.Info("BackendsClientManager", "status", "shutting down")
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	var wg sync.WaitGroup
+	wg.Add(len(c.clients))
+
+	for key, cc := range c.clients {
+		go func(cc clientInfo) {
+			defer wg.Done()
+			cc.conn.Close()
+		}(cc)
+
+		delete(c.clients, key)
+	}
+
+	wg.Wait()
+
+	c.log.Info("BackendsClientManager", "status", "shutdown completed")
+}
+
+func (c *BackendsClientManager) getClientsInfo() []clientInfo {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	backends := make([]clientInfo, 0, len(c.clients))
+	for _, backendClient := range c.clients {
+		backends = append(backends, backendClient)
+	}
+
+	return backends
+}
+
+// Update sends an update request to all available BackendsClient servers concurrently.
+func (c *BackendsClientManager) Update(ctx context.Context, in *Targets, opts ...grpc.CallOption) (*Confirmation, error) {
+	clientsInfo := c.getClientsInfo()
+
+	var wg sync.WaitGroup
+	wg.Add(len(clientsInfo))
+
+	errs := make(chan error, len(clientsInfo))
+
+	for _, ci := range clientsInfo {
+		go func(ci clientInfo) {
+			defer wg.Done()
+
+			conf, err := ci.client.Update(ctx, in, opts...)
+			if err != nil {
+				c.log.Error(err, "BackendsClientManager", "operation", "update", "pod", ci.name)
+				errs <- err
+				return
+			}
+			c.log.Info("BackendsClientManager", "operation", "update", "pod", ci.name, "confirmation", conf.Confirmation)
+		}(ci)
+	}
+
+	wg.Wait()
+	close(errs)
+
+	var err error
+	for e := range errs {
+		err = errors.Join(err, e)
+	}
+
+	return nil, err
+}
+
+// Delete sends an delete request to all available BackendsClient servers concurrently.
+func (c *BackendsClientManager) Delete(ctx context.Context, in *Vip, opts ...grpc.CallOption) (*Confirmation, error) {
+	clientsInfo := c.getClientsInfo()
+
+	var wg sync.WaitGroup
+	wg.Add(len(clientsInfo))
+
+	errs := make(chan error, len(clientsInfo))
+
+	for _, ci := range clientsInfo {
+		go func(ci clientInfo) {
+			defer wg.Done()
+
+			conf, err := ci.client.Delete(ctx, in, opts...)
+			if err != nil {
+				c.log.Error(err, "BackendsClientManager", "operation", "delete", "pod", ci.name)
+				errs <- err
+				return
+			}
+			c.log.Info("BackendsClientManager", "operation", "delete", "pod", ci.name, "confirmation", conf.Confirmation)
+
+		}(ci)
+	}
+
+	wg.Wait()
+	close(errs)
+
+	var err error
+	for e := range errs {
+		err = errors.Join(err, e)
+	}
+
+	return nil, err
 }
