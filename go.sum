@@ -120,8 +120,6 @@ github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnr
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
-github.com/kong/blixt v0.2.1 h1:QMBmHziwPhxgbUDl+Be+5cbQ6tbOT9JqGJJF8GtZs0U=
-github.com/kong/blixt v0.2.1/go.mod h1:N6gFG9pVhbrva7dzadaWJycGDkG6EBFgybE1hJQoIR0=
 github.com/kong/kubernetes-testing-framework v0.39.1 h1:30dTVe0Muda3r6NAMQHvdGLuB+nkhZRXnJA8AJjuvO4=
 github.com/kong/kubernetes-testing-framework v0.39.1/go.mod h1:12TQ5gAkZhuxh47IJcW03iumky1X/T7ZCStuClQ1vzs=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
@@ -342,14 +340,14 @@ honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWh
 honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 k8s.io/api v0.28.3 h1:Gj1HtbSdB4P08C8rs9AR94MfSGpRhJgsS+GF9V26xMM=
 k8s.io/api v0.28.3/go.mod h1:MRCV/jr1dW87/qJnZ57U5Pak65LGmQVkKTzf3AtKFHc=
-k8s.io/apiextensions-apiserver v0.28.2 h1:J6/QRWIKV2/HwBhHRVITMLYoypCoPY1ftigDM0Kn+QU=
-k8s.io/apiextensions-apiserver v0.28.2/go.mod h1:5tnkxLGa9nefefYzWuAlWZ7RZYuN/765Au8cWLA6SRg=
+k8s.io/apiextensions-apiserver v0.28.3 h1:Od7DEnhXHnHPZG+W9I97/fSQkVpVPQx2diy+2EtmY08=
+k8s.io/apiextensions-apiserver v0.28.3/go.mod h1:NE1XJZ4On0hS11aWWJUTNkmVB03j9LM7gJSisbRt8Lc=
 k8s.io/apimachinery v0.28.3 h1:B1wYx8txOaCQG0HmYF6nbpU8dg6HvA06x5tEffvOe7A=
 k8s.io/apimachinery v0.28.3/go.mod h1:uQTKmIqs+rAYaq+DFaoD2X7pcjLOqbQX2AOiO0nIpb8=
 k8s.io/client-go v0.28.3 h1:2OqNb72ZuTZPKCl+4gTKvqao0AMOl9f3o2ijbAj3LI4=
 k8s.io/client-go v0.28.3/go.mod h1:LTykbBp9gsA7SwqirlCXBWtK0guzfhpoW4qSm7i9dxo=
-k8s.io/component-base v0.28.2 h1:Yc1yU+6AQSlpJZyvehm/NkJBII72rzlEsd6MkBQ+G0E=
-k8s.io/component-base v0.28.2/go.mod h1:4IuQPQviQCg3du4si8GpMrhAIegxpsgPngPRR/zWpzc=
+k8s.io/component-base v0.28.3 h1:rDy68eHKxq/80RiMb2Ld/tbH8uAE75JdCqJyi6lXMzI=
+k8s.io/component-base v0.28.3/go.mod h1:fDJ6vpVNSk6cRo5wmDa6eKIG7UlIQkaFmZN2fYgIUD8=
 k8s.io/klog/v2 v2.100.1 h1:7WCHKK6K8fNhTqfBhISHQ97KrnJNFZMcQvKp7gP/tmg=
 k8s.io/klog/v2 v2.100.1/go.mod h1:y1WjHnz7Dj687irZUWR/WLkLc5N1YHtjLdmgWjndZn0=
 k8s.io/kube-openapi v0.0.0-20230905202853-d090da108d2f h1:eeEUOoGYWhOz7EyXqhlR2zHKNw2mNJ9vzJmub6YN6kk=
