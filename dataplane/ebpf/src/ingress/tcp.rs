@@ -15,7 +15,6 @@ use aya_log_ebpf::info;
 use network_types::{eth::EthHdr, ip::Ipv4Hdr, tcp::TcpHdr};
 
 use crate::{
-    // bindings::{iphdr, tcphdr},
     utils::{csum_fold_helper, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
     BACKENDS, BLIXT_CONNTRACK,
 };
