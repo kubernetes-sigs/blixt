@@ -12,22 +12,23 @@ use aya_bpf::{
     programs::TcContext,
 };
 use aya_log_ebpf::{debug, info};
+use network_types::{ip::Ipv4Hdr, eth::EthHdr, udp::UdpHdr};
 
 use crate::{
-    bindings::{iphdr, udphdr},
     utils::{csum_fold_helper, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
     BACKENDS, BLIXT_CONNTRACK, GATEWAY_INDEXES,
 };
 use common::{BackendKey, BACKENDS_ARRAY_CAPACITY};
 
 pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
-    let ip_hdr: *mut iphdr = unsafe { ptr_at(&ctx, ETH_HDR_LEN) }?;
+    
+    let ip_hdr: *mut Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
 
-    let udp_header_offset = ETH_HDR_LEN + IP_HDR_LEN;
 
-    let udp_hdr: *mut udphdr = unsafe { ptr_at(&ctx, udp_header_offset)? };
+    let udp_hdr: *mut UdpHdr =
+                unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
 
-    let original_daddr = unsafe { (*ip_hdr).daddr };
+    let original_daddr = unsafe { (*ip_hdr).dst_addr };
 
     let key = BackendKey {
         ip: u32::from_be(original_daddr),
@@ -39,7 +40,7 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
     info!(
         &ctx,
         "Received a UDP packet destined for svc ip: {:i} at Port: {} ",
-        u32::from_be(unsafe { (*ip_hdr).daddr }),
+        u32::from_be(unsafe { (*ip_hdr).dst_addr }),
         u16::from_be(unsafe { (*udp_hdr).dest })
     );
 
@@ -70,14 +71,14 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
 
     unsafe {
         BLIXT_CONNTRACK.insert(
-            &(*ip_hdr).saddr,
+            &(*ip_hdr).src_addr,
             &(original_daddr, (*udp_hdr).dest as u32),
             0 as u64,
         )?;
-        (*ip_hdr).daddr = backend.daddr.to_be();
+        (*ip_hdr).dst_addr = backend.daddr.to_be();
     };
 
-    if (ctx.data() + ETH_HDR_LEN + mem::size_of::<iphdr>()) > ctx.data_end() {
+    if (ctx.data() + ETH_HDR_LEN + IP_HDR_LEN) > ctx.data_end() {
         info!(&ctx, "Iphdr is out of bounds");
         return Ok(TC_ACT_PIPE);
     }
@@ -90,7 +91,7 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
             mem::MaybeUninit::zeroed().assume_init(),
             0,
             ip_hdr as *mut u32,
-            mem::size_of::<iphdr>() as u32,
+            IP_HDR_LEN as u32,
             0,
         )
     } as u64;

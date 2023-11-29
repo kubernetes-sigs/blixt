@@ -5,23 +5,19 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 */
 
 use core::mem;
+use network_types::{ip::Ipv4Hdr, eth::EthHdr};
 
 use aya_bpf::{bindings::TC_ACT_OK, programs::TcContext};
 
-use crate::bindings::{ethhdr, iphdr};
+
+
 
 // -----------------------------------------------------------------------------
 // Constants
 // -----------------------------------------------------------------------------
 
-pub const ETH_P_IP: u16 = 0x0800;
-
-pub const IPPROTO_TCP: u8 = 6;
-pub const IPPROTO_UDP: u8 = 17;
-pub const IPPROTO_ICMP: u8 = 1;
-
-pub const ETH_HDR_LEN: usize = mem::size_of::<ethhdr>();
-pub const IP_HDR_LEN: usize = mem::size_of::<iphdr>();
+pub const ETH_HDR_LEN: usize = mem::size_of::<EthHdr>();
+pub const IP_HDR_LEN: usize = mem::size_of::<Ipv4Hdr>();
 
 // -----------------------------------------------------------------------------
 // Helper Functions

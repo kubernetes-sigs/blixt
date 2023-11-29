@@ -12,21 +12,22 @@ use aya_bpf::{
     programs::TcContext,
 };
 use aya_log_ebpf::info;
+use network_types::{ip::Ipv4Hdr, eth::EthHdr, tcp::TcpHdr};
 
 use crate::{
-    bindings::{iphdr, tcphdr},
     utils::{csum_fold_helper, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
     BLIXT_CONNTRACK,
 };
 
 pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
     // gather the TCP header
-    let ip_hdr: *mut iphdr = unsafe { ptr_at(&ctx, ETH_HDR_LEN) }?;
-    let tcp_header_offset = ETH_HDR_LEN + IP_HDR_LEN;
-    let tcp_hdr: *mut tcphdr = unsafe { ptr_at(&ctx, tcp_header_offset)? };
+    let ip_hdr: *mut Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
+
+    let tcp_hdr: *mut TcpHdr =
+                unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)? };
 
     // capture some IP and port information
-    let client_addr = unsafe { (*ip_hdr).daddr };
+    let client_addr = unsafe { (*ip_hdr).dst_addr };
     let dest_port = unsafe { (*tcp_hdr).dest.to_be() };
     let ip_port_tuple = unsafe { BLIXT_CONNTRACK.get(&client_addr) }.ok_or(TC_ACT_PIPE)?;
 
@@ -44,10 +45,10 @@ pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
     );
 
     unsafe {
-        (*ip_hdr).saddr = ip_port_tuple.0;
+        (*ip_hdr).src_addr = ip_port_tuple.0;
     };
 
-    if (ctx.data() + ETH_HDR_LEN + mem::size_of::<iphdr>()) > ctx.data_end() {
+    if (ctx.data() + ETH_HDR_LEN + IP_HDR_LEN) > ctx.data_end() {
         info!(&ctx, "Iphdr is out of bounds");
         return Ok(TC_ACT_OK);
     }
@@ -58,7 +59,7 @@ pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
             mem::MaybeUninit::zeroed().assume_init(),
             0,
             ip_hdr as *mut u32,
-            mem::size_of::<iphdr>() as u32,
+            IP_HDR_LEN as u32,
             0,
         )
     } as u64;
