@@ -12,22 +12,22 @@ use aya_bpf::{
     programs::TcContext,
 };
 use aya_log_ebpf::info;
+use network_types::{eth::EthHdr, ip::Ipv4Hdr, tcp::TcpHdr};
 
 use crate::{
-    bindings::{iphdr, tcphdr},
-    utils::{csum_fold_helper, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
+    utils::{csum_fold_helper, ptr_at},
     BACKENDS, BLIXT_CONNTRACK,
 };
 use common::BackendKey;
 
 pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
-    let ip_hdr: *mut iphdr = unsafe { ptr_at(&ctx, ETH_HDR_LEN) }?;
+    let ip_hdr: *mut Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
 
-    let tcp_header_offset = ETH_HDR_LEN + IP_HDR_LEN;
+    let tcp_header_offset = EthHdr::LEN + Ipv4Hdr::LEN;
 
-    let tcp_hdr: *mut tcphdr = unsafe { ptr_at(&ctx, tcp_header_offset)? };
+    let tcp_hdr: *mut TcpHdr = unsafe { ptr_at(&ctx, tcp_header_offset) }?;
 
-    let original_daddr = unsafe { (*ip_hdr).daddr };
+    let original_daddr = unsafe { (*ip_hdr).dst_addr };
 
     let key = BackendKey {
         ip: u32::from_be(original_daddr),
@@ -46,10 +46,10 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
     );
 
     unsafe {
-        (*ip_hdr).daddr = backend.daddr.to_be();
+        (*ip_hdr).dst_addr = backend.daddr.to_be();
     }
 
-    if (ctx.data() + ETH_HDR_LEN + mem::size_of::<iphdr>()) > ctx.data_end() {
+    if (ctx.data() + EthHdr::LEN + Ipv4Hdr::LEN) > ctx.data_end() {
         info!(&ctx, "Iphdr is out of bounds");
         return Ok(TC_ACT_OK);
     }
@@ -62,7 +62,7 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
             mem::MaybeUninit::zeroed().assume_init(),
             0,
             ip_hdr as *mut u32,
-            mem::size_of::<iphdr>() as u32,
+            Ipv4Hdr::LEN as u32,
             0,
         )
     } as u64;
@@ -84,7 +84,7 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
 
     unsafe {
         BLIXT_CONNTRACK.insert(
-            &(*ip_hdr).saddr,
+            &(*ip_hdr).src_addr,
             &(original_daddr, (*tcp_hdr).source.to_be() as u32),
             0 as u64,
         )?;

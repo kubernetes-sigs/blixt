@@ -11,12 +11,9 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 #[allow(non_snake_case)]
 #[allow(non_camel_case_types)]
 #[allow(dead_code)]
-mod bindings;
 mod egress;
 mod ingress;
 mod utils;
-
-use memoffset::offset_of;
 
 use aya_bpf::{
     bindings::{TC_ACT_OK, TC_ACT_PIPE, TC_ACT_SHOT},
@@ -25,11 +22,15 @@ use aya_bpf::{
     programs::TcContext,
 };
 
-use bindings::{ethhdr, iphdr};
 use common::{BackendKey, BackendList, BPF_MAPS_CAPACITY};
 use egress::{icmp::handle_icmp_egress, tcp::handle_tcp_egress};
 use ingress::{tcp::handle_tcp_ingress, udp::handle_udp_ingress};
-use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_ICMP, IPPROTO_TCP, IPPROTO_UDP};
+
+use network_types::{
+    eth::{EthHdr, EtherType},
+    ip::{IpProto, Ipv4Hdr},
+};
+use utils::ptr_at;
 
 // -----------------------------------------------------------------------------
 // Maps
@@ -64,23 +65,17 @@ pub fn tc_ingress(ctx: TcContext) -> i32 {
 
 // Make sure ip_forwarding is enabled on the interface this it attached to
 fn try_tc_ingress(ctx: TcContext) -> Result<i32, i64> {
-    let h_proto = u16::from_be(
-        ctx.load(offset_of!(ethhdr, h_proto))
-            .map_err(|_| TC_ACT_PIPE)?,
-    );
-
-    if h_proto != ETH_P_IP {
-        return Ok(TC_ACT_PIPE);
-    }
-
-    let protocol = ctx
-        .load::<u8>(ETH_HDR_LEN + offset_of!(iphdr, protocol))
-        .map_err(|_| TC_ACT_PIPE)?;
-
-    match protocol {
-        IPPROTO_TCP => handle_tcp_ingress(ctx),
-        IPPROTO_UDP => handle_udp_ingress(ctx),
-        _ => Ok(TC_ACT_PIPE),
+    let eth_hdr: *const EthHdr = unsafe { ptr_at(&ctx, 0) }?;
+    match unsafe { *eth_hdr }.ether_type {
+        EtherType::Ipv4 => {
+            let ipv4hdr: *const Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
+            match unsafe { *ipv4hdr }.proto {
+                IpProto::Tcp => handle_tcp_ingress(ctx),
+                IpProto::Udp => handle_udp_ingress(ctx),
+                _ => Ok(TC_ACT_PIPE),
+            }
+        }
+        _ => return Ok(TC_ACT_PIPE),
     }
 }
 
@@ -100,23 +95,17 @@ pub fn tc_egress(ctx: TcContext) -> i32 {
 }
 
 fn try_tc_egress(ctx: TcContext) -> Result<i32, i64> {
-    let h_proto = u16::from_be(
-        ctx.load(offset_of!(ethhdr, h_proto))
-            .map_err(|_| TC_ACT_PIPE)?,
-    );
-
-    if h_proto != ETH_P_IP {
-        return Ok(TC_ACT_PIPE);
-    }
-
-    let protocol = ctx
-        .load::<u8>(ETH_HDR_LEN + offset_of!(iphdr, protocol))
-        .map_err(|_| TC_ACT_PIPE)?;
-
-    match protocol {
-        IPPROTO_ICMP => handle_icmp_egress(ctx),
-        IPPROTO_TCP => handle_tcp_egress(ctx),
-        _ => Ok(TC_ACT_PIPE),
+    let eth_hdr: *const EthHdr = unsafe { ptr_at(&ctx, 0) }?;
+    match unsafe { *eth_hdr }.ether_type {
+        EtherType::Ipv4 => {
+            let ipv4hdr: *const Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
+            match unsafe { *ipv4hdr }.proto {
+                IpProto::Icmp => handle_icmp_egress(ctx),
+                IpProto::Tcp => handle_tcp_egress(ctx),
+                _ => Ok(TC_ACT_PIPE),
+            }
+        }
+        _ => return Ok(TC_ACT_PIPE),
     }
 }
 

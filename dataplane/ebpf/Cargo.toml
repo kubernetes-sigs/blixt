@@ -8,7 +8,8 @@ publish = false
 aya-bpf = { git = "https://github.com/aya-rs/aya", branch = "main" }
 aya-log-ebpf = { git = "https://github.com/aya-rs/aya", branch = "main" }
 common = { path = "../common" }
-memoffset = "0.8"
+memoffset = "0.9"
+network-types = "0.0.5"
 
 [[bin]]
 name = "loader"
