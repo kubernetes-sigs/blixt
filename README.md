@@ -40,6 +40,16 @@ Current project goals are the following:
 
 After these goals are achieved, further goals may be decided.
 
+Given the goals and nature of this project, and the fact that everyone who works
+on it is a volunteer, we try to optimize for time with a highly iterative
+development approach. This project follows a **"Work -> Right -> Fast"** development
+mentality, which is to say for any functionality or feature we focus on making sure
+it **_works_** at a basic level first, then we'll focus on making it **_work right_**,
+and then once we're happy with the code quality we'll move on to making it **_faster_**
+and more efficient. This project is **currently still very much in the early parts of
+the work stage and so the code may be a little rough and/or incomplete**. We would love
+to have _you_ join us in iterating on it and helping us build it together!
+
 > **Note**: [TLSRoute][tlsroute] support may be on the table, but we're looking
 > for someone from the community to champion this.
 
