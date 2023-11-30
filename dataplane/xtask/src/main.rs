@@ -7,7 +7,6 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 // Remember to run `cargo install bindgen-cli`
 
 mod build_ebpf;
-mod codegen;
 mod grpc;
 mod run;
 
@@ -26,7 +25,6 @@ enum Command {
     BuildEbpf(build_ebpf::Options),
     Run(run::Options),
     GrpcClient(grpc::Options),
-    Codegen,
 }
 
 #[tokio::main]
@@ -38,7 +36,6 @@ async fn main() {
         BuildEbpf(opts) => build_ebpf::build_ebpf(opts),
         Run(opts) => run::run(opts),
         GrpcClient(opts) => grpc::update(opts).await,
-        Codegen => codegen::generate(),
     };
 
     if let Err(e) = ret {
