@@ -28,12 +28,9 @@ use ingress::{tcp::handle_tcp_ingress, udp::handle_udp_ingress};
 
 use network_types::{
     eth::{EthHdr, EtherType},
-    ip::{Ipv4Hdr, IpProto},
+    ip::{IpProto, Ipv4Hdr},
 };
 use utils::ptr_at;
-
-
-//use utils::{ETH_HDR_LEN, ETH_P_IP, IPPROTO_ICMP, IPPROTO_TCP, IPPROTO_UDP};
 
 // -----------------------------------------------------------------------------
 // Maps
@@ -72,16 +69,14 @@ fn try_tc_ingress(ctx: TcContext) -> Result<i32, i64> {
     match unsafe { *eth_hdr }.ether_type {
         EtherType::Ipv4 => {
             let ipv4hdr: *const Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
-            match unsafe { *ipv4hdr }.proto  {
-                IpProto::Tcp =>  handle_tcp_ingress(ctx),
+            match unsafe { *ipv4hdr }.proto {
+                IpProto::Tcp => handle_tcp_ingress(ctx),
                 IpProto::Udp => handle_udp_ingress(ctx),
                 _ => Ok(TC_ACT_PIPE),
             }
-
-        },
+        }
         _ => return Ok(TC_ACT_PIPE),
     }
-    
 }
 
 // -----------------------------------------------------------------------------
@@ -104,13 +99,12 @@ fn try_tc_egress(ctx: TcContext) -> Result<i32, i64> {
     match unsafe { *eth_hdr }.ether_type {
         EtherType::Ipv4 => {
             let ipv4hdr: *const Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
-            match unsafe { *ipv4hdr }.proto  {
+            match unsafe { *ipv4hdr }.proto {
                 IpProto::Icmp => handle_icmp_egress(ctx),
-                IpProto::Tcp =>  handle_tcp_egress(ctx),
+                IpProto::Tcp => handle_tcp_egress(ctx),
                 _ => Ok(TC_ACT_PIPE),
             }
-
-        },
+        }
         _ => return Ok(TC_ACT_PIPE),
     }
 }

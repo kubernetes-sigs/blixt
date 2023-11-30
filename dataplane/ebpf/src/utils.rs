@@ -5,19 +5,9 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 */
 
 use core::mem;
-use network_types::{ip::Ipv4Hdr, eth::EthHdr};
+use network_types::{eth::EthHdr, ip::Ipv4Hdr};
 
 use aya_bpf::{bindings::TC_ACT_OK, programs::TcContext};
-
-
-
-
-// -----------------------------------------------------------------------------
-// Constants
-// -----------------------------------------------------------------------------
-
-pub const ETH_HDR_LEN: usize = mem::size_of::<EthHdr>();
-pub const IP_HDR_LEN: usize = mem::size_of::<Ipv4Hdr>();
 
 // -----------------------------------------------------------------------------
 // Helper Functions
@@ -33,7 +23,6 @@ pub unsafe fn ptr_at<T>(ctx: &TcContext, offset: usize) -> Result<*mut T, i64> {
     if start + offset + len > end {
         return Err(TC_ACT_OK.into());
     }
-
     Ok((start + offset) as *mut T)
 }
 

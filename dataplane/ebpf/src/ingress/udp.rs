@@ -12,21 +12,20 @@ use aya_bpf::{
     programs::TcContext,
 };
 use aya_log_ebpf::{debug, info};
-use network_types::{ip::Ipv4Hdr, eth::EthHdr, udp::UdpHdr};
+use network_types::{eth::EthHdr, ip::Ipv4Hdr, udp::UdpHdr};
 
 use crate::{
-    utils::{csum_fold_helper, ptr_at, ETH_HDR_LEN, IP_HDR_LEN},
+    utils::{csum_fold_helper, ptr_at},
     BACKENDS, BLIXT_CONNTRACK, GATEWAY_INDEXES,
 };
 use common::{BackendKey, BACKENDS_ARRAY_CAPACITY};
 
 pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
-    
     let ip_hdr: *mut Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
 
+    let udp_header_offset = EthHdr::LEN + Ipv4Hdr::LEN;
 
-    let udp_hdr: *mut UdpHdr =
-                unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN) }?;
+    let udp_hdr: *mut UdpHdr = unsafe { ptr_at(&ctx, udp_header_offset) }?;
 
     let original_daddr = unsafe { (*ip_hdr).dst_addr };
 
@@ -78,7 +77,7 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
         (*ip_hdr).dst_addr = backend.daddr.to_be();
     };
 
-    if (ctx.data() + ETH_HDR_LEN + IP_HDR_LEN) > ctx.data_end() {
+    if (ctx.data() + EthHdr::LEN + Ipv4Hdr::LEN) > ctx.data_end() {
         info!(&ctx, "Iphdr is out of bounds");
         return Ok(TC_ACT_PIPE);
     }
@@ -91,7 +90,7 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
             mem::MaybeUninit::zeroed().assume_init(),
             0,
             ip_hdr as *mut u32,
-            IP_HDR_LEN as u32,
+            Ipv4Hdr::LEN as u32,
             0,
         )
     } as u64;

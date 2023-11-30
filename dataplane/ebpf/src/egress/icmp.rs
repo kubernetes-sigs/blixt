@@ -8,23 +8,21 @@ use core::mem;
 
 use aya_bpf::{bindings::TC_ACT_PIPE, helpers::bpf_csum_diff, programs::TcContext};
 use aya_log_ebpf::info;
-use network_types::{ip::Ipv4Hdr, eth::EthHdr, icmp::IcmpHdr};
+use network_types::{eth::EthHdr, icmp::IcmpHdr, ip::Ipv4Hdr};
 
 use crate::{
-   
-    utils::{csum_fold_helper, ptr_at, IP_HDR_LEN},
+    utils::{csum_fold_helper, ptr_at},
     BLIXT_CONNTRACK,
 };
-
 
 const ICMP_PROTO_TYPE_UNREACH: u8 = 3;
 
 pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
     let ip_hdr: *mut Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
 
-    let icmp_hdr: *mut IcmpHdr =
-                unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)? };
-                
+    let icmp_header_offset = EthHdr::LEN + Ipv4Hdr::LEN;
+
+    let icmp_hdr: *mut IcmpHdr = unsafe { ptr_at(&ctx, icmp_header_offset)? };
 
     // We only care about redirecting port unreachable messages currently so a
     // UDP client can tell when the server is shutdown
@@ -53,14 +51,15 @@ pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
             mem::MaybeUninit::zeroed().assume_init(),
             0,
             ip_hdr as *mut u32,
-            IP_HDR_LEN as u32,
+            Ipv4Hdr::LEN as u32,
             0,
         )
     } as u64;
     unsafe { (*ip_hdr).check = csum_fold_helper(full_cksum) };
 
     // Get inner ipheader since we need to update that as well
-    let icmp_inner_ip_hdr: *mut Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN + IcmpHdr::LEN) }?;
+    let icmp_inner_ip_hdr: *mut Ipv4Hdr =
+        unsafe { ptr_at(&ctx, icmp_header_offset + IcmpHdr::LEN) }?;
 
     unsafe {
         (*icmp_inner_ip_hdr).dst_addr = new_src.0;
@@ -72,7 +71,7 @@ pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
             mem::MaybeUninit::zeroed().assume_init(),
             0,
             icmp_inner_ip_hdr as *mut u32,
-            IP_HDR_LEN as u32,
+            Ipv4Hdr::LEN as u32,
             0,
         )
     } as u64;
