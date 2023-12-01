@@ -13,7 +13,7 @@ use aya::programs::{tc, SchedClassifier, TcAttachType};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
 use clap::Parser;
-use common::{BackendKey, BackendList};
+use common::{BackendKey, BackendList, ClientKey, TCPBackend};
 use log::{info, warn};
 
 #[derive(Debug, Parser)]
@@ -46,9 +46,21 @@ async fn main() -> Result<(), anyhow::Error> {
                 .expect("no maps named GATEWAY_INDEXES"),
         )
         .try_into()?;
+        let tcp_conns: HashMap<_, ClientKey, TCPBackend> = Map::HashMap(
+            MapData::from_pin(bpfd_maps.join("TCP_CONNECTIONS"))
+                .expect("no maps named TCP_CONNECTIONS"),
+        )
+        .try_into()?;
 
         info!("starting api server");
-        start_api_server(Ipv4Addr::new(0, 0, 0, 0), 9874, backends, gateway_indexes).await?;
+        start_api_server(
+            Ipv4Addr::new(0, 0, 0, 0),
+            9874,
+            backends,
+            gateway_indexes,
+            tcp_conns,
+        )
+        .await?;
     } else {
         info!("loading ebpf programs");
 
@@ -90,8 +102,19 @@ async fn main() -> Result<(), anyhow::Error> {
             bpf.take_map("GATEWAY_INDEXES")
                 .expect("no maps named GATEWAY_INDEXES"),
         )?;
+        let tcp_conns: HashMap<_, ClientKey, TCPBackend> = HashMap::try_from(
+            bpf.take_map("TCP_CONNECTIONS")
+                .expect("no maps named TCP_CONNECTIONS"),
+        )?;
 
-        start_api_server(Ipv4Addr::new(0, 0, 0, 0), 9874, backends, gateway_indexes).await?;
+        start_api_server(
+            Ipv4Addr::new(0, 0, 0, 0),
+            9874,
+            backends,
+            gateway_indexes,
+            tcp_conns,
+        )
+        .await?;
     }
 
     info!("Exiting...");

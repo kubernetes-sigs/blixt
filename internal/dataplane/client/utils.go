@@ -31,7 +31,6 @@ import (
 // CompileUDPRouteToDataPlaneBackend takes a UDPRoute and the Gateway it is
 // attached to and produces Backend Targets for the DataPlane to configure.
 func CompileUDPRouteToDataPlaneBackend(ctx context.Context, c client.Client, udproute *gatewayv1alpha2.UDPRoute, gateway *gatewayv1beta1.Gateway) (*Targets, error) {
-
 	gatewayIP, err := GetGatewayIP(gateway)
 	if gatewayIP == nil {
 		return nil, err
@@ -98,19 +97,8 @@ func CompileUDPRouteToDataPlaneBackend(ctx context.Context, c client.Client, udp
 
 // CompileTCPRouteToDataPlaneBackend takes a TCPRoute and the Gateway it is
 // attached to and produces Backend Targets for the DataPlane to configure.
-func CompileTCPRouteToDataPlaneBackend(ctx context.Context, c client.Client, tcproute *gatewayv1alpha2.TCPRoute, gateway *gatewayv1beta1.Gateway) (*Targets, error) {
-	// TODO: add support for multiple rules https://github.com/Kong/blixt/issues/10
-	if len(tcproute.Spec.Rules) != 1 {
-		return nil, fmt.Errorf("currently can only support 1 TCPRoute rule, received %d", len(tcproute.Spec.Rules))
-	}
-	rule := tcproute.Spec.Rules[0]
-
-	// TODO: add support for multiple rules https://github.com/Kong/blixt/issues/10
-	if len(rule.BackendRefs) != 1 {
-		return nil, fmt.Errorf("expect 1 backendRef received %d", len(rule.BackendRefs))
-	}
-	backendRef := rule.BackendRefs[0]
-
+func CompileTCPRouteToDataPlaneBackend(ctx context.Context, c client.Client,
+	tcproute *gatewayv1alpha2.TCPRoute, gateway *gatewayv1beta1.Gateway) (*Targets, error) {
 	gatewayIP, err := GetGatewayIP(gateway)
 	if gatewayIP == nil {
 		return nil, err
@@ -120,42 +108,49 @@ func CompileTCPRouteToDataPlaneBackend(ctx context.Context, c client.Client, tcp
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO only using one endpoint for now until https://github.com/Kong/blixt/issues/10
-	var target *Target
-	if tcproute.DeletionTimestamp == nil {
-		endpoints, err := endpointsFromBackendRef(ctx, c, tcproute.Namespace, backendRef)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, subset := range endpoints.Subsets {
-			if len(subset.Addresses) < 1 {
-				return nil, fmt.Errorf("addresses not ready for endpoints")
-			}
-			if len(subset.Ports) < 1 {
-				return nil, fmt.Errorf("ports not ready for endpoints")
-			}
-
-			if subset.Addresses[0].IP == "" {
-				return nil, fmt.Errorf("empty IP for endpoint subset")
-			}
-
-			ip := net.ParseIP(subset.Addresses[0].IP)
-			podip := binary.BigEndian.Uint32(ip.To4())
-			podPort, err := getBackendPort(ctx, c, tcproute.Namespace, backendRef, subset.Ports)
+	var backendTargets []*Target
+	for _, rule := range tcproute.Spec.Rules {
+		for _, backendRef := range rule.BackendRefs {
+			endpoints, err := endpointsFromBackendRef(ctx, c, tcproute.Namespace, backendRef)
 			if err != nil {
 				return nil, err
 			}
 
-			target = &Target{
-				Daddr: podip,
-				Dport: uint32(podPort),
+			if len(endpoints.Subsets) < 1 {
+				return nil, fmt.Errorf("endpoint has no subsets")
+			}
+			for _, subset := range endpoints.Subsets {
+				if len(subset.Addresses) < 1 {
+					return nil, fmt.Errorf("addresses not ready for endpoints")
+				}
+				if len(subset.Ports) < 1 {
+					return nil, fmt.Errorf("ports not ready for endpoints")
+				}
+
+				for _, addr := range subset.Addresses {
+					if addr.IP == "" {
+						return nil, fmt.Errorf("empty IP for endpoint subset")
+					}
+
+					ip := net.ParseIP(addr.IP)
+					podip := binary.BigEndian.Uint32(ip.To4())
+					podPort, err := getBackendPort(ctx, c, tcproute.Namespace, backendRef, subset.Ports)
+					if err != nil {
+						return nil, err
+					}
+
+					target := &Target{
+						Daddr: podip,
+						Dport: uint32(podPort),
+					}
+					backendTargets = append(backendTargets, target)
+				}
 			}
 		}
-		if target == nil {
-			return nil, fmt.Errorf("endpoints not ready")
-		}
+	}
+
+	if len(backendTargets) == 0 {
+		return nil, fmt.Errorf("no healthy backends")
 	}
 
 	ipint := binary.BigEndian.Uint32(gatewayIP.To4())
@@ -165,8 +160,7 @@ func CompileTCPRouteToDataPlaneBackend(ctx context.Context, c client.Client, tcp
 			Ip:   ipint,
 			Port: gatewayPort,
 		},
-		// TODO(aryan9600): Add support for multiple targets (https://github.com/kubernetes-sigs/blixt/issues/119)
-		Targets: []*Target{target},
+		Targets: backendTargets,
 	}
 
 	return targets, nil

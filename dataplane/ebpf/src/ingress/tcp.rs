@@ -11,14 +11,14 @@ use aya_bpf::{
     helpers::{bpf_csum_diff, bpf_redirect_neigh},
     programs::TcContext,
 };
-use aya_log_ebpf::info;
+use aya_log_ebpf::{debug, info};
 use network_types::{eth::EthHdr, ip::Ipv4Hdr, tcp::TcpHdr};
 
 use crate::{
-    utils::{csum_fold_helper, ptr_at},
-    BACKENDS, BLIXT_CONNTRACK,
+    utils::{csum_fold_helper, ptr_at, update_tcp_conns},
+    BACKENDS, GATEWAY_INDEXES, TCP_CONNECTIONS,
 };
-use common::BackendKey;
+use common::{Backend, BackendKey, ClientKey, TCPBackend, TCPState, BACKENDS_ARRAY_CAPACITY};
 
 pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
     let ip_hdr: *mut Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
@@ -29,14 +29,64 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
 
     let original_daddr = unsafe { (*ip_hdr).dst_addr };
 
-    let key = BackendKey {
-        ip: u32::from_be(original_daddr),
-        port: (u16::from_be(unsafe { (*tcp_hdr).dest })) as u32,
+    // The source identifier
+    let client_key = ClientKey {
+        ip: u32::from_be(unsafe { (*ip_hdr).src_addr }),
+        port: (u16::from_be(unsafe { (*tcp_hdr).source })) as u32,
     };
-    let backend_list = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_OK)?;
-    // Only a single backend is supported for TCP connections.
-    // TODO(aryan9600): Add support for multiple backends (https://github.com/kubernetes-sigs/blixt/issues/119)
-    let backend = backend_list.backends[0];
+    // The backend that is responsible for handling this TCP connection.
+    let mut backend: Backend;
+    // The Gateway that the TCP connections is forwarded from.
+    let backend_key: BackendKey;
+    // Flag to check whether this is a new connection.
+    let mut new_conn = false;
+    // The state of this TCP connection.
+    let mut tcp_state = TCPState::default();
+
+    // Try to find the backend previously used for this connection. If not found, it means that
+    // this is a new connection, so assign it the next backend in line.
+    if let Some(val) = unsafe { TCP_CONNECTIONS.get(&client_key) } {
+        backend = val.backend;
+        tcp_state = val.state;
+        backend_key = val.backend_key;
+    } else {
+        new_conn = true;
+
+        backend_key = BackendKey {
+            ip: u32::from_be(original_daddr),
+            port: (u16::from_be(unsafe { (*tcp_hdr).dest })) as u32,
+        };
+        let backend_list = unsafe { BACKENDS.get(&backend_key) }.ok_or(TC_ACT_OK)?;
+        let backend_index = unsafe { GATEWAY_INDEXES.get(&backend_key) }.ok_or(TC_ACT_OK)?;
+
+        debug!(&ctx, "Destination backend index: {}", *backend_index);
+        debug!(&ctx, "Backends length: {}", backend_list.backends_len);
+
+        // this check asserts that we don't use a "zero-value" Backend
+        if backend_list.backends_len <= *backend_index {
+            return Ok(TC_ACT_OK);
+        }
+        // the bpf verifier is aware of variables that are used as an index for
+        // an array and requires that we check the array boundaries against
+        // the index to ensure our access is in-bounds.
+        if *backend_index as usize >= BACKENDS_ARRAY_CAPACITY {
+            return Ok(TC_ACT_OK);
+        }
+
+        backend = backend_list.backends[0];
+        if let Some(val) = backend_list.backends.get(*backend_index as usize) {
+            backend = *val;
+        }
+
+        // move the index to the next backend in our list
+        let mut next = *backend_index + 1;
+        if next >= backend_list.backends_len {
+            next = 0;
+        }
+        unsafe {
+            GATEWAY_INDEXES.insert(&backend_key, &next, 0_u64)?;
+        }
+    }
 
     info!(
         &ctx,
@@ -45,9 +95,12 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
         u16::from_be(unsafe { (*tcp_hdr).dest })
     );
 
+    // DNAT the ip address
     unsafe {
         (*ip_hdr).dst_addr = backend.daddr.to_be();
     }
+    // DNAT the port
+    unsafe { (*tcp_hdr).dest = (backend.dport as u16).to_be() };
 
     if (ctx.data() + EthHdr::LEN + Ipv4Hdr::LEN) > ctx.data_end() {
         info!(&ctx, "Iphdr is out of bounds");
@@ -67,9 +120,6 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
         )
     } as u64;
     unsafe { (*ip_hdr).check = csum_fold_helper(full_cksum) };
-
-    // Update destination port
-    unsafe { (*tcp_hdr).dest = (backend.dport as u16).to_be() };
     // FIXME
     unsafe { (*tcp_hdr).check = 0 };
 
@@ -82,15 +132,35 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
         )
     };
 
-    unsafe {
-        BLIXT_CONNTRACK.insert(
-            &(*ip_hdr).src_addr,
-            &(original_daddr, (*tcp_hdr).source.to_be() as u32),
-            0 as u64,
-        )?;
+    let mut tcp_backend = TCPBackend {
+        backend,
+        backend_key,
+        state: tcp_state,
     };
 
-    info!(&ctx, "redirect action: {}", action);
+    // If the connection is new, then record it in our map for future tracking.
+    if new_conn {
+        unsafe {
+            TCP_CONNECTIONS.insert(&client_key, &tcp_backend, 0_u64)?;
+        }
 
+        // since this is a new connection, there is nothing else to do, so exit early
+        info!(&ctx, "redirect action: {}", action);
+        return Ok(action as i32);
+    }
+
+    let tcp_hdr_ref = unsafe { tcp_hdr.as_ref().ok_or(TC_ACT_OK)? };
+
+    // If the packet has the RST flag set, it means the connection is being terminated, so remove it
+    // from our map.
+    if tcp_hdr_ref.rst() == 1 {
+        unsafe {
+            TCP_CONNECTIONS.remove(&client_key)?;
+        }
+    }
+
+    update_tcp_conns(tcp_hdr_ref, &client_key, &mut tcp_backend)?;
+
+    info!(&ctx, "redirect action: {}", action);
     Ok(action as i32)
 }
