@@ -16,11 +16,9 @@ spec:
     spec:
       containers:
       - name: server
-        image: ghcr.io/shaneutt/malutki
+        image: istio/tcp-echo-server:1.1
         imagePullPolicy: IfNotPresent
-        env:
-        - name: LISTEN_PORT
-          value: "8080"
+        args: [ "8080", "blixt-tcproute-sample:" ]
         ports:
         - containerPort: 8080
           protocol: TCP
