@@ -15,15 +15,16 @@ use aya::maps::{HashMap, MapData};
 use tonic::transport::Server;
 
 use backends::backends_server::BackendsServer;
-use common::{BackendKey, BackendList};
+use common::{BackendKey, BackendList, ClientKey, TCPBackend};
 
 pub async fn start(
     addr: Ipv4Addr,
     port: u16,
     backends_map: HashMap<MapData, BackendKey, BackendList>,
     gateway_indexes_map: HashMap<MapData, BackendKey, u16>,
+    tcp_conns_map: HashMap<MapData, ClientKey, TCPBackend>,
 ) -> Result<(), Error> {
-    let server = server::BackendService::new(backends_map, gateway_indexes_map);
+    let server = server::BackendService::new(backends_map, gateway_indexes_map, tcp_conns_map);
     // TODO: mTLS https://github.com/Kong/blixt/issues/50
     Server::builder()
         .add_service(BackendsServer::new(server))

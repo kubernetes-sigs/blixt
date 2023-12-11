@@ -20,7 +20,7 @@ pub struct Backend {
 #[cfg(feature = "user")]
 unsafe impl aya::Pod for Backend {}
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct BackendKey {
     pub ip: u32,
@@ -40,3 +40,41 @@ pub struct BackendList {
 
 #[cfg(feature = "user")]
 unsafe impl aya::Pod for BackendList {}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+pub struct ClientKey {
+    pub ip: u32,
+    pub port: u32,
+}
+
+#[cfg(feature = "user")]
+unsafe impl aya::Pod for ClientKey {}
+
+// TCPState contains variants that represent the current phase of the TCP connection at a point in
+// time during the connection's termination.
+#[derive(Copy, Clone, Debug, Default)]
+#[repr(C)]
+pub enum TCPState {
+    #[default]
+    Established,
+    FinWait1,
+    FinWait2,
+    Closing,
+    TimeWait,
+    Closed,
+}
+
+#[cfg(feature = "user")]
+unsafe impl aya::Pod for TCPState {}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+pub struct TCPBackend {
+    pub backend: Backend,
+    pub backend_key: BackendKey,
+    pub state: TCPState,
+}
+
+#[cfg(feature = "user")]
+unsafe impl aya::Pod for TCPBackend {}

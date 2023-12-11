@@ -12,11 +12,12 @@ use aya_bpf::{
     programs::TcContext,
 };
 use aya_log_ebpf::info;
+use common::ClientKey;
 use network_types::{eth::EthHdr, ip::Ipv4Hdr, tcp::TcpHdr};
 
 use crate::{
-    utils::{csum_fold_helper, ptr_at},
-    BLIXT_CONNTRACK,
+    utils::{csum_fold_helper, ptr_at, update_tcp_conns},
+    TCP_CONNECTIONS,
 };
 
 pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
@@ -29,25 +30,30 @@ pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
 
     // capture some IP and port information
     let client_addr = unsafe { (*ip_hdr).dst_addr };
-    let dest_port = unsafe { (*tcp_hdr).dest.to_be() };
-    let ip_port_tuple = unsafe { BLIXT_CONNTRACK.get(&client_addr) }.ok_or(TC_ACT_PIPE)?;
-
-    // verify traffic destination
-    if ip_port_tuple.1 as u16 != dest_port {
-        return Ok(TC_ACT_PIPE);
-    }
+    let dest_port = unsafe { (*tcp_hdr).dest };
+    // The source identifier
+    let client_key = ClientKey {
+        ip: u32::from_be(client_addr),
+        port: u16::from_be(dest_port) as u32,
+    };
+    let tcp_backend = unsafe { TCP_CONNECTIONS.get(&client_key) }.ok_or(TC_ACT_PIPE)?;
 
     info!(
         &ctx,
-        "Received TCP packet destined for tracked IP {:i}:{} setting source IP to VIP {:i}",
+        "Received TCP packet destined for tracked IP {:i}:{} setting source IP to VIP {:i}:{}",
         u32::from_be(client_addr),
-        ip_port_tuple.1 as u16,
-        u32::from_be(ip_port_tuple.0),
+        u16::from_be(dest_port),
+        tcp_backend.backend_key.ip,
+        tcp_backend.backend_key.port,
     );
 
+    // TODO: connection tracking cleanup https://github.com/kubernetes-sigs/blixt/issues/85
+    // SNAT the ip address
     unsafe {
-        (*ip_hdr).src_addr = ip_port_tuple.0;
+        (*ip_hdr).src_addr = tcp_backend.backend_key.ip.to_be();
     };
+    // SNAT the port
+    unsafe { (*tcp_hdr).source = u16::from_be(tcp_backend.backend_key.port as u16) };
 
     if (ctx.data() + EthHdr::LEN + Ipv4Hdr::LEN) > ctx.data_end() {
         info!(&ctx, "Iphdr is out of bounds");
@@ -67,7 +73,18 @@ pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
     unsafe { (*ip_hdr).check = csum_fold_helper(full_cksum) };
     unsafe { (*tcp_hdr).check = 0 };
 
-    // TODO: connection tracking cleanup https://github.com/kubernetes-sigs/blixt/issues/85
+    let tcp_hdr_ref = unsafe { tcp_hdr.as_ref().ok_or(TC_ACT_OK)? };
+
+    // If the packet has the RST flag set, it means the connection is being terminated, so remove it
+    // from our map.
+    if tcp_hdr_ref.rst() == 1 {
+        unsafe {
+            TCP_CONNECTIONS.remove(&client_key)?;
+        }
+    }
+
+    let mut tcp_bk = *tcp_backend;
+    update_tcp_conns(tcp_hdr_ref, &client_key, &mut tcp_bk)?;
 
     Ok(TC_ACT_PIPE)
 }

@@ -22,7 +22,7 @@ use aya_bpf::{
     programs::TcContext,
 };
 
-use common::{BackendKey, BackendList, BPF_MAPS_CAPACITY};
+use common::{BackendKey, BackendList, ClientKey, TCPBackend, BPF_MAPS_CAPACITY};
 use egress::{icmp::handle_icmp_egress, tcp::handle_tcp_egress};
 use ingress::{tcp::handle_tcp_ingress, udp::handle_udp_ingress};
 
@@ -47,6 +47,10 @@ static mut GATEWAY_INDEXES: HashMap<BackendKey, u16> =
 #[map(name = "BLIXT_CONNTRACK")]
 static mut BLIXT_CONNTRACK: HashMap<u32, (u32, u32)> =
     HashMap::<u32, (u32, u32)>::with_max_entries(BPF_MAPS_CAPACITY, 0);
+
+#[map(name = "TCP_CONNECTIONS")]
+static mut TCP_CONNECTIONS: HashMap<ClientKey, TCPBackend> =
+    HashMap::<ClientKey, TCPBackend>::with_max_entries(128, 0);
 
 // -----------------------------------------------------------------------------
 // Ingress
