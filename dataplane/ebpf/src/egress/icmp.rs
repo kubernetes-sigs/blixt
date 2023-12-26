@@ -8,11 +8,12 @@ use core::mem;
 
 use aya_bpf::{bindings::TC_ACT_PIPE, helpers::bpf_csum_diff, programs::TcContext};
 use aya_log_ebpf::info;
+use common::ClientKey;
 use network_types::{eth::EthHdr, icmp::IcmpHdr, ip::Ipv4Hdr};
 
 use crate::{
     utils::{csum_fold_helper, ptr_at},
-    BLIXT_CONNTRACK,
+    LB_CONNECTIONS,
 };
 
 const ICMP_PROTO_TYPE_UNREACH: u8 = 3;
@@ -31,18 +32,21 @@ pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
     }
 
     let dest_addr = unsafe { (*ip_hdr).dst_addr };
-
-    let new_src = unsafe { BLIXT_CONNTRACK.get(&dest_addr) }.ok_or(TC_ACT_PIPE)?;
+    let client_key = &ClientKey {
+        ip: dest_addr.to_be(),
+        port: 0,
+    };
+    let lb_mapping = unsafe { LB_CONNECTIONS.get(client_key) }.ok_or(TC_ACT_PIPE)?;
 
     info!(
         &ctx,
         "Received a ICMP Unreachable packet destined for svc ip: {:i} ",
-        u32::from_be(unsafe { (*ip_hdr).dst_addr })
+        u32::from_be(dest_addr)
     );
 
     // redirect icmp unreachable message back to client
     unsafe {
-        (*ip_hdr).src_addr = new_src.0;
+        (*ip_hdr).src_addr = lb_mapping.backend_key.ip.to_be();
         (*ip_hdr).check = 0;
     }
 
@@ -62,7 +66,7 @@ pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
         unsafe { ptr_at(&ctx, icmp_header_offset + IcmpHdr::LEN) }?;
 
     unsafe {
-        (*icmp_inner_ip_hdr).dst_addr = new_src.0;
+        (*icmp_inner_ip_hdr).dst_addr = lb_mapping.backend_key.ip.to_be();
         (*icmp_inner_ip_hdr).check = 0;
     }
 
@@ -77,7 +81,7 @@ pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
     } as u64;
     unsafe { (*icmp_inner_ip_hdr).check = csum_fold_helper(full_cksum) };
 
-    unsafe { BLIXT_CONNTRACK.remove(&dest_addr)? };
+    unsafe { LB_CONNECTIONS.remove(client_key)? };
 
     return Ok(TC_ACT_PIPE);
 }

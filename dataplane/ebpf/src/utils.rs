@@ -8,8 +8,8 @@ use aya_bpf::{bindings::TC_ACT_OK, programs::TcContext};
 use core::mem;
 use network_types::tcp::TcpHdr;
 
-use crate::TCP_CONNECTIONS;
-use common::{ClientKey, TCPBackend, TCPState};
+use crate::LB_CONNECTIONS;
+use common::{ClientKey, LoadBalancerMapping, TCPState};
 
 // -----------------------------------------------------------------------------
 // Helper Functions
@@ -104,21 +104,22 @@ pub fn process_tcp_state_transition(hdr: &TcpHdr, state: &mut TCPState) -> bool 
 pub fn update_tcp_conns(
     hdr: &TcpHdr,
     client_key: &ClientKey,
-    tcp_backend: &mut TCPBackend,
+    lb_mapping: &mut LoadBalancerMapping,
 ) -> Result<(), i64> {
-    let transitioned = process_tcp_state_transition(hdr, &mut tcp_backend.state);
-    if let TCPState::Closed = tcp_backend.state {
-        unsafe {
-            return TCP_CONNECTIONS.remove(&client_key);
+    if let Some(mut tcp_state) = lb_mapping.tcp_state {
+        let transitioned = process_tcp_state_transition(hdr, &mut tcp_state);
+        if let TCPState::Closed = tcp_state {
+            unsafe {
+                return LB_CONNECTIONS.remove(&client_key);
+            }
+        }
+        // If the connection has not reached the Closed state yet, but it did transition to a new state,
+        // then record the new state.
+        if transitioned {
+            unsafe {
+                return LB_CONNECTIONS.insert(&client_key, &lb_mapping, 0_u64);
+            }
         }
     }
-    // If the connection has not reached the Closed state yet, but it did transition to a new state,
-    // then record the new state.
-    if transitioned {
-        unsafe {
-            return TCP_CONNECTIONS.insert(&client_key, &tcp_backend, 0_u64);
-        }
-    }
-
     Ok(())
 }

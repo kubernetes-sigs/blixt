@@ -70,11 +70,11 @@ unsafe impl aya::Pod for TCPState {}
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
-pub struct TCPBackend {
+pub struct LoadBalancerMapping {
     pub backend: Backend,
     pub backend_key: BackendKey,
-    pub state: TCPState,
+    pub tcp_state: Option<TCPState>,
 }
 
 #[cfg(feature = "user")]
-unsafe impl aya::Pod for TCPBackend {}
+unsafe impl aya::Pod for LoadBalancerMapping {}

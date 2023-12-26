@@ -13,7 +13,7 @@ use aya::programs::{tc, SchedClassifier, TcAttachType};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
 use clap::Parser;
-use common::{BackendKey, BackendList, ClientKey, TCPBackend};
+use common::{BackendKey, BackendList, ClientKey, LoadBalancerMapping};
 use log::{info, warn};
 
 #[derive(Debug, Parser)]
@@ -46,9 +46,9 @@ async fn main() -> Result<(), anyhow::Error> {
                 .expect("no maps named GATEWAY_INDEXES"),
         )
         .try_into()?;
-        let tcp_conns: HashMap<_, ClientKey, TCPBackend> = Map::HashMap(
-            MapData::from_pin(bpfd_maps.join("TCP_CONNECTIONS"))
-                .expect("no maps named TCP_CONNECTIONS"),
+        let tcp_conns: HashMap<_, ClientKey, LoadBalancerMapping> = Map::HashMap(
+            MapData::from_pin(bpfd_maps.join("LB_CONNECTIONS"))
+                .expect("no maps named LB_CONNECTIONS"),
         )
         .try_into()?;
 
@@ -102,9 +102,9 @@ async fn main() -> Result<(), anyhow::Error> {
             bpf.take_map("GATEWAY_INDEXES")
                 .expect("no maps named GATEWAY_INDEXES"),
         )?;
-        let tcp_conns: HashMap<_, ClientKey, TCPBackend> = HashMap::try_from(
-            bpf.take_map("TCP_CONNECTIONS")
-                .expect("no maps named TCP_CONNECTIONS"),
+        let tcp_conns: HashMap<_, ClientKey, LoadBalancerMapping> = HashMap::try_from(
+            bpf.take_map("LB_CONNECTIONS")
+                .expect("no maps named LB_CONNECTIONS"),
         )?;
 
         start_api_server(

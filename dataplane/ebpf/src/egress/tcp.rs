@@ -17,7 +17,7 @@ use network_types::{eth::EthHdr, ip::Ipv4Hdr, tcp::TcpHdr};
 
 use crate::{
     utils::{csum_fold_helper, ptr_at, update_tcp_conns},
-    TCP_CONNECTIONS,
+    LB_CONNECTIONS,
 };
 
 pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
@@ -36,24 +36,24 @@ pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
         ip: u32::from_be(client_addr),
         port: u16::from_be(dest_port) as u32,
     };
-    let tcp_backend = unsafe { TCP_CONNECTIONS.get(&client_key) }.ok_or(TC_ACT_PIPE)?;
+    let lb_mapping = unsafe { LB_CONNECTIONS.get(&client_key) }.ok_or(TC_ACT_PIPE)?;
 
     info!(
         &ctx,
         "Received TCP packet destined for tracked IP {:i}:{} setting source IP to VIP {:i}:{}",
         u32::from_be(client_addr),
         u16::from_be(dest_port),
-        tcp_backend.backend_key.ip,
-        tcp_backend.backend_key.port,
+        lb_mapping.backend_key.ip,
+        lb_mapping.backend_key.port,
     );
 
     // TODO: connection tracking cleanup https://github.com/kubernetes-sigs/blixt/issues/85
     // SNAT the ip address
     unsafe {
-        (*ip_hdr).src_addr = tcp_backend.backend_key.ip.to_be();
+        (*ip_hdr).src_addr = lb_mapping.backend_key.ip.to_be();
     };
     // SNAT the port
-    unsafe { (*tcp_hdr).source = u16::from_be(tcp_backend.backend_key.port as u16) };
+    unsafe { (*tcp_hdr).source = u16::from_be(lb_mapping.backend_key.port as u16) };
 
     if (ctx.data() + EthHdr::LEN + Ipv4Hdr::LEN) > ctx.data_end() {
         info!(&ctx, "Iphdr is out of bounds");
@@ -79,12 +79,12 @@ pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
     // from our map.
     if tcp_hdr_ref.rst() == 1 {
         unsafe {
-            TCP_CONNECTIONS.remove(&client_key)?;
+            LB_CONNECTIONS.remove(&client_key)?;
         }
     }
 
-    let mut tcp_bk = *tcp_backend;
-    update_tcp_conns(tcp_hdr_ref, &client_key, &mut tcp_bk)?;
+    let mut mapping = *lb_mapping;
+    update_tcp_conns(tcp_hdr_ref, &client_key, &mut mapping)?;
 
     Ok(TC_ACT_PIPE)
 }
