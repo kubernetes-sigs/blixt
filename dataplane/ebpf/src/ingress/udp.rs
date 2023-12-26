@@ -78,8 +78,8 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
         let client_key = ClientKey {
             ip: u32::from_be((*ip_hdr).src_addr),
             // The only reason we're tracking UDP packets is to be able to allow ICMP egress
-            // traffic. Since ICMP is a L3 protocol, ICMP packet's header don't have access to the
-            // UDP port and operates solely based on the IP address.
+            // traffic. Since ICMP is a L3 protocol, an ICMP packet's header does not have access to
+            // the UDP port and operates solely based on the IP address.
             port: 0,
         };
         let lb_mapping = LoadBalancerMapping {
