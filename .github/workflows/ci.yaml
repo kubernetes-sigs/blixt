@@ -22,10 +22,10 @@ jobs:
       with:
         fetch-depth: 0
     - name: Get list of all changes
-      uses: tj-actions/changed-files@1d6e210c970d01a876fbc6155212d068e79ca584
+      uses: tj-actions/changed-files@716b1e13042866565e00e85fd4ec490e186c4a2f
       id: changed-files
     - name: Check if any files related to the building of the control plane image have changed (see the Dockerfiles)
-      uses: tj-actions/changed-files@1d6e210c970d01a876fbc6155212d068e79ca584
+      uses: tj-actions/changed-files@716b1e13042866565e00e85fd4ec490e186c4a2f
       id: control-plane-changed
       with:
         files: |
@@ -36,7 +36,7 @@ jobs:
           controllers/
           LICENSE
     - name: Check if any files related to the building of the dataplane image have changed (see the Dockerfiles)
-      uses: tj-actions/changed-files@1d6e210c970d01a876fbc6155212d068e79ca584
+      uses: tj-actions/changed-files@716b1e13042866565e00e85fd4ec490e186c4a2f
       id: dataplane-changed
       with:
         files: |
@@ -48,7 +48,7 @@ jobs:
           dataplane/Makefile
           dataplane/LICENCE
     - name: Check if any of the workflow files have changed
-      uses: tj-actions/changed-files@1d6e210c970d01a876fbc6155212d068e79ca584
+      uses: tj-actions/changed-files@716b1e13042866565e00e85fd4ec490e186c4a2f
       id: workflow-changed
       with:
         files: |
