@@ -136,13 +136,12 @@ test.integration: manifests generate fmt vet
 	BLIXT_UDP_SERVER_IMAGE=$(BLIXT_UDP_SERVER_IMAGE):$(TAG) \
 	GOFLAGS="-tags=integration_tests" go test -race -v ./test/integration/...
 
+.PHONY: test.icmp.integration
 test.icmp.integration:
 	go clean -testcache
 	# This needs to run as sudo as the test involves listening for raw ICMP packets, which
 	# requires you to be root.
 	sudo env PATH=$(PATH) \
-	DOCKER_API_VERSION=1.41 \
-	BLIXT_TEST_KEEP_CLUSTER=true \
 	BLIXT_CONTROLPLANE_IMAGE=$(BLIXT_CONTROLPLANE_IMAGE):$(TAG) \
 	BLIXT_DATAPLANE_IMAGE=$(BLIXT_DATAPLANE_IMAGE):$(TAG) \
 	BLIXT_UDP_SERVER_IMAGE=$(BLIXT_UDP_SERVER_IMAGE):$(TAG) \

@@ -50,10 +50,11 @@ var (
 	dataplaneImage    = os.Getenv("BLIXT_DATAPLANE_IMAGE")
 	udpServerImage    = os.Getenv("BLIXT_UDP_SERVER_IMAGE")
 
-	existingCluster      = os.Getenv("BLIXT_USE_EXISTING_KIND_CLUSTER")
-	keepTestCluster      = func() bool { return os.Getenv("BLIXT_TEST_KEEP_CLUSTER") == "true" || existingCluster != "" }()
+	clusterName          = os.Getenv("BLIXT_TEST_CLUSTER_NAME")
+	useExistingCluster   = func() bool { return os.Getenv("BLIX_USE_EXISTING_KIND_CLUSTER") == "true" }()
+	keepTestCluster      = func() bool { return os.Getenv("BLIXT_TEST_KEEP_CLUSTER") == "true" || useExistingCluster }()
 	keepKustomizeDeploys = func() bool { return os.Getenv("BLIXT_TEST_KEEP_KUSTOMIZE_DEPLOYS") == "true" }()
-	blixtUseBpfd         = func() bool { return os.Getenv("BLIXT_USE_BPFD") == "true" && existingCluster == "" }()
+	blixtUseBpfd         = func() bool { return os.Getenv("BLIXT_USE_BPFD") == "true" && useExistingCluster }()
 
 	mainCleanupKey = "main"
 )
@@ -83,11 +84,11 @@ func TestMain(m *testing.M) {
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	if existingCluster != "" {
-		fmt.Printf("INFO: existing kind cluster %s was provided\n", existingCluster)
+	if useExistingCluster {
+		fmt.Printf("INFO: existing kind cluster %s was provided\n", clusterName)
 
 		// if an existing cluster was provided, build a test env out of that instead
-		cluster, err := kind.NewFromExisting(existingCluster)
+		cluster, err := kind.NewFromExisting(clusterName)
 		exitOnErr(err)
 		env, err = environments.NewBuilder().WithExistingCluster(cluster).Build(ctx)
 		exitOnErr(err)
@@ -103,8 +104,12 @@ func TestMain(m *testing.M) {
 		loadImages, err = loadImages.WithImage(udpServerImage)
 		exitOnErr(err)
 
-		// create the testing environment and cluster
-		env, err = environments.NewBuilder().WithAddons(metallb.New(), loadImages.Build()).Build(ctx)
+		// create the testing environment and builder
+		builder := environments.NewBuilder().WithAddons(metallb.New(), loadImages.Build())
+		if clusterName != "" {
+			builder.WithName(clusterName)
+		}
+		env, err = builder.Build(ctx)
 		exitOnErr(err)
 
 		if !keepTestCluster {

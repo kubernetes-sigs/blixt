@@ -70,9 +70,22 @@ jobs:
     - name: build images
       run: make build.all.images TAG=integration-tests
 
+    - name: Set cluster name in enviornment
+      run: echo "BLIXT_TEST_CLUSTER_NAME=`echo blixt-ci-${GITHUB_SHA} | cut -c1-8`" >> $GITHUB_ENV
+
     - name: run integration tests
       run: make test.integration
       env:
+        BLIXT_TEST_KEEP_CLUSTER: true
+        BLIXT_CONTROLPLANE_IMAGE: "ghcr.io/kubernetes-sigs/blixt-controlplane"
+        BLIXT_DATAPLANE_IMAGE: "ghcr.io/kubernetes-sigs/blixt-dataplane"
+        BLIXT_UDP_SERVER_IMAGE: "ghcr.io/kubernetes-sigs/blixt-udp-test-server"
+        TAG: "integration-tests"
+
+    - name: run integration tests
+      run: make test.icmp.integration
+      env:
+        BLIXT_USE_EXISTING_KIND_CLUSTER: true
         BLIXT_CONTROLPLANE_IMAGE: "ghcr.io/kubernetes-sigs/blixt-controlplane"
         BLIXT_DATAPLANE_IMAGE: "ghcr.io/kubernetes-sigs/blixt-dataplane"
         BLIXT_UDP_SERVER_IMAGE: "ghcr.io/kubernetes-sigs/blixt-udp-test-server"
