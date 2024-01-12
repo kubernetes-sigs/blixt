@@ -39,7 +39,8 @@ var (
 	dataplaneImage    = os.Getenv("BLIXT_DATAPLANE_IMAGE")
 	udpServerImage    = os.Getenv("BLIXT_UDP_SERVER_IMAGE")
 
-	useExistingCluster = os.Getenv("BLIXT_USE_EXISTING_CLUSTER")
+	useExistingCluster = func() bool { return os.Getenv("BLIX_USE_EXISTING_KIND_CLUSTER") == "true" }()
+	clusterName        = os.Getenv("BLIXT_TEST_CLUSTER_NAME")
 )
 
 func TestMain(m *testing.M) {
@@ -47,9 +48,9 @@ func TestMain(m *testing.M) {
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	if useExistingCluster != "" {
-		fmt.Printf("INFO: using existing kind cluster %s for test environment\n", useExistingCluster)
-		cluster, err := kind.NewFromExisting(useExistingCluster)
+	if useExistingCluster {
+		fmt.Printf("INFO: using existing kind cluster %s for test environment\n", clusterName)
+		cluster, err := kind.NewFromExisting(clusterName)
 		exitOnErr(err)
 		env, err = environments.NewBuilder().WithExistingCluster(cluster).Build(ctx)
 		exitOnErr(err)
@@ -63,7 +64,11 @@ func TestMain(m *testing.M) {
 		exitOnErr(err)
 
 		fmt.Println("INFO: building the test environment and cluster")
-		env, err = environments.NewBuilder().WithAddons(metallb.New(), imageLoader.Build()).Build(ctx)
+		builder := environments.NewBuilder().WithAddons(metallb.New(), imageLoader.Build())
+		if clusterName != "" {
+			builder.WithName(clusterName)
+		}
+		env, err = builder.Build(ctx)
 		exitOnErr(err)
 		addCleanup(env.Cleanup)
 	}

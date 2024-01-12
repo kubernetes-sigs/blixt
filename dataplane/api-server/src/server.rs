@@ -15,19 +15,19 @@ use tonic::{Request, Response, Status};
 use crate::backends::backends_server::Backends;
 use crate::backends::{Confirmation, InterfaceIndexConfirmation, PodIp, Targets, Vip};
 use crate::netutils::{if_name_for_routing_ip, if_nametoindex};
-use common::{Backend, BackendKey, BackendList, ClientKey, TCPBackend, BACKENDS_ARRAY_CAPACITY};
+use common::{Backend, BackendKey, BackendList, ClientKey, LoadBalancerMapping, BACKENDS_ARRAY_CAPACITY};
 
 pub struct BackendService {
     backends_map: Arc<Mutex<HashMap<MapData, BackendKey, BackendList>>>,
     gateway_indexes_map: Arc<Mutex<HashMap<MapData, BackendKey, u16>>>,
-    tcp_conns_map: Arc<Mutex<HashMap<MapData, ClientKey, TCPBackend>>>,
+    tcp_conns_map: Arc<Mutex<HashMap<MapData, ClientKey, LoadBalancerMapping>>>,
 }
 
 impl BackendService {
     pub fn new(
         backends_map: HashMap<MapData, BackendKey, BackendList>,
         gateway_indexes_map: HashMap<MapData, BackendKey, u16>,
-        tcp_conns_map: HashMap<MapData, ClientKey, TCPBackend>,
+        tcp_conns_map: HashMap<MapData, ClientKey, LoadBalancerMapping>,
     ) -> BackendService {
         BackendService {
             backends_map: Arc::new(Mutex::new(backends_map)),
@@ -65,15 +65,15 @@ impl BackendService {
         let mut tcp_conns_map = self.tcp_conns_map.lock().await;
         for item in tcp_conns_map
             .iter()
-            .collect::<Vec<Result<(ClientKey, TCPBackend), MapError>>>()
+            .collect::<Vec<Result<(ClientKey, LoadBalancerMapping), MapError>>>()
         {
             match item {
                 Ok((
                     client_key,
-                    TCPBackend {
+                    LoadBalancerMapping {
                         backend: _,
                         backend_key,
-                        state: _,
+                        tcp_state: _,
                     },
                 )) => {
                     if backend_key == key {

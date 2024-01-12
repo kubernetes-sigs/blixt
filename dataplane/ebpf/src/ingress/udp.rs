@@ -16,9 +16,9 @@ use network_types::{eth::EthHdr, ip::Ipv4Hdr, udp::UdpHdr};
 
 use crate::{
     utils::{csum_fold_helper, ptr_at},
-    BACKENDS, BLIXT_CONNTRACK, GATEWAY_INDEXES,
+    BACKENDS, GATEWAY_INDEXES, LB_CONNECTIONS,
 };
-use common::{BackendKey, BACKENDS_ARRAY_CAPACITY};
+use common::{BackendKey, ClientKey, LoadBalancerMapping, BACKENDS_ARRAY_CAPACITY};
 
 pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
     let ip_hdr: *mut Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
@@ -28,21 +28,21 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
     let udp_hdr: *mut UdpHdr = unsafe { ptr_at(&ctx, udp_header_offset) }?;
 
     let original_daddr = unsafe { (*ip_hdr).dst_addr };
+    let original_dport = unsafe { (*udp_hdr).dest };
 
-    let key = BackendKey {
+    let backend_key = BackendKey {
         ip: u32::from_be(original_daddr),
-        port: (u16::from_be(unsafe { (*udp_hdr).dest })) as u32,
+        port: (u16::from_be(original_dport)) as u32,
     };
-    let backend_list = unsafe { BACKENDS.get(&key) }.ok_or(TC_ACT_PIPE)?;
-    let backend_index = unsafe { GATEWAY_INDEXES.get(&key) }.ok_or(TC_ACT_PIPE)?;
+    let backend_list = unsafe { BACKENDS.get(&backend_key) }.ok_or(TC_ACT_PIPE)?;
+    let backend_index = unsafe { GATEWAY_INDEXES.get(&backend_key) }.ok_or(TC_ACT_PIPE)?;
 
     info!(
         &ctx,
         "Received a UDP packet destined for svc ip: {:i} at Port: {} ",
-        u32::from_be(unsafe { (*ip_hdr).dst_addr }),
-        u16::from_be(unsafe { (*udp_hdr).dest })
+        backend_key.ip,
+        backend_key.port as u16,
     );
-
     debug!(&ctx, "Destination backend index: {}", *backend_index);
     debug!(&ctx, "Backends length: {}", backend_list.backends_len);
 
@@ -61,7 +61,7 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
         None => {
             debug!(
                 &ctx,
-                "Failed to find backend in backends_list at index {}, using 0th index; backends_len: {} ",
+                "Failed to find backend in backends_list at index {}, falling back to 0th index; backends_len: {} ",
                 *backend_index,
                 backend_list.backends_len
             )
@@ -69,12 +69,25 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
     }
 
     unsafe {
-        BLIXT_CONNTRACK.insert(
-            &(*ip_hdr).src_addr,
-            &(original_daddr, (*udp_hdr).dest as u32),
-            0 as u64,
-        )?;
+        // DNAT the ip address
         (*ip_hdr).dst_addr = backend.daddr.to_be();
+        // DNAT the port
+        (*udp_hdr).dest = (backend.dport as u16).to_be();
+
+        // Record the packet's source and destination in our connection tracking map.
+        let client_key = ClientKey {
+            ip: u32::from_be((*ip_hdr).src_addr),
+            // The only reason we're tracking UDP packets is to be able to allow ICMP egress
+            // traffic. Since ICMP is a L3 protocol, an ICMP packet's header does not have access to
+            // the UDP port and operates solely based on the IP address.
+            port: 0,
+        };
+        let lb_mapping = LoadBalancerMapping {
+            backend,
+            backend_key,
+            tcp_state: None,
+        };
+        LB_CONNECTIONS.insert(&client_key, &lb_mapping, 0_u64)?;
     };
 
     if (ctx.data() + EthHdr::LEN + Ipv4Hdr::LEN) > ctx.data_end() {
@@ -95,9 +108,6 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
         )
     } as u64;
     unsafe { (*ip_hdr).check = csum_fold_helper(full_cksum) };
-
-    // Update destination port
-    unsafe { (*udp_hdr).dest = (backend.dport as u16).to_be() };
     // Kernel allows UDP packet with unset checksums
     unsafe { (*udp_hdr).check = 0 };
 
@@ -116,7 +126,7 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
         next = 0;
     }
     unsafe {
-        GATEWAY_INDEXES.insert(&key, &next, 0 as u64)?;
+        GATEWAY_INDEXES.insert(&backend_key, &next, 0 as u64)?;
     }
 
     info!(&ctx, "redirect action: {}", action);

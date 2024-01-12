@@ -33,6 +33,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/kong/kubernetes-testing-framework/pkg/clusters"
 	"github.com/stretchr/testify/require"
+	"github.com/vishvananda/netlink"
+	"golang.org/x/net/icmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -216,8 +218,8 @@ func sendUDPPacket(t *testing.T, msg, gwaddr string) int {
 	t.Helper()
 
 	conn, err := net.Dial("udp", gwaddr)
-	defer conn.Close()
 	require.NoError(t, err)
+	defer conn.Close()
 
 	bytesWritten, err := conn.Write([]byte(msg))
 	require.NoError(t, err)
@@ -233,7 +235,9 @@ func sendUDPPacket(t *testing.T, msg, gwaddr string) int {
 }
 
 func TestUDPRouteNoReach(t *testing.T) {
-	t.Skip("TODO: temporarily skipped due to instability, see https://github.com/kubernetes-sigs/blixt/issues/104")
+	if os.Getenv("RUN_ICMP_TEST") == "" {
+		t.Skip("skipping ICMP integration test")
+	}
 
 	udpRouteNoReachCleanupKey := "udproutenoreach"
 	defer func() {
@@ -269,6 +273,20 @@ func TestUDPRouteNoReach(t *testing.T) {
 		return server.Status.AvailableReplicas > 0
 	}, time.Minute, time.Second)
 
+	// start listening for ICMP packets originating from the cluster
+	gwHost := strings.Split(gwaddr, ":")[0]
+	ip := net.ParseIP(gwHost)
+	routes, err := netlink.RouteGet(ip)
+	require.NoError(t, err)
+	require.Len(t, routes, 1)
+
+	msgs := make(chan icmp.Message, 2)
+	errs := make(chan error, 1)
+	go listenForICMPPacket(routes[0].Src.String(), gwHost, msgs, errs)
+	// Block unitl we get a ping that indicates that we have an active connection
+	// listening for ICMP packets, otherwise we might be too late to capture the packet.
+	<-msgs
+
 	t.Logf("sending a datagram to the UDP server at %s", gwaddr)
 	message := uuid.NewString()
 	conn, err := net.Dial("udp", gwaddr)
@@ -278,10 +296,42 @@ func TestUDPRouteNoReach(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(message), bytesWritten)
 
-	// ensure server sent back icmp host unreachable
-	t.Logf("ensuring UDP server sent back icmp host unreachable")
-	err = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	require.NoError(t, err)
-	_, err = conn.Read(make([]byte, 2048))
-	require.ErrorContains(t, err, "read: connection refused")
+	t.Logf("ensuring UDP server sent back icmp destination unreachable")
+	select {
+	case msg := <-msgs:
+		require.Contains(t, fmt.Sprintf("%s", msg.Type), "destination unreachable")
+	case err := <-errs:
+		t.Fatalf("received error while listening for ICMP packets: %s", err)
+	}
+}
+
+// listenForICMPPacket listens for ICMP packets on the given address. It sends the parsed
+// ICMP message to the given channel if the packet arose from the provided host.
+func listenForICMPPacket(address, gwHost string, msgs chan icmp.Message, errs chan error) {
+	conn, err := icmp.ListenPacket("ip4:icmp", address)
+	if err != nil {
+		errs <- err
+		return
+	}
+	defer conn.Close()
+	// Send an empty message which acts like a ping indicating that we have an active ICMP listener.
+	msgs <- icmp.Message{}
+
+	for {
+		packet := make([]byte, 1024)
+		length, src, err := conn.ReadFrom(packet)
+		if err != nil {
+			errs <- err
+			return
+		}
+
+		if src != nil && src.String() == gwHost {
+			msg, err := icmp.ParseMessage(1, packet[:length])
+			if err != nil {
+				errs <- err
+				return
+			}
+			msgs <- *msg
+		}
+	}
 }

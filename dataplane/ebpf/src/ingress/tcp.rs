@@ -16,9 +16,11 @@ use network_types::{eth::EthHdr, ip::Ipv4Hdr, tcp::TcpHdr};
 
 use crate::{
     utils::{csum_fold_helper, ptr_at, update_tcp_conns},
-    BACKENDS, GATEWAY_INDEXES, TCP_CONNECTIONS,
+    BACKENDS, GATEWAY_INDEXES, LB_CONNECTIONS,
 };
-use common::{Backend, BackendKey, ClientKey, TCPBackend, TCPState, BACKENDS_ARRAY_CAPACITY};
+use common::{
+    Backend, BackendKey, ClientKey, LoadBalancerMapping, TCPState, BACKENDS_ARRAY_CAPACITY,
+};
 
 pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
     let ip_hdr: *mut Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
@@ -41,14 +43,14 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
     // Flag to check whether this is a new connection.
     let mut new_conn = false;
     // The state of this TCP connection.
-    let mut tcp_state = TCPState::default();
+    let mut tcp_state = Some(TCPState::default());
 
     // Try to find the backend previously used for this connection. If not found, it means that
     // this is a new connection, so assign it the next backend in line.
-    if let Some(val) = unsafe { TCP_CONNECTIONS.get(&client_key) } {
+    if let Some(val) = unsafe { LB_CONNECTIONS.get(&client_key) } {
         backend = val.backend;
-        tcp_state = val.state;
         backend_key = val.backend_key;
+        tcp_state = val.tcp_state;
     } else {
         new_conn = true;
 
@@ -76,6 +78,13 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
         backend = backend_list.backends[0];
         if let Some(val) = backend_list.backends.get(*backend_index as usize) {
             backend = *val;
+        } else {
+            debug!(
+                &ctx,
+                "Failed to find backend in backends_list at index {}, falling back to 0th index; backends_len: {} ",
+                *backend_index,
+                backend_list.backends_len
+            )
         }
 
         // move the index to the next backend in our list
@@ -132,16 +141,16 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
         )
     };
 
-    let mut tcp_backend = TCPBackend {
+    let mut lb_mapping = LoadBalancerMapping {
         backend,
         backend_key,
-        state: tcp_state,
+        tcp_state,
     };
 
     // If the connection is new, then record it in our map for future tracking.
     if new_conn {
         unsafe {
-            TCP_CONNECTIONS.insert(&client_key, &tcp_backend, 0_u64)?;
+            LB_CONNECTIONS.insert(&client_key, &lb_mapping, 0_u64)?;
         }
 
         // since this is a new connection, there is nothing else to do, so exit early
@@ -155,11 +164,11 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
     // from our map.
     if tcp_hdr_ref.rst() == 1 {
         unsafe {
-            TCP_CONNECTIONS.remove(&client_key)?;
+            LB_CONNECTIONS.remove(&client_key)?;
         }
     }
 
-    update_tcp_conns(tcp_hdr_ref, &client_key, &mut tcp_backend)?;
+    update_tcp_conns(tcp_hdr_ref, &client_key, &mut lb_mapping)?;
 
     info!(&ctx, "redirect action: {}", action);
     Ok(action as i32)
