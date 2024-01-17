@@ -5,5 +5,7 @@ aliases:
   blixt-maintainers:
     - astoycos
     - mlavacca
-    - robscott
     - shaneutt
+
+  emeritus-blixt-maintainers:
+    - robscott
