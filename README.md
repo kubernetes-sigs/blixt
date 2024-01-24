@@ -11,6 +11,12 @@ The control-plane is built using [Gateway API][gwapi] and written in
 data-plane is built using [eBPF][ebpf] and is written in [Rust][rust] using
 [Aya][aya].
 
+> **Warning**: We've [decided](https://github.com/kubernetes-sigs/blixt/discussions/150) that we're going to rewrite
+> the control-plane in Rust (as it was earlier on in this project's life), so please note that if you contribute to
+> the Go control-plane in the interim before we take this warning down, things might get "lost" when we switch to the
+> new version. See the [relevant milestone](https://github.com/kubernetes-sigs/blixt/milestone/8) and check in with
+> us in the issues (or via discussions) if you're interested in working on something control-plane related!
+
 This project's main purposes are to help facilitate the development of the
 [Gateway API][gwapi] project and to be a fun and safe place for contributors to
 contribute and try out newer technologies.
