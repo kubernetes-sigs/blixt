@@ -81,13 +81,30 @@ to have _you_ join us in iterating on it and helping us build it together!
 > (KIND)][kind] clusters. You can generate a new development cluster for
 > testing with `make build.cluster`.
 
-Deploy [Gateway API][gwapi] [CRDs][crds]:
+> **Note**: Currently our container images are under migration from a private repository.
+> At this moment, you should build and load images yourself.
+
+1. Deploy [Gateway API][gwapi] [CRDs][crds]:
 
 ```console
 kubectl apply -k https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.8.1
 ```
 
-Deploy:
+2. Build Blixt images:
+
+```console
+make build.all.images TAG=latest
+```
+
+3. Load images into your Kind cluster:
+
+```console
+make load.all.images TAG=latest
+```
+You may get an error like `Error from server (NotFound): namespaces "blixt-system" not found`, but please ignore it at this moment. The entire resources are created in the next step.
+
+
+4. Deploy Blixt:
 
 ```console
 kubectl apply -k config/default
