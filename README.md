@@ -101,8 +101,6 @@ make build.all.images TAG=latest
 ```console
 make load.all.images TAG=latest
 ```
-You may get an error like `Error from server (NotFound): namespaces "blixt-system" not found`, but please ignore it at this moment. The entire resources are created in the next step.
-
 
 4. Deploy Blixt:
 

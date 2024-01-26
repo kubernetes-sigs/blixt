@@ -331,11 +331,13 @@ build.cluster: $(KTF) # builds a KIND cluster which can be used for testing and 
 .PHONY: load.image
 load.image: build.image
 	kind load docker-image $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
-		kubectl -n blixt-system rollout restart deployment blixt-controlplane
+		kubectl -n blixt-system get deployment blixt-controlplane >/dev/null 2>&1 && \
+		kubectl -n blixt-system rollout restart deployment blixt-controlplane || true
 
 .PHONY: load.all.images
 load.all.images: build.all.images
 	kind load docker-image $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
 	kind load docker-image $(BLIXT_DATAPLANE_IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
 	kind load docker-image $(BLIXT_UDP_SERVER_IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
-		kubectl -n blixt-system rollout restart deployment blixt-controlplane
+		kubectl -n blixt-system get deployment blixt-controlplane >/dev/null 2>&1 && \
+		kubectl -n blixt-system rollout restart deployment blixt-controlplane || true
