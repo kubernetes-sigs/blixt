@@ -2,6 +2,13 @@ IMAGE ?= ghcr.io/kubernetes-sigs/blixt-dataplane
 TAG ?= latest
 KIND_CLUSTER ?= blixt-dev
 
+ifeq ($(shell uname -m),arm64)
+BUILD_PLATFORMS ?= linux/arm64
+else
+BUILD_PLATFORMS ?= linux/amd64
+endif
+BUILD_ARGS ?= --load
+
 all: build
 
 .PHONY:
@@ -20,7 +27,7 @@ build.release:
 
 .PHONY: build.image
 build.image:
-	DOCKER_BUILDKIT=1 docker build -t $(IMAGE):$(TAG) ./
+	DOCKER_BUILDKIT=1 docker buildx build --platform $(BUILD_PLATFORMS) $(BUILD_ARGS) -t $(IMAGE):$(TAG) ./
 
 .PHONY: load.image
 load.image: build.image

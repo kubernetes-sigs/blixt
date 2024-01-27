@@ -8,6 +8,12 @@ EXISTING_CLUSTER ?=
 
 # Image URL to use all building/pushing image targets
 TAG ?= integration-tests
+ifeq ($(shell uname -m),arm64)
+BUILD_PLATFORMS ?= linux/arm64
+else
+BUILD_PLATFORMS ?= linux/amd64
+endif
+BUILD_ARGS ?= --load
 
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
@@ -187,7 +193,7 @@ debug: manifests generate fmt vet ## Run a controller from your host via debugge
 
 .PHONY: build.image
 build.image:
-	DOCKER_BUILDKIT=1 docker build -t $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) .
+	DOCKER_BUILDKIT=1 docker buildx build --platform=$(BUILD_PLATFORMS) $(BUILD_ARGS) -t $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) .
 
 .PHONY: build.all.images
 build.all.images: build.image
