@@ -24,9 +24,12 @@ pub async fn start(
     gateway_indexes_map: HashMap<MapData, BackendKey, u16>,
     tcp_conns_map: HashMap<MapData, ClientKey, LoadBalancerMapping>,
 ) -> Result<(), Error> {
+    let (_, health_service) = tonic_health::server::health_reporter();
+
     let server = server::BackendService::new(backends_map, gateway_indexes_map, tcp_conns_map);
     // TODO: mTLS https://github.com/Kong/blixt/issues/50
     Server::builder()
+        .add_service(health_service)
         .add_service(BackendsServer::new(server))
         .serve(SocketAddrV4::new(addr, port).into())
         .await?;
