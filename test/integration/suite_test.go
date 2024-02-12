@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 
 	testutils "github.com/kubernetes-sigs/blixt/internal/test/utils"
+	"github.com/kubernetes-sigs/blixt/pkg/vars"
 )
 
 var (
@@ -181,6 +182,9 @@ func TestMain(m *testing.M) {
 	fmt.Println("INFO: waiting for Blixt component readiness")
 	exitOnErr(testutils.WaitForBlixtReadiness(ctx, env))
 
+	fmt.Println("INFO: waiting for Dataplane readiness")
+	exitOnErr(waitForDataplaneReadiness(ctx, env))
+
 	exit := m.Run()
 
 	exitOnErr(runCleanup(mainCleanupKey))
@@ -306,6 +310,53 @@ func waitForBpfdConfigDelete(ctx context.Context, env environments.Environment) 
 				}
 				return err
 			}
+		}
+	}
+}
+
+func waitForDataplaneReadiness(ctx context.Context, env environments.Environment) error {
+	for {
+		select {
+		case <-ctx.Done():
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("context completed while waiting for dataplane readiness, and an error occurred: %w", err)
+			}
+			return fmt.Errorf("context completed while waiting for dataplane readiness")
+		default:
+			dataplanes, err := env.Cluster().Client().CoreV1().Pods(vars.DefaultNamespace).
+				List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("component=%s", vars.DefaultDataPlaneComponentLabel)})
+			if err != nil {
+				return fmt.Errorf("failed to fetch dataplane pod list: %w", err)
+			}
+
+			if len(dataplanes.Items) == 0 {
+				return fmt.Errorf("no dataplanes found in namespace %s", vars.DefaultNamespace)
+			}
+
+			// Check whether dataplane is set readiness probe.
+			for _, container := range dataplanes.Items[0].Spec.Containers {
+				if container.Name == "dataplane" && container.ReadinessProbe == nil {
+					return fmt.Errorf("found a dataplane container which doesn't have readiness probe")
+				}
+			}
+
+			// Check all pods' readiness
+			var ready int
+			for _, pod := range dataplanes.Items {
+				for _, status := range pod.Status.ContainerStatuses {
+					if status.Name == "dataplane" && status.Ready {
+						ready++
+					}
+				}
+			}
+
+			if ready != len(dataplanes.Items) {
+				fmt.Printf("%d dataplanes not yet ready\n", len(dataplanes.Items)-ready)
+				time.Sleep(time.Second) // small rest from hitting the API over and over again
+				break
+			}
+
+			return nil
 		}
 	}
 }
