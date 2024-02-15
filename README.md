@@ -135,8 +135,8 @@ can now deploy.
 
 You can reach out to the community by creating [issue][issues] or
 [discussions][disc]. You can also reach out on [Kubernetes Slack][kslack] on the
-`#sig-network-gateway-api` channel. There is also a `#ebpf` channel on
-Kubernetes Slack for general eBPF related help.
+`#blixt` channel. There is also a `#ebpf` channel on Kubernetes Slack for general
+eBPF related help.
 
 [donation]:https://github.com/kubernetes/org/issues/3875
 [gwapi]:https://gateway-api.sigs.k8s.io/
