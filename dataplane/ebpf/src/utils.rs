@@ -106,8 +106,8 @@ pub fn update_tcp_conns(
     client_key: &ClientKey,
     lb_mapping: &mut LoadBalancerMapping,
 ) -> Result<(), i64> {
-    if let Some(mut tcp_state) = lb_mapping.tcp_state {
-        let transitioned = process_tcp_state_transition(hdr, &mut tcp_state);
+    if let Some(ref mut tcp_state) = lb_mapping.tcp_state {
+        let transitioned = process_tcp_state_transition(hdr, tcp_state);
         if let TCPState::Closed = tcp_state {
             unsafe {
                 return LB_CONNECTIONS.remove(&client_key);
