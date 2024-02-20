@@ -310,7 +310,7 @@ pub mod backends_server {
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                (*inner).get_interface_index(request).await
+                                <T as Backends>::get_interface_index(&inner, request).await
                             };
                             Box::pin(fut)
                         }
@@ -353,7 +353,9 @@ pub mod backends_server {
                             request: tonic::Request<super::Targets>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move { (*inner).update(request).await };
+                            let fut = async move {
+                                <T as Backends>::update(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -395,7 +397,9 @@ pub mod backends_server {
                             request: tonic::Request<super::Vip>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move { (*inner).delete(request).await };
+                            let fut = async move {
+                                <T as Backends>::delete(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
