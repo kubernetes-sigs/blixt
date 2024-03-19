@@ -15,7 +15,9 @@ use tonic::{Request, Response, Status};
 use crate::backends::backends_server::Backends;
 use crate::backends::{Confirmation, InterfaceIndexConfirmation, PodIp, Targets, Vip};
 use crate::netutils::{if_name_for_routing_ip, if_nametoindex};
-use common::{Backend, BackendKey, BackendList, ClientKey, LoadBalancerMapping, BACKENDS_ARRAY_CAPACITY};
+use common::{
+    Backend, BackendKey, BackendList, ClientKey, LoadBalancerMapping, BACKENDS_ARRAY_CAPACITY,
+};
 
 pub struct BackendService {
     backends_map: Arc<Mutex<HashMap<MapData, BackendKey, BackendList>>>,

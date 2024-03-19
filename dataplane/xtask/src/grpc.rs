@@ -53,14 +53,16 @@ pub async fn update(opts: Options) -> Result<(), Error> {
             res.into_inner().confirmation
         );
     } else {
-        let res = client.update(Targets {
-            vip: Some(vip.clone()),
-            targets: vec![Target {
-                daddr: daddr.into(),
-                dport: opts.dport,
-                ifindex: Some(opts.ifindex),
-            }],
-        }).await?;
+        let res = client
+            .update(Targets {
+                vip: Some(vip.clone()),
+                targets: vec![Target {
+                    daddr: daddr.into(),
+                    dport: opts.dport,
+                    ifindex: Some(opts.ifindex),
+                }],
+            })
+            .await?;
         println!(
             "grpc server responded to UPDATE: {}",
             res.into_inner().confirmation

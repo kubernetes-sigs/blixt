@@ -45,8 +45,8 @@ pub struct InterfaceIndexConfirmation {
 /// Generated client implementations.
 pub mod backends_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::*;
     use tonic::codegen::http::Uri;
+    use tonic::codegen::*;
     #[derive(Debug, Clone)]
     pub struct BackendsClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -90,9 +90,8 @@ pub mod backends_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<
-                http::Request<tonic::body::BoxBody>,
-            >>::Error: Into<StdError> + Send + Sync,
+            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
+                Into<StdError> + Send + Sync,
         {
             BackendsClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -130,23 +129,16 @@ pub mod backends_client {
         pub async fn get_interface_index(
             &mut self,
             request: impl tonic::IntoRequest<super::PodIp>,
-        ) -> std::result::Result<
-            tonic::Response<super::InterfaceIndexConfirmation>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+        ) -> std::result::Result<tonic::Response<super::InterfaceIndexConfirmation>, tonic::Status>
+        {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/backends.backends/GetInterfaceIndex",
-            );
+            let path = http::uri::PathAndQuery::from_static("/backends.backends/GetInterfaceIndex");
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("backends.backends", "GetInterfaceIndex"));
@@ -156,38 +148,34 @@ pub mod backends_client {
             &mut self,
             request: impl tonic::IntoRequest<super::Targets>,
         ) -> std::result::Result<tonic::Response<super::Confirmation>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static("/backends.backends/Update");
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("backends.backends", "Update"));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("backends.backends", "Update"));
             self.inner.unary(req, path, codec).await
         }
         pub async fn delete(
             &mut self,
             request: impl tonic::IntoRequest<super::Vip>,
         ) -> std::result::Result<tonic::Response<super::Confirmation>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static("/backends.backends/Delete");
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("backends.backends", "Delete"));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("backends.backends", "Delete"));
             self.inner.unary(req, path, codec).await
         }
     }
@@ -202,10 +190,7 @@ pub mod backends_server {
         async fn get_interface_index(
             &self,
             request: tonic::Request<super::PodIp>,
-        ) -> std::result::Result<
-            tonic::Response<super::InterfaceIndexConfirmation>,
-            tonic::Status,
-        >;
+        ) -> std::result::Result<tonic::Response<super::InterfaceIndexConfirmation>, tonic::Status>;
         async fn update(
             &self,
             request: tonic::Request<super::Targets>,
@@ -238,10 +223,7 @@ pub mod backends_server {
                 max_encoding_message_size: None,
             }
         }
-        pub fn with_interceptor<F>(
-            inner: T,
-            interceptor: F,
-        ) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -297,17 +279,10 @@ pub mod backends_server {
                 "/backends.backends/GetInterfaceIndex" => {
                     #[allow(non_camel_case_types)]
                     struct GetInterfaceIndexSvc<T: Backends>(pub Arc<T>);
-                    impl<T: Backends> tonic::server::UnaryService<super::PodIp>
-                    for GetInterfaceIndexSvc<T> {
+                    impl<T: Backends> tonic::server::UnaryService<super::PodIp> for GetInterfaceIndexSvc<T> {
                         type Response = super::InterfaceIndexConfirmation;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::PodIp>,
-                        ) -> Self::Future {
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(&mut self, request: tonic::Request<super::PodIp>) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as Backends>::get_interface_index(&inner, request).await
@@ -341,21 +316,15 @@ pub mod backends_server {
                 "/backends.backends/Update" => {
                     #[allow(non_camel_case_types)]
                     struct UpdateSvc<T: Backends>(pub Arc<T>);
-                    impl<T: Backends> tonic::server::UnaryService<super::Targets>
-                    for UpdateSvc<T> {
+                    impl<T: Backends> tonic::server::UnaryService<super::Targets> for UpdateSvc<T> {
                         type Response = super::Confirmation;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::Targets>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Backends>::update(&inner, request).await
-                            };
+                            let fut = async move { <T as Backends>::update(&inner, request).await };
                             Box::pin(fut)
                         }
                     }
@@ -385,21 +354,12 @@ pub mod backends_server {
                 "/backends.backends/Delete" => {
                     #[allow(non_camel_case_types)]
                     struct DeleteSvc<T: Backends>(pub Arc<T>);
-                    impl<T: Backends> tonic::server::UnaryService<super::Vip>
-                    for DeleteSvc<T> {
+                    impl<T: Backends> tonic::server::UnaryService<super::Vip> for DeleteSvc<T> {
                         type Response = super::Confirmation;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::Vip>,
-                        ) -> Self::Future {
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(&mut self, request: tonic::Request<super::Vip>) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Backends>::delete(&inner, request).await
-                            };
+                            let fut = async move { <T as Backends>::delete(&inner, request).await };
                             Box::pin(fut)
                         }
                     }
@@ -426,18 +386,14 @@ pub mod backends_server {
                     };
                     Box::pin(fut)
                 }
-                _ => {
-                    Box::pin(async move {
-                        Ok(
-                            http::Response::builder()
-                                .status(200)
-                                .header("grpc-status", "12")
-                                .header("content-type", "application/grpc")
-                                .body(empty_body())
-                                .unwrap(),
-                        )
-                    })
-                }
+                _ => Box::pin(async move {
+                    Ok(http::Response::builder()
+                        .status(200)
+                        .header("grpc-status", "12")
+                        .header("content-type", "application/grpc")
+                        .body(empty_body())
+                        .unwrap())
+                }),
             }
         }
     }
