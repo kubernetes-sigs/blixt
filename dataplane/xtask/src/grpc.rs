@@ -9,7 +9,6 @@ use std::str::FromStr;
 
 use anyhow::Error;
 use clap::Parser;
-use tonic::Request;
 
 use api_server::backends::backends_client::BackendsClient;
 use api_server::backends::{Target, Targets, Vip};
@@ -47,16 +46,6 @@ pub async fn update(opts: Options) -> Result<(), Error> {
         port: opts.vip_port,
     };
 
-    // TODO: add support for multiple targets
-    let req = Request::new(Targets {
-        vip: Some(vip.clone()),
-        targets: vec![Target {
-            daddr: daddr.into(),
-            dport: opts.dport,
-            ifindex: Some(opts.ifindex),
-        }],
-    });
-
     if opts.delete {
         let res = client.delete(vip.clone()).await?;
         println!(
@@ -64,7 +53,14 @@ pub async fn update(opts: Options) -> Result<(), Error> {
             res.into_inner().confirmation
         );
     } else {
-        let res = client.update(req).await?;
+        let res = client.update(Targets {
+            vip: Some(vip.clone()),
+            targets: vec![Target {
+                daddr: daddr.into(),
+                dport: opts.dport,
+                ifindex: Some(opts.ifindex),
+            }],
+        }).await?;
         println!(
             "grpc server responded to UPDATE: {}",
             res.into_inner().confirmation
