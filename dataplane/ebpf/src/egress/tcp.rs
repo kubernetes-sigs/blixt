@@ -6,7 +6,7 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 
 use core::mem;
 
-use aya_bpf::{
+use aya_ebpf::{
     bindings::{TC_ACT_OK, TC_ACT_PIPE},
     helpers::bpf_csum_diff,
     programs::TcContext,
