@@ -36,7 +36,7 @@ pub fn csum_fold_helper(mut csum: u64) -> u16 {
             csum = (csum & 0xffff) + (csum >> 16);
         }
     }
-    return !(csum as u16);
+    !(csum as u16)
 }
 
 // Updates the TCP connection's state based on the current phase and the incoming packet's header.
@@ -95,7 +95,7 @@ pub fn process_tcp_state_transition(hdr: &TcpHdr, state: &mut TCPState) -> bool 
         }
         TCPState::Closed => {}
     }
-    return false;
+    false
 }
 
 // Modifies the map tracking TCP connections based on the current state
@@ -110,14 +110,14 @@ pub fn update_tcp_conns(
         let transitioned = process_tcp_state_transition(hdr, tcp_state);
         if let TCPState::Closed = tcp_state {
             unsafe {
-                return LB_CONNECTIONS.remove(&client_key);
+                return LB_CONNECTIONS.remove(client_key);
             }
         }
         // If the connection has not reached the Closed state yet, but it did transition to a new state,
         // then record the new state.
         if transitioned {
             unsafe {
-                return LB_CONNECTIONS.insert(&client_key, &lb_mapping, 0_u64);
+                return LB_CONNECTIONS.insert(client_key, lb_mapping, 0_u64);
             }
         }
     }

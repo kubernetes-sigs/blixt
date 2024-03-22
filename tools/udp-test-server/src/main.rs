@@ -36,9 +36,8 @@ async fn run_server(port: u16, start_notifier: Sender<u16>) -> std::io::Result<(
     let bindaddr = format!("0.0.0.0:{}", port);
     let sock = UdpSocket::bind(&bindaddr).await?;
 
-    match start_notifier.send(port).await {
-        Err(err) => return Err(Error::new(ErrorKind::BrokenPipe, err)),
-        Ok(_) => {}
+    if let Err(err) = start_notifier.send(port).await {
+        return Err(Error::new(ErrorKind::BrokenPipe, err));
     };
 
     let mut buf = [0; 1024];
@@ -48,7 +47,7 @@ async fn run_server(port: u16, start_notifier: Sender<u16>) -> std::io::Result<(
         println!(
             "port {}: buffer contents: {}",
             port,
-            String::from_utf8_lossy(&buf).replace("\n", "")
+            String::from_utf8_lossy(&buf).replace('\n', "")
         );
     }
 }
@@ -60,12 +59,9 @@ async fn run_health_server(port: u16, mut rx: Receiver<u16>) -> std::io::Result<
     println!("waiting for listeners...");
     let mut wait_for = 3;
     while wait_for > 0 {
-        match rx.recv().await {
-            Some(port) => {
-                println!("UDP worker listening on port {}", port);
-                wait_for = wait_for - 1;
-            }
-            None => {}
+        if let Some(port) = rx.recv().await {
+            println!("UDP worker listening on port {}", port);
+            wait_for -= 1;
         };
     }
 

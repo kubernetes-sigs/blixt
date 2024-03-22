@@ -126,7 +126,7 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
         next = 0;
     }
     unsafe {
-        GATEWAY_INDEXES.insert(&backend_key, &next, 0 as u64)?;
+        GATEWAY_INDEXES.insert(&backend_key, &next, 0_u64)?;
     }
 
     info!(&ctx, "redirect action: {}", action);
