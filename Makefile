@@ -130,6 +130,33 @@ vet: ## Run go vet against code.
 lint:
 	golangci-lint run
 
+.PHONY: check.format.rust.helper
+check.format.rust.helper: 
+	@echo "Checking formatting $(DIRECTORY)..."
+	cargo fmt --manifest-path $(DIRECTORY)/Cargo.toml --all -- --check
+
+.PHONY: fix.format.rust.helper
+fix.format.rust.helper:
+	@echo "Fixing formatting $(DIRECTORY)..."
+	cargo fmt --manifest-path $(DIRECTORY)/Cargo.toml --all
+
+.PHONY: fix.format.rust
+fix.format.rust:
+	@find . -name 'Cargo.toml' -type f -exec dirname {} \; | xargs -I {} $(MAKE) fix.format.rust.helper DIRECTORY={}
+
+.PHONY: check.format.rust
+check.format.rust:
+	@find . -name 'Cargo.toml' -type f -exec dirname {} \; | xargs -I {} $(MAKE) check.format.rust.helper DIRECTORY={}
+
+.PHONY: lint.rust.helper
+lint.rust.helper:
+	@echo "Linting $(DIRECTORY)..."
+	@cd $(DIRECTORY) && cargo clippy --all -- -D warnings
+
+.PHONY: lint.rust
+lint.rust:
+	@find . -name 'Cargo.toml' -type f -exec dirname {} \; | xargs -I {} $(MAKE) lint.rust.helper DIRECTORY={}
+
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out

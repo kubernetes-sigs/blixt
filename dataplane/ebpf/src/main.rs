@@ -60,7 +60,7 @@ pub fn tc_ingress(ctx: TcContext) -> i32 {
     };
 
     // TODO(https://github.com/Kong/blixt/issues/69) better Error reporting framework
-    return TC_ACT_OK;
+    TC_ACT_OK
 }
 
 // Make sure ip_forwarding is enabled on the interface this it attached to
@@ -75,7 +75,7 @@ fn try_tc_ingress(ctx: TcContext) -> Result<i32, i64> {
                 _ => Ok(TC_ACT_PIPE),
             }
         }
-        _ => return Ok(TC_ACT_PIPE),
+        _ => Ok(TC_ACT_PIPE),
     }
 }
 
@@ -91,7 +91,7 @@ pub fn tc_egress(ctx: TcContext) -> i32 {
     };
 
     // TODO(https://github.com/Kong/blixt/issues/69) better Error reporting framework
-    return TC_ACT_OK;
+    TC_ACT_OK
 }
 
 fn try_tc_egress(ctx: TcContext) -> Result<i32, i64> {
@@ -105,7 +105,7 @@ fn try_tc_egress(ctx: TcContext) -> Result<i32, i64> {
                 _ => Ok(TC_ACT_PIPE),
             }
         }
-        _ => return Ok(TC_ACT_PIPE),
+        _ => Ok(TC_ACT_PIPE),
     }
 }
 

@@ -83,5 +83,5 @@ pub fn handle_icmp_egress(ctx: TcContext) -> Result<i32, i64> {
 
     unsafe { LB_CONNECTIONS.remove(client_key)? };
 
-    return Ok(TC_ACT_PIPE);
+    Ok(TC_ACT_PIPE)
 }

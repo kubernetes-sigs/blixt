@@ -15,6 +15,3 @@ tokio = { version = "1.32", features = ["macros", "rt", "rt-multi-thread", "net"
 common = { path = "../common", features=["user"] }
 regex = "1"
 libc = "0.2"
-
-[build-dependencies]
-tonic-build = "0.11.0"

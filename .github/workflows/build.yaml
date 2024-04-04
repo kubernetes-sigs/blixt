@@ -1,0 +1,55 @@
+name: build
+
+on:
+  pull_request:
+    branches:
+      - '*'
+  push:
+    branches:
+      - 'main'
+    tags:
+      - '*'
+  workflow_dispatch: {}
+
+jobs:
+  rust-build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        components: rust-src, clippy, rustfmt
+        override: false
+
+    - name: Install bpf-linker
+      run: |
+        cargo install bpf-linker
+
+    # TODO: Once we migrate the controller from Go to Rust,
+    # add the controller build step here.
+
+    - name: Build dataplane
+      working-directory: ./dataplane
+      run: |
+        make build
+
+    - name: Build UDP Test Server
+      working-directory: ./tools/udp-test-server
+      run: |
+        make build
+    
+    - name: Check formatting
+      run: |
+        make check.format.rust
+
+    - name: Check clippy
+      run: |
+        make lint.rust

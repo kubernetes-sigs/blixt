@@ -7,6 +7,7 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 // Remember to run `cargo install bindgen-cli`
 
 mod build_ebpf;
+mod build_proto;
 mod grpc;
 mod run;
 
@@ -23,6 +24,7 @@ pub struct Options {
 #[derive(Debug, Parser)]
 enum Command {
     BuildEbpf(build_ebpf::Options),
+    BuildProto(build_proto::Options),
     Run(run::Options),
     GrpcClient(grpc::Options),
 }
@@ -34,6 +36,7 @@ async fn main() {
     use Command::*;
     let ret = match opts.command {
         BuildEbpf(opts) => build_ebpf::build_ebpf(opts),
+        BuildProto(opts) => build_proto::build_proto(opts),
         Run(opts) => run::run(opts),
         GrpcClient(opts) => grpc::update(opts).await,
     };
