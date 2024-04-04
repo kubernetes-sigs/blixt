@@ -8,17 +8,26 @@ use core::mem;
 
 use aya_ebpf::{
     bindings::TC_ACT_PIPE,
-    helpers::{bpf_csum_diff, bpf_redirect_neigh},
+    helpers::{bpf_l4_csum_replace, bpf_l3_csum_replace, bpf_skb_store_bytes, bpf_redirect_neigh},
     programs::TcContext,
 };
 use aya_log_ebpf::{debug, info};
+use aya_ebpf_cty::c_void;
+
 use network_types::{eth::EthHdr, ip::Ipv4Hdr, udp::UdpHdr};
+use memoffset::offset_of;
 
 use crate::{
-    utils::{csum_fold_helper, ptr_at},
+    utils::ptr_at,
     BACKENDS, GATEWAY_INDEXES, LB_CONNECTIONS,
 };
 use common::{BackendKey, ClientKey, LoadBalancerMapping, BACKENDS_ARRAY_CAPACITY};
+
+const IP_CSUM_OFF: u32 = (EthHdr::LEN + offset_of!(Ipv4Hdr, check)) as u32;
+const UDP_CSUM_OFF: u32 = (EthHdr::LEN + Ipv4Hdr::LEN + offset_of!(UdpHdr, check)) as u32;
+const IP_DST_OFF: u32 = (EthHdr::LEN + offset_of!(Ipv4Hdr, dst_addr)) as u32;
+const UDP_DPORT_OFF: u32 = (EthHdr::LEN + Ipv4Hdr::LEN + offset_of!(UdpHdr, dest)) as u32; 
+const IS_PSEUDO: u64 = 0x10;
 
 pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
     let ip_hdr: *mut Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
@@ -90,27 +99,89 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
         LB_CONNECTIONS.insert(&client_key, &lb_mapping, 0_u64)?;
     };
 
-    if (ctx.data() + EthHdr::LEN + Ipv4Hdr::LEN) > ctx.data_end() {
-        info!(&ctx, "Iphdr is out of bounds");
-        return Ok(TC_ACT_PIPE);
+    // inspired by https://github.com/torvalds/linux/blob/master/samples/bpf/tcbpf1_kern.c
+    // update dst_addr in the ip_hdr
+    // recalculate the checksums
+    unsafe {
+        let backend_ip = backend.daddr.to_be();
+
+        let ret = bpf_l4_csum_replace(
+            ctx.skb.skb,
+            UDP_CSUM_OFF,
+            original_daddr as u64,
+            backend_ip as u64,
+            IS_PSEUDO | (mem::size_of_val(&backend_ip) as u64),
+        );
+        if ret != 0 {
+            info!(
+                &ctx, 
+                "Failed to update the UDP checksum after modifying the destination IP");
+            return Ok(TC_ACT_PIPE);
+        }
+        
+        let ret = bpf_l3_csum_replace(
+            ctx.skb.skb,
+            IP_CSUM_OFF,
+            original_daddr as u64,
+            backend_ip as u64,
+            mem::size_of_val(&backend_ip) as u64,
+        );
+        if ret != 0 {
+            info!(
+                &ctx, 
+                "Failed to update the IP header checksum after modifying the destination IP");
+            return Ok(TC_ACT_PIPE);
+        }
+
+        let ret = bpf_skb_store_bytes(
+            ctx.skb.skb,
+            IP_DST_OFF,
+            &backend_ip as *const u32 as *const c_void,
+            mem::size_of_val(&backend_ip) as u32,
+            0,
+        );
+        if ret != 0 {
+            info!(
+                &ctx,
+                "Failed to update the destination IP address in the packet header");
+            return Ok(TC_ACT_PIPE);
+        }
     }
+    
+    // update dest in the udp_hdr
+    // recalculate the checksums
+    unsafe{
+        let backend_port = (backend.dport as u16).to_be();
 
-    // Calculate l3 cksum
-    // TODO(astoycos) use l3_cksum_replace instead
-    unsafe { (*ip_hdr).check = 0 };
-    let full_cksum = unsafe {
-        bpf_csum_diff(
-            mem::MaybeUninit::zeroed().assume_init(),
+        let ret = bpf_l4_csum_replace(
+            ctx.skb.skb,
+            UDP_CSUM_OFF,
+            original_dport as u64,
+            backend_port as u64,
+            mem::size_of_val(&backend_port) as u64,
+        );
+        if ret != 0 {
+            info!(
+                &ctx,
+                "Failed to update the UDP checksum after modifying the destination port");
+            return Ok(TC_ACT_PIPE);
+        }
+        
+        let ret = bpf_skb_store_bytes(
+            ctx.skb.skb,
+            UDP_DPORT_OFF,
+            &backend_port as *const u16 as *const c_void,
+            mem::size_of_val(&backend_port) as u32,
             0,
-            ip_hdr as *mut u32,
-            Ipv4Hdr::LEN as u32,
-            0,
-        )
-    } as u64;
-    unsafe { (*ip_hdr).check = csum_fold_helper(full_cksum) };
-    // Kernel allows UDP packet with unset checksums
-    unsafe { (*udp_hdr).check = 0 };
-
+        );
+        if ret != 0 {
+            info!(
+                &ctx,
+                "Failed to update the destination port in the UDP header");
+            return Ok(TC_ACT_PIPE);
+        }
+    }
+    
     let action = unsafe {
         bpf_redirect_neigh(
             backend.ifindex as u32,

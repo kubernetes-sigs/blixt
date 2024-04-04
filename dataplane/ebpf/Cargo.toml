@@ -7,6 +7,7 @@ publish = false
 [dependencies]
 aya-ebpf = { git = "https://github.com/aya-rs/aya" }
 aya-log-ebpf = { git = "https://github.com/aya-rs/aya" }
+aya-ebpf-cty = { git = "https://github.com/aya-rs/aya" }
 common = { path = "../common" }
 memoffset = "0.9"
 network-types = "0.0.5"
