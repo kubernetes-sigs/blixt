@@ -99,6 +99,11 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
         LB_CONNECTIONS.insert(&client_key, &lb_mapping, 0_u64)?;
     };
 
+    if (ctx.data() + EthHdr::LEN + Ipv4Hdr::LEN) > ctx.data_end() {
+        info!(&ctx, "Iphdr is out of bounds");
+        return Ok(TC_ACT_PIPE);
+    }
+
     // inspired by https://github.com/torvalds/linux/blob/master/samples/bpf/tcbpf1_kern.c
     // update dst_addr in the ip_hdr
     // recalculate the checksums
