@@ -67,9 +67,8 @@ func NewBackendsClientManager(config *rest.Config) (*BackendsClientManager, erro
 	}, nil
 }
 
-func (c *BackendsClientManager) SetClientsList(ctx context.Context, readyPods map[types.NamespacedName]corev1.Pod) (bool, error) {
+func (c *BackendsClientManager) SetClientsList(readyPods map[types.NamespacedName]corev1.Pod) (bool, error) {
 	// TODO: close and connect to the different clients concurrently.
-
 	clientListUpdated := false
 	var err error
 
@@ -100,7 +99,7 @@ func (c *BackendsClientManager) SetClientsList(ctx context.Context, readyPods ma
 			endpoint := fmt.Sprintf("%s:%d", pod.Status.PodIP, vars.DefaultDataPlaneAPIPort)
 			c.log.Info("BackendsClientManager", "status", "connecting", "pod", pod.GetName(), "endpoint", endpoint)
 
-			conn, dialErr := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+			conn, dialErr := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 			if dialErr != nil {
 				c.log.Error(dialErr, "BackendsClientManager", "status", "connection failure", "pod", pod.GetName())
 				err = errors.Join(err, dialErr)

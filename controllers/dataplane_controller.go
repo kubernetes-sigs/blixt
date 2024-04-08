@@ -148,7 +148,7 @@ func (r *DataplaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	logger.Info("DataplaneReconciler", "reconcile status", "setting updated backends client list", "num ready pods", len(readyPodByNN))
-	updated, err := r.backendsClientManager.SetClientsList(ctx, readyPodByNN)
+	updated, err := r.backendsClientManager.SetClientsList(readyPodByNN)
 	if updated {
 		logger.Info("DataplaneReconciler", "reconcile status", "backends client list updated, sending generic event")
 		select {
