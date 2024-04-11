@@ -4,12 +4,24 @@ Copyright 2023 The Kubernetes Authors.
 SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 */
 
-use aya_ebpf::{bindings::TC_ACT_OK, programs::TcContext};
+use aya_ebpf::{
+    bindings::TC_ACT_OK,
+    helpers::{bpf_l3_csum_replace, bpf_l4_csum_replace, bpf_skb_store_bytes},
+    programs::TcContext,
+};
+use aya_ebpf_cty::{c_long, c_void};
+use aya_log_ebpf::info;
 use core::mem;
-use network_types::tcp::TcpHdr;
+use network_types::{eth::EthHdr, ip::Ipv4Hdr, tcp::TcpHdr};
 
 use crate::LB_CONNECTIONS;
 use common::{ClientKey, LoadBalancerMapping, TCPState};
+
+use memoffset::offset_of;
+
+const IP_CSUM_OFF: u32 = (EthHdr::LEN + offset_of!(Ipv4Hdr, check)) as u32;
+const IP_DST_OFF: u32 = (EthHdr::LEN + offset_of!(Ipv4Hdr, dst_addr)) as u32;
+const IS_PSEUDO: u64 = 0x10;
 
 // -----------------------------------------------------------------------------
 // Helper Functions
@@ -122,4 +134,109 @@ pub fn update_tcp_conns(
         }
     }
     Ok(())
+}
+
+// inspired by https://github.com/torvalds/linux/blob/master/samples/bpf/tcbpf1_kern.c
+// update dst_addr in the ip_hdr
+// recalculate the checksums
+pub fn set_ipv4_ip_dst(ctx: &TcContext, l4_csum_offset: u32, old_ip: &u32, new_dip: u32) -> c_long {
+    let mut ret: c_long;
+    unsafe {
+        ret = bpf_l4_csum_replace(
+            ctx.skb.skb,
+            l4_csum_offset,
+            *old_ip as u64,
+            new_dip as u64,
+            IS_PSEUDO | (mem::size_of_val(&new_dip) as u64),
+        );
+    }
+    if ret != 0 {
+        info!(
+            ctx,
+            "Failed to update the TCP checksum after modifying the destination IP"
+        );
+        return ret;
+    }
+
+    unsafe {
+        ret = bpf_l3_csum_replace(
+            ctx.skb.skb,
+            IP_CSUM_OFF,
+            *old_ip as u64,
+            new_dip as u64,
+            mem::size_of_val(&new_dip) as u64,
+        );
+    }
+    if ret != 0 {
+        info!(
+            ctx,
+            "Failed to update the IP header checksum after modifying the destination IP"
+        );
+        return ret;
+    }
+
+    unsafe {
+        ret = bpf_skb_store_bytes(
+            ctx.skb.skb,
+            IP_DST_OFF,
+            &new_dip as *const u32 as *const c_void,
+            mem::size_of_val(&new_dip) as u32,
+            0,
+        );
+    }
+    if ret != 0 {
+        info!(
+            ctx,
+            "Failed to update the destination IP address in the packet header"
+        );
+        return ret;
+    }
+
+    return ret;
+}
+
+// update destination port in the tcp_hdr
+// recalculate the checksums
+pub fn set_ipv4_dest_port(
+    ctx: &TcContext,
+    l4_csum_offset: u32,
+    old_port: &u16,
+    new_port: u16,
+) -> c_long {
+    let mut ret: c_long;
+    unsafe {
+        ret = bpf_l4_csum_replace(
+            ctx.skb.skb,
+            l4_csum_offset,
+            *old_port as u64,
+            new_port as u64,
+            mem::size_of_val(&new_port) as u64,
+        );
+    }
+    if ret != 0 {
+        info!(
+            ctx,
+            "Failed to update the TCP checksum after modifying the destination port"
+        );
+        return ret;
+    }
+
+    unsafe {
+        ret = bpf_skb_store_bytes(
+            ctx.skb.skb,
+            l4_csum_offset,
+            &new_port as *const u16 as *const c_void,
+            mem::size_of_val(&new_port) as u32,
+            0,
+        );
+    }
+    if ret != 0 {
+        info!(
+            ctx,
+            "Failed to update the destination port in the packet header"
+        );
+        return ret;
+    }
+
+    return ret;
 }

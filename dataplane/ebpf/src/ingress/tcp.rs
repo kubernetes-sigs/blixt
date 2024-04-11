@@ -6,30 +6,21 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 
 use core::mem;
 
-use aya_ebpf::{
-    bindings::TC_ACT_OK,
-    helpers::{bpf_l4_csum_replace, bpf_l3_csum_replace, bpf_skb_store_bytes, bpf_redirect_neigh},
-    programs::TcContext,
-};
+use aya_ebpf::{bindings::TC_ACT_OK, helpers::bpf_redirect_neigh, programs::TcContext};
 use aya_log_ebpf::{debug, info};
-use aya_ebpf_cty::c_void;
 
-use network_types::{eth::EthHdr, ip::Ipv4Hdr, tcp::TcpHdr};
 use memoffset::offset_of;
+use network_types::{eth::EthHdr, ip::Ipv4Hdr, tcp::TcpHdr};
 
 use crate::{
-    utils::{ptr_at, update_tcp_conns},
+    utils::{ptr_at, set_ipv4_dest_port, set_ipv4_ip_dst, update_tcp_conns},
     BACKENDS, GATEWAY_INDEXES, LB_CONNECTIONS,
 };
 use common::{
     Backend, BackendKey, ClientKey, LoadBalancerMapping, TCPState, BACKENDS_ARRAY_CAPACITY,
 };
 
-const IP_CSUM_OFF: u32 = (EthHdr::LEN + offset_of!(Ipv4Hdr, check)) as u32;
 const TCP_CSUM_OFF: u32 = (EthHdr::LEN + Ipv4Hdr::LEN + offset_of!(TcpHdr, check)) as u32;
-const IP_DST_OFF: u32 = (EthHdr::LEN + offset_of!(Ipv4Hdr, dst_addr)) as u32;
-const TCP_DPORT_OFF: u32 = (EthHdr::LEN + Ipv4Hdr::LEN + offset_of!(TcpHdr, dest)) as u32; 
-const IS_PSEUDO: u64 = 0x10;
 
 pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
     let ip_hdr: *mut Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
@@ -114,23 +105,10 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
         u16::from_be(unsafe { (*tcp_hdr).dest })
     );
 
-    // DNAT the ip address
-    unsafe {
-        (*ip_hdr).dst_addr = backend.daddr.to_be();
-    }
-    // DNAT the port
-    unsafe { (*tcp_hdr).dest = (backend.dport as u16).to_be() };
-
     if (ctx.data() + EthHdr::LEN + Ipv4Hdr::LEN) > ctx.data_end() {
         info!(&ctx, "Iphdr is out of bounds");
         return Ok(TC_ACT_OK);
     }
-
-    let mut lb_mapping = LoadBalancerMapping {
-        backend,
-        backend_key,
-        tcp_state,
-    };
 
     let tcp_hdr_ref = unsafe { tcp_hdr.as_ref().ok_or(TC_ACT_OK)? };
 
@@ -142,89 +120,24 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
         }
     }
 
+    let mut lb_mapping = LoadBalancerMapping {
+        backend,
+        backend_key,
+        tcp_state,
+    };
+
     update_tcp_conns(tcp_hdr_ref, &client_key, &mut lb_mapping)?;
 
-    // inspired by https://github.com/torvalds/linux/blob/master/samples/bpf/tcbpf1_kern.c
-    // update dst_addr in the ip_hdr
-    // recalculate the checksums
-    unsafe {
-        let backend_ip = backend.daddr.to_be();
-
-        let ret = bpf_l4_csum_replace(
-            ctx.skb.skb,
-            TCP_CSUM_OFF,
-            original_daddr as u64,
-            backend_ip as u64,
-            IS_PSEUDO | (mem::size_of_val(&backend_ip) as u64),
-        );
-        if ret != 0 {
-            info!(
-                &ctx, 
-                "Failed to update the TCP checksum after modifying the destination IP");
-            return Ok(TC_ACT_OK);
-        }
-        
-        let ret = bpf_l3_csum_replace(
-            ctx.skb.skb,
-            IP_CSUM_OFF,
-            original_daddr as u64,
-            backend_ip as u64,
-            mem::size_of_val(&backend_ip) as u64,
-        );
-        if ret != 0 {
-            info!(
-                &ctx, 
-                "Failed to update the IP header checksum after modifying the destination IP");
-            return Ok(TC_ACT_OK);
-        }
-
-        let ret = bpf_skb_store_bytes(
-            ctx.skb.skb,
-            IP_DST_OFF,
-            &backend_ip as *const u32 as *const c_void,
-            mem::size_of_val(&backend_ip) as u32,
-            0,
-        );
-        if ret != 0 {
-            info!(
-                &ctx,
-                "Failed to update the destination IP address in the packet header");
-            return Ok(TC_ACT_OK);
-        }
+    let backend_ip = backend.daddr.to_be();
+    let ret = set_ipv4_ip_dst(&ctx, TCP_CSUM_OFF, &original_daddr, backend_ip);
+    if ret != 0 {
+        return Ok(TC_ACT_OK);
     }
 
-    // update dest in the tcp_hdr
-    // recalculate the checksums
-    unsafe{
-        let backend_port = (backend.dport as u16).to_be();
-
-        let ret = bpf_l4_csum_replace(
-            ctx.skb.skb,
-            TCP_CSUM_OFF,
-            original_dport as u64,
-            backend_port as u64,
-            mem::size_of_val(&backend_port) as u64,
-        );
-        if ret != 0 {
-            info!(
-                &ctx,
-                "Failed to update the TCP checksum after modifying the destination port");
-            return Ok(TC_ACT_OK);
-        }
-        
-        let ret = bpf_skb_store_bytes(
-            ctx.skb.skb,
-            TCP_DPORT_OFF,
-            &backend_port as *const u16 as *const c_void,
-            mem::size_of_val(&backend_port) as u32,
-            0,
-        );
-        if ret != 0 {
-            info!(
-                &ctx,
-                "Failed to update the destination port in the TCP header");
-            return Ok(TC_ACT_OK);
-        }
+    let backend_port = (backend.dport as u16).to_be();
+    let ret = set_ipv4_dest_port(&ctx, TCP_CSUM_OFF, &original_dport, backend_port);
+    if ret != 0 {
+        return Ok(TC_ACT_OK);
     }
 
     let action = unsafe {
