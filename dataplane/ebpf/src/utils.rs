@@ -192,7 +192,7 @@ pub fn set_ipv4_ip_dst(ctx: &TcContext, l4_csum_offset: u32, old_ip: &u32, new_d
         return ret;
     }
 
-    return ret;
+    ret
 }
 
 // update destination port in the tcp_hdr
@@ -238,5 +238,5 @@ pub fn set_ipv4_dest_port(
         return ret;
     }
 
-    return ret;
+    ret
 }
