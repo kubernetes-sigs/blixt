@@ -10,14 +10,14 @@ use clap::Parser;
 pub struct Options {}
 
 pub(crate) fn build_proto(_opts: Options) -> Result<(), anyhow::Error> {
-    let proto_file = "./api-server/proto/backends.proto";
+    let proto_file = "./dataplane/api-server/proto/backends.proto";
 
     println!("building proto {}", proto_file);
 
     tonic_build::configure()
         .protoc_arg("--experimental_allow_proto3_optional")
         .build_server(true)
-        .out_dir("./api-server/src")
+        .out_dir("./dataplane/api-server/src")
         .compile(&[proto_file], &["."])?;
 
     Ok(())

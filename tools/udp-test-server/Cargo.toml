@@ -1,8 +1,8 @@
 [package]
 name = "udp-test-server"
-version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+version.workspace = true
 publish = false
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
+tokio = { workspace = true, features = ["full"] }

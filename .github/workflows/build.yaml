@@ -36,16 +36,10 @@ jobs:
     # TODO: Once we migrate the controller from Go to Rust,
     # add the controller build step here.
 
-    - name: Build dataplane
-      working-directory: ./dataplane
+    - name: Build all rust crates (dataplane, test server) 
       run: |
-        make build
+        make build.rust
 
-    - name: Build UDP Test Server
-      working-directory: ./tools/udp-test-server
-      run: |
-        make build
-    
     - name: Check formatting
       run: |
         make check.format.rust
