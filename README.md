@@ -42,7 +42,6 @@ Current project goals are the following:
 - [ ] support [TCPRoute][tcproute] (partially complete)
 - [ ] use this as a basis for adding/improving [Gateway API Conformance Tests][gwcnf]
 - [ ] plug this into [Gateway API][gwapi] CI to run conformance tests on PRs
-- [ ] use as a reference implementation for Gateway API (don't use it this way yet!)
 
 After these goals are achieved, further goals may be decided.
 
