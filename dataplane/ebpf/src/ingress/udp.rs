@@ -6,19 +6,19 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 
 use core::mem;
 
-use aya_ebpf::{
-    bindings::TC_ACT_PIPE,
-    helpers::{bpf_csum_diff, bpf_redirect_neigh},
-    programs::TcContext,
-};
+use aya_ebpf::{bindings::TC_ACT_PIPE, helpers::bpf_redirect_neigh, programs::TcContext};
 use aya_log_ebpf::{debug, info};
+
+use memoffset::offset_of;
 use network_types::{eth::EthHdr, ip::Ipv4Hdr, udp::UdpHdr};
 
 use crate::{
-    utils::{csum_fold_helper, ptr_at},
+    utils::{ptr_at, set_ipv4_dest_port, set_ipv4_ip_dst},
     BACKENDS, GATEWAY_INDEXES, LB_CONNECTIONS,
 };
 use common::{BackendKey, ClientKey, LoadBalancerMapping, BACKENDS_ARRAY_CAPACITY};
+
+const UDP_CSUM_OFF: u32 = (EthHdr::LEN + Ipv4Hdr::LEN + offset_of!(UdpHdr, check)) as u32;
 
 pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
     let ip_hdr: *mut Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
@@ -95,21 +95,17 @@ pub fn handle_udp_ingress(ctx: TcContext) -> Result<i32, i64> {
         return Ok(TC_ACT_PIPE);
     }
 
-    // Calculate l3 cksum
-    // TODO(astoycos) use l3_cksum_replace instead
-    unsafe { (*ip_hdr).check = 0 };
-    let full_cksum = unsafe {
-        bpf_csum_diff(
-            mem::MaybeUninit::zeroed().assume_init(),
-            0,
-            ip_hdr as *mut u32,
-            Ipv4Hdr::LEN as u32,
-            0,
-        )
-    } as u64;
-    unsafe { (*ip_hdr).check = csum_fold_helper(full_cksum) };
-    // Kernel allows UDP packet with unset checksums
-    unsafe { (*udp_hdr).check = 0 };
+    let backend_ip = backend.daddr.to_be();
+    let ret = set_ipv4_ip_dst(&ctx, UDP_CSUM_OFF, &original_daddr, backend_ip);
+    if ret != 0 {
+        return Ok(TC_ACT_PIPE);
+    }
+
+    let backend_port = (backend.dport as u16).to_be();
+    let ret = set_ipv4_dest_port(&ctx, UDP_CSUM_OFF, &original_dport, backend_port);
+    if ret != 0 {
+        return Ok(TC_ACT_PIPE);
+    }
 
     let action = unsafe {
         bpf_redirect_neigh(

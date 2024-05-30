@@ -6,21 +6,21 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 
 use core::mem;
 
-use aya_ebpf::{
-    bindings::TC_ACT_OK,
-    helpers::{bpf_csum_diff, bpf_redirect_neigh},
-    programs::TcContext,
-};
+use aya_ebpf::{bindings::TC_ACT_OK, helpers::bpf_redirect_neigh, programs::TcContext};
 use aya_log_ebpf::{debug, info};
+
+use memoffset::offset_of;
 use network_types::{eth::EthHdr, ip::Ipv4Hdr, tcp::TcpHdr};
 
 use crate::{
-    utils::{csum_fold_helper, ptr_at, update_tcp_conns},
+    utils::{ptr_at, set_ipv4_dest_port, set_ipv4_ip_dst, update_tcp_conns},
     BACKENDS, GATEWAY_INDEXES, LB_CONNECTIONS,
 };
 use common::{
     Backend, BackendKey, ClientKey, LoadBalancerMapping, TCPState, BACKENDS_ARRAY_CAPACITY,
 };
+
+const TCP_CSUM_OFF: u32 = (EthHdr::LEN + Ipv4Hdr::LEN + offset_of!(TcpHdr, check)) as u32;
 
 pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
     let ip_hdr: *mut Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
@@ -30,6 +30,7 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
     let tcp_hdr: *mut TcpHdr = unsafe { ptr_at(&ctx, tcp_header_offset) }?;
 
     let original_daddr = unsafe { (*ip_hdr).dst_addr };
+    let original_dport = unsafe { (*tcp_hdr).dest };
 
     // The source identifier
     let client_key = ClientKey {
@@ -56,7 +57,7 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
 
         backend_key = BackendKey {
             ip: u32::from_be(original_daddr),
-            port: (u16::from_be(unsafe { (*tcp_hdr).dest })) as u32,
+            port: (u16::from_be(original_dport)) as u32,
         };
         let backend_list = unsafe { BACKENDS.get(&backend_key) }.ok_or(TC_ACT_OK)?;
         let backend_index = unsafe { GATEWAY_INDEXES.get(&backend_key) }.ok_or(TC_ACT_OK)?;
@@ -104,58 +105,9 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
         u16::from_be(unsafe { (*tcp_hdr).dest })
     );
 
-    // DNAT the ip address
-    unsafe {
-        (*ip_hdr).dst_addr = backend.daddr.to_be();
-    }
-    // DNAT the port
-    unsafe { (*tcp_hdr).dest = (backend.dport as u16).to_be() };
-
     if (ctx.data() + EthHdr::LEN + Ipv4Hdr::LEN) > ctx.data_end() {
         info!(&ctx, "Iphdr is out of bounds");
         return Ok(TC_ACT_OK);
-    }
-
-    // Calculate l3 cksum
-    // TODO(astoycos) use l3_cksum_replace instead
-    unsafe { (*ip_hdr).check = 0 };
-    let full_cksum = unsafe {
-        bpf_csum_diff(
-            mem::MaybeUninit::zeroed().assume_init(),
-            0,
-            ip_hdr as *mut u32,
-            Ipv4Hdr::LEN as u32,
-            0,
-        )
-    } as u64;
-    unsafe { (*ip_hdr).check = csum_fold_helper(full_cksum) };
-    // FIXME
-    unsafe { (*tcp_hdr).check = 0 };
-
-    let action = unsafe {
-        bpf_redirect_neigh(
-            backend.ifindex as u32,
-            mem::MaybeUninit::zeroed().assume_init(),
-            0,
-            0,
-        )
-    };
-
-    let mut lb_mapping = LoadBalancerMapping {
-        backend,
-        backend_key,
-        tcp_state,
-    };
-
-    // If the connection is new, then record it in our map for future tracking.
-    if new_conn {
-        unsafe {
-            LB_CONNECTIONS.insert(&client_key, &lb_mapping, 0_u64)?;
-        }
-
-        // since this is a new connection, there is nothing else to do, so exit early
-        info!(&ctx, "redirect action: {}", action);
-        return Ok(action as i32);
     }
 
     let tcp_hdr_ref = unsafe { tcp_hdr.as_ref().ok_or(TC_ACT_OK)? };
@@ -168,7 +120,45 @@ pub fn handle_tcp_ingress(ctx: TcContext) -> Result<i32, i64> {
         }
     }
 
+    let mut lb_mapping = LoadBalancerMapping {
+        backend,
+        backend_key,
+        tcp_state,
+    };
+
     update_tcp_conns(tcp_hdr_ref, &client_key, &mut lb_mapping)?;
+
+    let backend_ip = backend.daddr.to_be();
+    let ret = set_ipv4_ip_dst(&ctx, TCP_CSUM_OFF, &original_daddr, backend_ip);
+    if ret != 0 {
+        return Ok(TC_ACT_OK);
+    }
+
+    let backend_port = (backend.dport as u16).to_be();
+    let ret = set_ipv4_dest_port(&ctx, TCP_CSUM_OFF, &original_dport, backend_port);
+    if ret != 0 {
+        return Ok(TC_ACT_OK);
+    }
+
+    let action = unsafe {
+        bpf_redirect_neigh(
+            backend.ifindex as u32,
+            mem::MaybeUninit::zeroed().assume_init(),
+            0,
+            0,
+        )
+    };
+
+    // If the connection is new, then record it in our map for future tracking.
+    if new_conn {
+        unsafe {
+            LB_CONNECTIONS.insert(&client_key, &lb_mapping, 0_u64)?;
+        }
+
+        // since this is a new connection, there is nothing else to do, so exit early
+        info!(&ctx, "redirect action: {}", action);
+        return Ok(action as i32);
+    }
 
     info!(&ctx, "redirect action: {}", action);
     Ok(action as i32)
