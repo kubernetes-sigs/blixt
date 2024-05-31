@@ -17,6 +17,11 @@ data-plane is built using [eBPF][ebpf] and is written in [Rust][rust] using
 > new version. See the [relevant milestone](https://github.com/kubernetes-sigs/blixt/milestone/8) and check in with
 > us in the issues (or via discussions) if you're interested in working on something control-plane related!
 
+> **Note**: We use [Cargo workspaces](https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html) 
+> to manage the various crates spread across the Rust parts of the repo. However, there is one exception.
+> The `dataplane/eBPF` crate must be kept as a standalone because it needs to re-implement the `panic` handler.
+> All new crates should be added to the workspace, if possible.
+ 
 This project's main purposes are to help facilitate the development of the
 [Gateway API][gwapi] project and to be a fun and safe place for contributors to
 contribute and try out newer technologies.

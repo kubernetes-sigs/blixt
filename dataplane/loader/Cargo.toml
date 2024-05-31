@@ -1,20 +1,21 @@
 [package]
 name = "loader"
-version = "0.1.0"
-edition = "2021"
-publish = false
-
-[dependencies]
-aya = { version = "0.12.0", features=["async_tokio"] }
-aya-log = "0.2.0"
-common = { path = "../common", features=["user"] }
-clap = { version = "4.4", features = ["derive"] }
-env_logger = "0.11"
-log = "0.4"
-tokio = { version = "1.32.0", features = ["macros", "rt", "rt-multi-thread", "net", "signal"] }
-api-server = { path = "../api-server" }
-anyhow = "1"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
 
 [[bin]]
 name = "loader"
 path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+api-server = { workspace = true }
+aya = { workspace = true , features=["async_tokio"] }
+aya-log = { workspace = true } 
+common = { workspace = true, features=["user"] }
+clap = { workspace = true, features = ["derive"] }
+env_logger = { workspace = true }
+log = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "net", "signal"] }

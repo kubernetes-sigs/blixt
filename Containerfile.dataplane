@@ -3,7 +3,12 @@ FROM rust:1.75-slim-bookworm as builder
 ARG TARGETARCH
 
 RUN apt-get update
-RUN apt-get install --yes build-essential protobuf-compiler pkg-config llvm-16
+RUN apt-get install --yes \
+    build-essential \
+    protobuf-compiler \
+    pkg-config \
+    llvm-16 \
+    musl-tools
 
 RUN rustup default stable
 RUN rustup install nightly
@@ -21,7 +26,11 @@ RUN if [ "$TARGETARCH" = "amd64" ]; \
     fi
 RUN rustup target add $(eval cat arch)-unknown-linux-musl
 
-COPY . .
+COPY dataplane dataplane 
+COPY tools/udp-test-server tools/udp-test-server
+COPY xtask xtask
+COPY Cargo.toml Cargo.toml
+COPY .cargo .cargo
 
 # We need to tell bpf-linker where it can find LLVM's shared library file.
 # Ref: https://github.com/aya-rs/rustc-llvm-proxy/blob/cbcb3c6/src/lib.rs#L48
@@ -32,9 +41,13 @@ RUN --mount=type=cache,target=/workspace/target/ \
     cargo xtask build-ebpf --release
 RUN --mount=type=cache,target=/workspace/target/ \
     --mount=type=cache,target=/root/.cargo/registry \
-    RUSTFLAGS=-Ctarget-feature=+crt-static cargo build --release --target=$(eval cat arch)-unknown-linux-musl
+    RUSTFLAGS=-Ctarget-feature=+crt-static cargo build \
+    --workspace \
+    --exclude ebpf \ 
+    --release \
+    --target=$(eval cat arch)-unknown-linux-musl
 RUN --mount=type=cache,target=/workspace/target/ \
-    cp /workspace/target/$(eval cat arch)-unknown-linux-musl/release/loader /workspace/dataplane
+    cp /workspace/target/$(eval cat arch)-unknown-linux-musl/release/loader /workspace/dataplane-release
 
 FROM alpine
 
@@ -43,9 +56,9 @@ LABEL org.opencontainers.image.licenses=GPL-2.0-only,BSD-2-Clause
 
 WORKDIR /opt/blixt/
 
-COPY --from=builder /workspace/dataplane /opt/blixt/dataplane
+COPY --from=builder /workspace/dataplane-release /opt/blixt/dataplane
 
-COPY LICENSE.GPL-2.0 /opt/blixt/LICENSE.GPL-2.0
-COPY LICENSE.BSD-2-Clause /opt/blixt/LICENSE.BSD-2-Clause
+COPY dataplane/LICENSE.GPL-2.0 /opt/blixt/LICENSE.GPL-2.0
+COPY dataplane/LICENSE.BSD-2-Clause /opt/blixt/LICENSE.BSD-2-Clause
 
 ENTRYPOINT ["/opt/blixt/dataplane"]

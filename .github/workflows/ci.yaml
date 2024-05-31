@@ -29,7 +29,7 @@ jobs:
       id: control-plane-changed
       with:
         files: |
-          Dockerfile
+          Containerfile.controlplane
           go.mod
           go.sum
           main.go
@@ -40,12 +40,11 @@ jobs:
       id: dataplane-changed
       with:
         files: |
-          dataplane/Dockerfile
+          Containerfile.dataplane
           dataplane/go.mod
           dataplane/go.sum
           dataplane/main.go
           dataplane/xdp.c
-          dataplane/Makefile
           dataplane/LICENCE
     - name: Check if any of the workflow files have changed
       uses: tj-actions/changed-files@716b1e13042866565e00e85fd4ec490e186c4a2f
@@ -80,6 +79,7 @@ jobs:
       uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
       with:
         context: .
+        file: Containerfile.controlplane
         cache-from: type=gha
         cache-to: type=gha,mode=max
         tags: kubernetes-sigs/blixt-controlplane:pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
@@ -92,7 +92,8 @@ jobs:
     - name: Docker build - Dataplane
       uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
       with:
-        context: dataplane
+        context: .
+        file: Containerfile.dataplane
         cache-from: type=gha
         cache-to: type=gha,mode=max
         tags: kubernetes-sigs/blixt-dataplane:pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
@@ -130,6 +131,7 @@ jobs:
       uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
       with:
         context: .
+        file: Containerfile.controlplane
         push: false # TODO: https://github.com/kubernetes-sigs/blixt/issues/106
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -137,7 +139,8 @@ jobs:
     - name: Docker build - Data Plane
       uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5
       with:
-        context: dataplane
+        context: .
+        file: Containerfile.dataplane
         push: false # TODO: https://github.com/kubernetes-sigs/blixt/issues/106
         cache-from: type=gha
         cache-to: type=gha,mode=max

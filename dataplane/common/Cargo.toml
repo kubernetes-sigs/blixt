@@ -1,15 +1,17 @@
 [package]
 name = "common"
-version = "0.1.0"
-edition = "2021"
-publish = false
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[lib]
+name = "common"
+path = "src/lib.rs"
 
 [features]
 default = []
 user = [ "aya" ]
 
 [dependencies]
-aya = { version = ">=0.11", optional=true }
-
-[lib]
-path = "src/lib.rs"
+aya = { workspace = true, optional=true }

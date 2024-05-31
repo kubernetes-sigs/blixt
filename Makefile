@@ -3,6 +3,11 @@ BLIXT_CONTROLPLANE_IMAGE ?= ghcr.io/kubernetes-sigs/blixt-controlplane
 BLIXT_DATAPLANE_IMAGE ?= ghcr.io/kubernetes-sigs/blixt-dataplane
 BLIXT_UDP_SERVER_IMAGE ?= ghcr.io/kubernetes-sigs/blixt-udp-test-server
 
+# Dockerfile paths for each service
+CONTROLPLANE_DOCKERFILE ?= Containerfile.controlplane
+DATAPLANE_DOCKERFILE ?= Containerfile.dataplane
+UDP_SERVER_DOCKERFILE ?= Containerfile.udp_server
+
 # Other testing variables
 EXISTING_CLUSTER ?=
 
@@ -14,6 +19,7 @@ else
 BUILD_PLATFORMS ?= linux/amd64
 endif
 BUILD_ARGS ?= --load
+
 
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
@@ -127,35 +133,24 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: lint
-lint:
+lint: ## Lint go code
 	golangci-lint run
 
-.PHONY: check.format.rust.helper
-check.format.rust.helper: 
-	@echo "Checking formatting $(DIRECTORY)..."
-	cargo fmt --manifest-path $(DIRECTORY)/Cargo.toml --all -- --check
-
-.PHONY: fix.format.rust.helper
-fix.format.rust.helper:
-	@echo "Fixing formatting $(DIRECTORY)..."
-	cargo fmt --manifest-path $(DIRECTORY)/Cargo.toml --all
+.PHONY: clean
+clean: ## Cargo clean
+	cargo clean
 
 .PHONY: fix.format.rust
-fix.format.rust:
-	@find . -name 'Cargo.toml' -type f -exec dirname {} \; | xargs -I {} $(MAKE) fix.format.rust.helper DIRECTORY={}
+fix.format.rust: ## Autofix rust code formatting
+	cargo fmt --manifest-path Cargo.toml --all
 
 .PHONY: check.format.rust
-check.format.rust:
-	@find . -name 'Cargo.toml' -type f -exec dirname {} \; | xargs -I {} $(MAKE) check.format.rust.helper DIRECTORY={}
-
-.PHONY: lint.rust.helper
-lint.rust.helper:
-	@echo "Linting $(DIRECTORY)..."
-	@cd $(DIRECTORY) && cargo clippy --all -- -D warnings
+check.format.rust: ## Check rust code formatting
+	cargo fmt --manifest-path Cargo.toml --all -- --check
 
 .PHONY: lint.rust
-lint.rust:
-	@find . -name 'Cargo.toml' -type f -exec dirname {} \; | xargs -I {} $(MAKE) lint.rust.helper DIRECTORY={}
+lint.rust: ## Lint rust code
+	cargo clippy --all -- -D warnings
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
@@ -206,26 +201,67 @@ debug.conformance: manifests generate fmt vet
 
 ##@ Build
 
-.PHONY: build
-build: generate fmt vet ## Build manager binary.
+.PHONY: build.go
+build.go: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go
 
-.PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
+.PHONY: build.rust
+build.rust: ## Build dataplane
+	cargo xtask build-ebpf
+	cargo build
+
+.PHONY: build.rust.release
+build.rust.release: ## Build dataplane release
+	cargo xtask build-ebpf --release
+	cargo build --release
+
+.PHONY: run.go
+run.go: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
-.PHONY: debug
-debug: manifests generate fmt vet ## Run a controller from your host via debugger.
+.PHONY: debug.go
+debug.go: manifests generate fmt vet ## Run a controller from your host via debugger.
 	dlv debug ./main.go
 
-.PHONY: build.image
-build.image:
-	DOCKER_BUILDKIT=1 docker buildx build --platform=$(BUILD_PLATFORMS) $(BUILD_ARGS) -t $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) .
+.PHONY: build.image.controlplane
+build.image.controlplane:
+	DOCKER_BUILDKIT=1 docker buildx build --platform=$(BUILD_PLATFORMS) --file=$(CONTROLPLANE_DOCKERFILE) $(BUILD_ARGS) -t $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) .
+
+.PHONY: build.image.udp_server
+build.image.udp_server:
+	DOCKER_BUILDKIT=1 docker buildx build --platform=$(BUILD_PLATFORMS) --file=$(UDP_SERVER_DOCKERFILE) -t $(BLIXT_UDP_SERVER_IMAGE):$(TAG) .
+
+.PHONY: build.image.dataplane
+build.image.dataplane:
+	DOCKER_BUILDKIT=1 docker buildx build --platform $(BUILD_PLATFORMS) $(BUILD_ARGS) --file=$(DATAPLANE_DOCKERFILE) -t $(BLIXT_DATAPLANE_IMAGE):$(TAG) ./
 
 .PHONY: build.all.images
-build.all.images: build.image
-	cd dataplane/ && make build.image TAG=$(TAG)
-	cd tools/udp-test-server && make build.image TAG=$(TAG)
+build.all.images: 
+	$(MAKE) build.image.controlplane
+	$(MAKE) build.image.dataplane
+	$(MAKE) build.image.udp_server
+
+.PHONY: build.bytecode.images
+build.bytecode.images: build
+	docker build \
+	--build-arg PROGRAM_NAME=blixt-tc-ingress \
+	--build-arg BPF_FUNCTION_NAME=tc_ingress \
+	--build-arg PROGRAM_TYPE=tc \
+	--build-arg BYTECODE_FILENAME=loader \
+	-f https://raw.githubusercontent.com/bpfd-dev/bpfd/main/packaging/container-deployment/Containerfile.bytecode \
+	./target/bpfel-unknown-none/debug -t quay.io/bpfd-bytecode/blixt-tc-ingress:latest
+	docker build \
+	--build-arg PROGRAM_NAME=blixt-tc-egress \
+	--build-arg BPF_FUNCTION_NAME=tc_egress \
+	--build-arg PROGRAM_TYPE=tc \
+	--build-arg BYTECODE_FILENAME=loader \
+	-f https://raw.githubusercontent.com/bpfd-dev/bpfd/main/packaging/container-deployment/Containerfile.bytecode \
+	./target/bpfel-unknown-none/debug -t quay.io/bpfd-bytecode/blixt-tc-egress:latest
+
+.PHONY: push.bytecode.images
+push.bytecode.images: build.bytecode.images
+	docker push quay.io/bpfd-bytecode/blixt-tc-egress:latest
+	docker push quay.io/bpfd-bytecode/blixt-tc-ingress:latest
 
 ##@ Deployment
 
@@ -361,11 +397,16 @@ KIND_CLUSTER ?= blixt-dev
 build.cluster: $(KTF) # builds a KIND cluster which can be used for testing and development
 	PATH="$(LOCALBIN):${PATH}" $(KTF) env create --name $(KIND_CLUSTER) --addon metallb
 
-.PHONY: load.image
-load.image: build.image
+.PHONY: load.image.controlplane
+load.image.controlplane: build.image.controlplane
 	kind load docker-image $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
 		kubectl -n blixt-system get deployment blixt-controlplane >/dev/null 2>&1 && \
 		kubectl -n blixt-system rollout restart deployment blixt-controlplane || true
+
+.PHONY: load.image.dataplane
+load.image.dataplane: build.image.dataplane
+	kind load docker-image $(IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
+		kubectl -n blixt-system rollout restart daemonset blixt-dataplane
 
 .PHONY: load.all.images
 load.all.images: build.all.images

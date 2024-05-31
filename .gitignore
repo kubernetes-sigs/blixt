@@ -6,6 +6,9 @@
 *.dylib
 bin/*
 
+# xtask targets
+target/
+
 # Test binary, built with `go test -c`
 *.test
 
