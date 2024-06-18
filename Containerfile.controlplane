@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.21 as builder
+FROM golang:1.22 as builder
 
 LABEL org.opencontainers.image.source=https://github.com/kubernetes-sigs/blixt
 LABEL org.opencontainers.image.description="An experimental layer 4 load-balancer built using eBPF/XDP with ebpf-go \
