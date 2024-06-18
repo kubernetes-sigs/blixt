@@ -1,0 +1,18 @@
+---
+kind: GatewayClass
+apiVersion: gateway.networking.k8s.io/v1
+metadata:
+  name: blixt-tcproute-sample
+spec:
+  controllerName: gateway.networking.k8s.io/blixt
+---
+kind: Gateway
+apiVersion: gateway.networking.k8s.io/v1
+metadata:
+  name: blixt-tcproute-sample
+spec:
+  gatewayClassName: blixt-tcproute-sample
+  listeners:
+  - name: tcp
+    protocol: TCP
+    port: 8080
