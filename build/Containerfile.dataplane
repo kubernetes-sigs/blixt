@@ -1,14 +1,21 @@
-FROM rust:1.75-slim-bookworm AS builder
+FROM rust:1.79-slim-bookworm as builder
 
 ARG TARGETARCH
+ARG LLVM_VERSION=19
 
 RUN apt-get update
 RUN apt-get install --yes \
     build-essential \
     protobuf-compiler \
     pkg-config \
-    llvm-16 \
-    musl-tools
+    musl-tools \
+    clang \
+    wget
+
+RUN apt install --yes lsb-release software-properties-common gnupg
+RUN wget -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+RUN chmod +x /tmp/llvm.sh
+RUN /bin/sh -c "/tmp/llvm.sh ${LLVM_VERSION} all"
 
 RUN rustup default stable
 RUN rustup install nightly
@@ -35,7 +42,12 @@ COPY .cargo .cargo
 
 # We need to tell bpf-linker where it can find LLVM's shared library file.
 # Ref: https://github.com/aya-rs/rustc-llvm-proxy/blob/cbcb3c6/src/lib.rs#L48
-ENV LD_LIBRARY_PATH="/usr/lib/llvm-16/lib"
+ENV LD_LIBRARY_PATH="/usr/lib/llvm-$LLVM_VERSION/lib"
+ENV CC_aarch64_unknown_linux_musl="/usr/lib/llvm-$LLVM_VERSION/bin/clang"
+ENV AR_aarch64_unknown_linux_musl="/usr/lib/llvm-$LLVM_VERSION/bin/llvm-ar"
+ENV CC_x86_64_unknown_linux_musl="/usr/lib/llvm-$LLVM_VERSION/bin/clang"
+ENV AR_x86_64_unknown_linux_musl="/usr/lib/llvm-$LLVM_VERSION/bin/llvm-ar"
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-Clink-self-contained=yes -Clinker=rust-lld"
 
 RUN --mount=type=cache,target=/workspace/target/ \
     --mount=type=cache,target=/root/.cargo/registry \
