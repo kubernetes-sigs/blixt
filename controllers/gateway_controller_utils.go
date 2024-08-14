@@ -146,7 +146,7 @@ func (r *GatewayReconciler) svcIsHealthy(ctx context.Context, svc *corev1.Servic
 		if allocationSucceeded != nil && allocationSucceeded.EventTime.After(allocationFailed.EventTime.Time) {
 			return nil
 		}
-		return fmt.Errorf(allocationFailed.Message)
+		return fmt.Errorf("%s", allocationFailed.Message)
 	}
 
 	return nil

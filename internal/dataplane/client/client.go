@@ -99,7 +99,7 @@ func (c *BackendsClientManager) SetClientsList(readyPods map[types.NamespacedNam
 			endpoint := fmt.Sprintf("%s:%d", pod.Status.PodIP, vars.DefaultDataPlaneAPIPort)
 			c.log.Info("BackendsClientManager", "status", "connecting", "pod", pod.GetName(), "endpoint", endpoint)
 
-			conn, dialErr := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+			conn, dialErr := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()) //nolint:staticcheck
 			if dialErr != nil {
 				c.log.Error(dialErr, "BackendsClientManager", "status", "connection failure", "pod", pod.GetName())
 				err = errors.Join(err, dialErr)
