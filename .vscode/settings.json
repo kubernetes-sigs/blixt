@@ -1,4 +1,4 @@
 {
-    "rust-analyzer.linkedProjects": ["Cargo.toml", "dataplane/ebpf/Cargo.toml"],
+    "rust-analyzer.linkedProjects": ["Cargo.toml", "dataplane/ebpf/Cargo.toml", "controlplane/Cargo.toml"],
     "rust-analyzer.check.allTargets": false
 }

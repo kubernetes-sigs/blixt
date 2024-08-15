@@ -6,7 +6,10 @@ members = [
 	"tools/udp-test-server",
 	"xtask",
 ]
-exclude = ["dataplane/ebpf"]
+exclude = [
+	"dataplane/ebpf",
+	"controlplane",
+]
 
 [workspace.package]
 edition = "2021"
