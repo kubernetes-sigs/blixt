@@ -1,6 +1,6 @@
 ![blixt](https://github.com/kubernetes-sigs/blixt/assets/5332524/387ce94a-88fd-43a9-bde9-73fb9005564d)
 
-> **Warning**: Experimental. There is no intention to ever make this viable for production. Do not use in production.
+> **Warning**: Experimental. There is no intention to ever make this viable for production. **DO NOT USE IN PRODUCTION**.
 
 # Blixt
 
