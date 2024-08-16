@@ -12,7 +12,7 @@ https://github.com/kubernetes-sigs/blixt/discussions/150.
 - [ ] TCPRoute reconciler
 - [ ] UDPRoute reconciler
 
-## Getting started
+## Development
 
 First you'll need to create a Kubernetes cluster (with `kind`):
 
