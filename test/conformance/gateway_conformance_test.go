@@ -30,9 +30,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
-	"sigs.k8s.io/gateway-api/conformance/apis/v1alpha1"
+	v1 "sigs.k8s.io/gateway-api/conformance/apis/v1"
 	"sigs.k8s.io/gateway-api/conformance/tests"
 	"sigs.k8s.io/gateway-api/conformance/utils/suite"
 
@@ -46,8 +46,8 @@ const (
 )
 
 const (
-	gatewayAPICRDKustomize        = "https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.8.1"
-	conformanceTestsBaseManifests = "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v0.8.1/conformance/base/manifests.yaml"
+	gatewayAPICRDKustomize        = "https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v1.1.0"
+	conformanceTestsBaseManifests = "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.1.0/conformance/base/manifests.yaml"
 )
 
 func TestGatewayConformance(t *testing.T) {
@@ -56,7 +56,7 @@ func TestGatewayConformance(t *testing.T) {
 	c, err := client.New(env.Cluster().Config(), client.Options{})
 	require.NoError(t, err)
 	require.NoError(t, gatewayv1alpha2.AddToScheme(c.Scheme()))
-	require.NoError(t, gatewayv1beta1.AddToScheme(c.Scheme()))
+	require.NoError(t, gatewayv1.AddToScheme(c.Scheme()))
 
 	t.Log("deploying Gateway API CRDs")
 	require.NoError(t, clusters.KustomizeDeployForCluster(ctx, env.Cluster(), gatewayAPICRDKustomize))
@@ -105,7 +105,7 @@ func TestGatewayConformance(t *testing.T) {
 				UsableNetworkAddresses:   []gatewayv1beta1.GatewayAddress{{Value: "172.18.0.242"}},
 				UnusableNetworkAddresses: []gatewayv1beta1.GatewayAddress{{Value: "1.1.1.1"}},
 			},
-			Implementation: v1alpha1.Implementation{
+			Implementation: v1.Implementation{
 				Organization: "kubernetes-sigs",
 				Project:      "blixt",
 				URL:          "https://github.com/kubernetes-sigs/blixt",

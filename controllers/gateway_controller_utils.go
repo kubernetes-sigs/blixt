@@ -28,10 +28,10 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
-func (r *GatewayReconciler) getServiceForGateway(ctx context.Context, gw *gatewayv1beta1.Gateway) (*corev1.Service, error) {
+func (r *GatewayReconciler) getServiceForGateway(ctx context.Context, gw *gatewayv1.Gateway) (*corev1.Service, error) {
 	svcs := new(corev1.ServiceList)
 	if err := r.List(ctx, svcs, client.InNamespace(gw.Namespace), client.MatchingLabels{gatewayServiceLabel: gw.Name}); err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (r *GatewayReconciler) getServiceForGateway(ctx context.Context, gw *gatewa
 	return nil, nil
 }
 
-func (r *GatewayReconciler) createServiceForGateway(ctx context.Context, gw *gatewayv1beta1.Gateway) error {
+func (r *GatewayReconciler) createServiceForGateway(ctx context.Context, gw *gatewayv1.Gateway) error {
 	svc := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    gw.Namespace,
@@ -62,7 +62,7 @@ func (r *GatewayReconciler) createServiceForGateway(ctx context.Context, gw *gat
 	if len(gw.Spec.Addresses) > 0 {
 		addr := gw.Spec.Addresses[0]
 
-		if *addr.Type != gatewayv1beta1.IPAddressType {
+		if *addr.Type != gatewayv1.IPAddressType {
 			// TODO: update status https://github.com/Kong/blixt/issues/96
 			return fmt.Errorf("status addresses of type %s are not supported, only IP addresses are supported", *addr.Type)
 		}
@@ -152,7 +152,7 @@ func (r *GatewayReconciler) svcIsHealthy(ctx context.Context, svc *corev1.Servic
 	return nil
 }
 
-func (r *GatewayReconciler) ensureServiceConfiguration(ctx context.Context, svc *corev1.Service, gw *gatewayv1beta1.Gateway) (bool, error) {
+func (r *GatewayReconciler) ensureServiceConfiguration(ctx context.Context, svc *corev1.Service, gw *gatewayv1.Gateway) (bool, error) {
 	updated := false
 
 	if len(gw.Spec.Addresses) > 0 && svc.Spec.LoadBalancerIP != gw.Spec.Addresses[0].Value {
@@ -178,13 +178,13 @@ func (r *GatewayReconciler) ensureServiceConfiguration(ctx context.Context, svc 
 	ports := make([]corev1.ServicePort, 0, len(gw.Spec.Listeners))
 	for _, listener := range gw.Spec.Listeners {
 		switch proto := listener.Protocol; proto {
-		case gatewayv1beta1.TCPProtocolType:
+		case gatewayv1.TCPProtocolType:
 			ports = append(ports, corev1.ServicePort{
 				Name:     string(listener.Name),
 				Protocol: corev1.ProtocolTCP,
 				Port:     int32(listener.Port),
 			})
-		case gatewayv1beta1.UDPProtocolType:
+		case gatewayv1.UDPProtocolType:
 			ports = append(ports, corev1.ServicePort{
 				Name:     string(listener.Name),
 				Protocol: corev1.ProtocolUDP,
@@ -195,13 +195,13 @@ func (r *GatewayReconciler) ensureServiceConfiguration(ctx context.Context, svc 
 		// can still pass the tests. For now, we just treat an HTTP/S listener
 		// as a TCP listener to workaround this (but we don't actually support
 		// HTTPRoute).
-		case gatewayv1beta1.HTTPProtocolType:
+		case gatewayv1.HTTPProtocolType:
 			ports = append(ports, corev1.ServicePort{
 				Name:     string(listener.Name),
 				Protocol: corev1.ProtocolTCP,
 				Port:     int32(listener.Port),
 			})
-		case gatewayv1beta1.HTTPSProtocolType:
+		case gatewayv1.HTTPSProtocolType:
 			ports = append(ports, corev1.ServicePort{
 				Name:     string(listener.Name),
 				Protocol: corev1.ProtocolTCP,
@@ -235,8 +235,8 @@ func (r *GatewayReconciler) ensureServiceConfiguration(ctx context.Context, svc 
 }
 
 var (
-	ipAddrType   = gatewayv1beta1.IPAddressType
-	hostAddrType = gatewayv1beta1.HostnameAddressType
+	ipAddrType   = gatewayv1.IPAddressType
+	hostAddrType = gatewayv1.HostnameAddressType
 )
 
 // hackEnsureEndpoints is a temporary hack around how metallb'd L2 mode works, re: https://github.com/metallb/metallb/issues/1640
@@ -286,13 +286,13 @@ func (r *GatewayReconciler) hackEnsureEndpoints(ctx context.Context, svc *corev1
 }
 
 func (r *GatewayReconciler) mapGatewayClassToGateway(_ context.Context, obj client.Object) (recs []reconcile.Request) {
-	gatewayClass, ok := obj.(*gatewayv1beta1.GatewayClass)
+	gatewayClass, ok := obj.(*gatewayv1.GatewayClass)
 	if !ok {
-		r.Log.Error(fmt.Errorf("unexpected object type in gateway watch predicates"), "expected", "*gatewayv1beta1.GatewayClass", "found", reflect.TypeOf(obj))
+		r.Log.Error(fmt.Errorf("unexpected object type in gateway watch predicates"), "expected", "*gatewayv1.GatewayClass", "found", reflect.TypeOf(obj))
 		return
 	}
 
-	gateways := &gatewayv1beta1.GatewayList{}
+	gateways := &gatewayv1.GatewayList{}
 	if err := r.Client.List(context.Background(), gateways); err != nil {
 		// TODO: https://github.com/kubernetes-sigs/controller-runtime/issues/1996
 		r.Log.Error(err, "could not map gatewayclass event to gateways")
@@ -300,7 +300,7 @@ func (r *GatewayReconciler) mapGatewayClassToGateway(_ context.Context, obj clie
 	}
 
 	for _, gateway := range gateways.Items {
-		if gateway.Spec.GatewayClassName == gatewayv1beta1.ObjectName(gatewayClass.Name) {
+		if gateway.Spec.GatewayClassName == gatewayv1.ObjectName(gatewayClass.Name) {
 			recs = append(recs, reconcile.Request{NamespacedName: types.NamespacedName{
 				Namespace: gateway.Namespace,
 				Name:      gateway.Name,
@@ -318,7 +318,7 @@ func mapServiceToGateway(_ context.Context, obj client.Object) (reqs []reconcile
 	}
 
 	for _, ownerRef := range svc.OwnerReferences {
-		if ownerRef.APIVersion == fmt.Sprintf("%s/%s", gatewayv1beta1.GroupName, gatewayv1beta1.GroupVersion.Version) {
+		if ownerRef.APIVersion == fmt.Sprintf("%s/%s", gatewayv1.GroupName, gatewayv1.GroupVersion.Version) {
 			reqs = append(reqs, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: svc.Namespace,
@@ -331,20 +331,20 @@ func mapServiceToGateway(_ context.Context, obj client.Object) (reqs []reconcile
 	return
 }
 
-func setGatewayStatus(gateway *gatewayv1beta1.Gateway) {
+func setGatewayStatus(gateway *gatewayv1.Gateway) {
 	newAccepted := determineGatewayAcceptance(gateway)
 	newProgrammed := determineGatewayProgrammed(gateway)
 	setCond(gateway, newAccepted)
 	setCond(gateway, newProgrammed)
 }
 
-func determineGatewayAcceptance(gateway *gatewayv1beta1.Gateway) metav1.Condition {
+func determineGatewayAcceptance(gateway *gatewayv1.Gateway) metav1.Condition {
 	// this is the default accepted condition, it may get overidden if there are
 	// unsupported values in the specification.
 	accepted := metav1.Condition{
-		Type:               string(gatewayv1beta1.GatewayConditionAccepted),
+		Type:               string(gatewayv1.GatewayConditionAccepted),
 		Status:             metav1.ConditionTrue,
-		Reason:             string(gatewayv1beta1.GatewayReasonAccepted),
+		Reason:             string(gatewayv1.GatewayReasonAccepted),
 		ObservedGeneration: gateway.Generation,
 		LastTransitionTime: metav1.Now(),
 		Message:            "blixt controlplane accepts responsibility for the Gateway",
@@ -352,9 +352,9 @@ func determineGatewayAcceptance(gateway *gatewayv1beta1.Gateway) metav1.Conditio
 
 	// verify that all addresses are supported
 	for _, addr := range gateway.Spec.Addresses {
-		if addr.Type != nil && *addr.Type != gatewayv1beta1.IPAddressType {
+		if addr.Type != nil && *addr.Type != gatewayv1.IPAddressType {
 			accepted.Status = metav1.ConditionFalse
-			accepted.Reason = string(gatewayv1beta1.GatewayReasonUnsupportedAddress)
+			accepted.Reason = string(gatewayv1.GatewayReasonUnsupportedAddress)
 			accepted.Message = fmt.Sprintf("found an address of type %s, only IPAddress is supported", *addr.Type)
 		}
 	}
@@ -362,14 +362,14 @@ func determineGatewayAcceptance(gateway *gatewayv1beta1.Gateway) metav1.Conditio
 	return accepted
 }
 
-func determineGatewayProgrammed(gateway *gatewayv1beta1.Gateway) metav1.Condition {
+func determineGatewayProgrammed(gateway *gatewayv1.Gateway) metav1.Condition {
 	// TODO: give this client access and make it dynamic
 	return metav1.Condition{
-		Type:               string(gatewayv1beta1.GatewayConditionProgrammed),
+		Type:               string(gatewayv1.GatewayConditionProgrammed),
 		ObservedGeneration: gateway.Generation,
 		Status:             metav1.ConditionFalse,
 		LastTransitionTime: metav1.Now(),
-		Reason:             string(gatewayv1beta1.GatewayReasonPending),
+		Reason:             string(gatewayv1.GatewayReasonPending),
 		Message:            "dataplane not yet configured",
 	}
 }

@@ -33,8 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	dataplane "github.com/kubernetes-sigs/blixt/internal/dataplane/client"
 	"github.com/kubernetes-sigs/blixt/pkg/vars"
@@ -69,7 +69,7 @@ func (r *UDPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(r.mapDataPlaneDaemonsetToUDPRoutes),
 		).
 		Watches(
-			&gatewayv1beta1.Gateway{},
+			&gatewayv1.Gateway{},
 			handler.EnqueueRequestsFromMapFunc(r.mapGatewayToUDPRoutes),
 		).
 		Complete(r)
@@ -129,13 +129,13 @@ func (r *UDPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 // isUDPRouteManaged verifies wether a provided UDPRoute is managed by this
 // controller, according to it's Gateway and GatewayClass.
-func (r *UDPRouteReconciler) isUDPRouteManaged(ctx context.Context, udproute gatewayv1alpha2.UDPRoute) (bool, *gatewayv1beta1.Gateway, error) {
-	var supportedGateways []gatewayv1beta1.Gateway
+func (r *UDPRouteReconciler) isUDPRouteManaged(ctx context.Context, udproute gatewayv1alpha2.UDPRoute) (bool, *gatewayv1.Gateway, error) {
+	var supportedGateways []gatewayv1.Gateway
 
 	//Use the retrieve objects its parent ref to look for the gateway.
 	for _, parentRef := range udproute.Spec.ParentRefs {
 		//Build Gateway object to retrieve
-		gw := new(gatewayv1beta1.Gateway)
+		gw := new(gatewayv1.Gateway)
 
 		ns := udproute.Namespace
 		if parentRef.Namespace != nil {
@@ -151,7 +151,7 @@ func (r *UDPRouteReconciler) isUDPRouteManaged(ctx context.Context, udproute gat
 		}
 
 		//Get GatewayClass for the Gateway and match to our name of controler
-		gwc := new(gatewayv1beta1.GatewayClass)
+		gwc := new(gatewayv1.GatewayClass)
 		if err := r.Get(ctx, types.NamespacedName{Name: string(gw.Spec.GatewayClassName), Namespace: ns}, gwc); err != nil {
 			if !errors.IsNotFound(err) {
 				return false, nil, err
@@ -189,16 +189,16 @@ func (r *UDPRouteReconciler) isUDPRouteManaged(ctx context.Context, udproute gat
 
 // verifyListener verifies that the provided gateway has at least one listener
 // matching the provided ParentReference.
-func (r *UDPRouteReconciler) verifyListener(_ context.Context, gw *gatewayv1beta1.Gateway, udprouteSpec gatewayv1alpha2.ParentReference) error {
+func (r *UDPRouteReconciler) verifyListener(_ context.Context, gw *gatewayv1.Gateway, udprouteSpec gatewayv1alpha2.ParentReference) error {
 	for _, listener := range gw.Spec.Listeners {
-		if (listener.Protocol == gatewayv1beta1.UDPProtocolType) && (listener.Port == gatewayv1beta1.PortNumber(*udprouteSpec.Port)) {
+		if (listener.Protocol == gatewayv1.UDPProtocolType) && (listener.Port == gatewayv1.PortNumber(*udprouteSpec.Port)) {
 			return nil
 		}
 	}
 	return fmt.Errorf("No matching Gateway listener found for defined Parentref")
 }
 
-func (r *UDPRouteReconciler) ensureUDPRouteConfiguredInDataPlane(ctx context.Context, udproute *gatewayv1alpha2.UDPRoute, gateway *gatewayv1beta1.Gateway) error {
+func (r *UDPRouteReconciler) ensureUDPRouteConfiguredInDataPlane(ctx context.Context, udproute *gatewayv1alpha2.UDPRoute, gateway *gatewayv1.Gateway) error {
 	// build the dataplane configuration from the UDPRoute and its Gateway
 	targets, err := dataplane.CompileUDPRouteToDataPlaneBackend(ctx, r.Client, udproute, gateway)
 	if err != nil {
@@ -214,7 +214,7 @@ func (r *UDPRouteReconciler) ensureUDPRouteConfiguredInDataPlane(ctx context.Con
 	return nil
 }
 
-func (r *UDPRouteReconciler) ensureUDPRouteDeletedInDataPlane(ctx context.Context, udproute *gatewayv1alpha2.UDPRoute, gateway *gatewayv1beta1.Gateway) error {
+func (r *UDPRouteReconciler) ensureUDPRouteDeletedInDataPlane(ctx context.Context, udproute *gatewayv1alpha2.UDPRoute, gateway *gatewayv1.Gateway) error {
 	// get the gateway IP and port.
 	gwIP, err := dataplane.GetGatewayIP(gateway)
 	if err != nil {

@@ -29,14 +29,14 @@ import (
 	controllerruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/kubernetes-sigs/blixt/internal/test/utils"
 	"github.com/kubernetes-sigs/blixt/pkg/vars"
 )
 
 func init() {
-	_ = gatewayv1beta1.AddToScheme(scheme.Scheme)
+	_ = gatewayv1.AddToScheme(scheme.Scheme)
 }
 
 func TestGatewayReconciler_gatewayHasMatchingGatewayClass(t *testing.T) {
@@ -56,12 +56,12 @@ func TestGatewayReconciler_gatewayHasMatchingGatewayClass(t *testing.T) {
 	}{
 		{
 			name: "a gateway with a gatewayclass managed by our controller name matches",
-			obj: &gatewayv1beta1.Gateway{
+			obj: &gatewayv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "managed-gateway",
 					Namespace: corev1.NamespaceDefault,
 				},
-				Spec: gatewayv1beta1.GatewaySpec{
+				Spec: gatewayv1.GatewaySpec{
 					GatewayClassName: managedGWC,
 				},
 			},
@@ -69,12 +69,12 @@ func TestGatewayReconciler_gatewayHasMatchingGatewayClass(t *testing.T) {
 		},
 		{
 			name: "a gateway with a gatewayclass NOT managed by our controller name doesn't match",
-			obj: &gatewayv1beta1.Gateway{
+			obj: &gatewayv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "unmanaged-gateway",
 					Namespace: corev1.NamespaceDefault,
 				},
-				Spec: gatewayv1beta1.GatewaySpec{
+				Spec: gatewayv1.GatewaySpec{
 					GatewayClassName: unmanagedGWC,
 				},
 			},
@@ -82,12 +82,12 @@ func TestGatewayReconciler_gatewayHasMatchingGatewayClass(t *testing.T) {
 		},
 		{
 			name: "a gateway with a gatewayclass which is missing doesn't match",
-			obj: &gatewayv1beta1.Gateway{
+			obj: &gatewayv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "unmanaged-gateway",
 					Namespace: corev1.NamespaceDefault,
 				},
-				Spec: gatewayv1beta1.GatewaySpec{
+				Spec: gatewayv1.GatewaySpec{
 					GatewayClassName: "non-existent-gateway-class",
 				},
 			},
@@ -95,7 +95,7 @@ func TestGatewayReconciler_gatewayHasMatchingGatewayClass(t *testing.T) {
 		},
 		{
 			name:             "if inexplicably controller-runtime feeds the predicate a non-gateway object, it doesn't match",
-			obj:              &gatewayv1beta1.HTTPRoute{},
+			obj:              &gatewayv1.HTTPRoute{},
 			expected:         false,
 			logEntryExpected: "unexpected object type in gateway watch predicates",
 		},
@@ -121,11 +121,11 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 	testCases := []struct {
 		name         string
 		gatewayReq   reconcile.Request
-		gatewayClass *gatewayv1beta1.GatewayClass
-		gateway      *gatewayv1beta1.Gateway
+		gatewayClass *gatewayv1.GatewayClass
+		gateway      *gatewayv1.Gateway
 		objectsToAdd []controllerruntimeclient.Object
 
-		run func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gatewayClass *gatewayv1beta1.Gateway)
+		run func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gatewayClass *gatewayv1.Gateway)
 	}{
 		{
 			name: "gatewayclass not accepted",
@@ -135,35 +135,35 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 					Namespace: "test-namespace",
 				},
 			},
-			gatewayClass: &gatewayv1beta1.GatewayClass{
+			gatewayClass: &gatewayv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-gatewayclass",
 				},
-				Spec: gatewayv1beta1.GatewayClassSpec{
-					ControllerName: gatewayv1beta1.GatewayController("mismatch-controller-name"),
+				Spec: gatewayv1.GatewayClassSpec{
+					ControllerName: gatewayv1.GatewayController("mismatch-controller-name"),
 				},
 			},
-			gateway: &gatewayv1beta1.Gateway{
+			gateway: &gatewayv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "test-namespace",
 				},
-				Spec: gatewayv1beta1.GatewaySpec{
+				Spec: gatewayv1.GatewaySpec{
 					GatewayClassName: "test-gatewayclass",
-					Listeners: []gatewayv1beta1.Listener{
+					Listeners: []gatewayv1.Listener{
 						{
 							Name:     "udp",
-							Protocol: gatewayv1beta1.UDPProtocolType,
+							Protocol: gatewayv1.UDPProtocolType,
 							Port:     9875,
 						},
 					},
 				},
 			},
-			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
+			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1.Gateway) {
 				ctx := context.Background()
 				_, err := reconciler.Reconcile(ctx, gatewayReq)
 				require.NoError(t, err)
-				newGateway := &gatewayv1beta1.Gateway{}
+				newGateway := &gatewayv1.Gateway{}
 				err = reconciler.Client.Get(ctx, gatewayReq.NamespacedName, newGateway)
 				require.NoError(t, err)
 				require.Len(t, newGateway.Status.Conditions, 0)
@@ -179,27 +179,27 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 					Namespace: "test-namespace",
 				},
 			},
-			gatewayClass: &gatewayv1beta1.GatewayClass{
+			gatewayClass: &gatewayv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-gatewayclass",
 				},
-				Spec: gatewayv1beta1.GatewayClassSpec{
+				Spec: gatewayv1.GatewayClassSpec{
 					ControllerName: vars.GatewayClassControllerName,
 				},
 			},
-			gateway: &gatewayv1beta1.Gateway{
+			gateway: &gatewayv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "test-namespace",
 				},
-				Spec: gatewayv1beta1.GatewaySpec{
+				Spec: gatewayv1.GatewaySpec{
 					GatewayClassName: "test-gatewayclass",
-					Listeners: []gatewayv1beta1.Listener{
+					Listeners: []gatewayv1.Listener{
 						{
 							Name:          "udp",
-							Protocol:      gatewayv1beta1.UDPProtocolType,
+							Protocol:      gatewayv1.UDPProtocolType,
 							Port:          9875,
-							AllowedRoutes: &gatewayv1beta1.AllowedRoutes{},
+							AllowedRoutes: &gatewayv1.AllowedRoutes{},
 						},
 					},
 				},
@@ -241,7 +241,7 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 					},
 				},
 			},
-			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
+			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1.Gateway) {
 				ctx := context.Background()
 				// first reconcile to initialize the Gateway status
 				_, err := reconciler.Reconcile(ctx, gatewayReq)
@@ -249,16 +249,16 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 				// second reconcile to have a complete status
 				_, err = reconciler.Reconcile(ctx, gatewayReq)
 				require.NoError(t, err)
-				newGateway := &gatewayv1beta1.Gateway{}
+				newGateway := &gatewayv1.Gateway{}
 				err = reconciler.Client.Get(ctx, gatewayReq.NamespacedName, newGateway)
 				require.NoError(t, err)
 				require.Len(t, newGateway.Status.Addresses, 1)
 				require.Len(t, newGateway.Status.Conditions, 2)
 				require.Equal(t, newGateway.Status.Conditions[0].Status, metav1.ConditionTrue)
 				require.Len(t, newGateway.Status.Listeners, 1)
-				require.Equal(t, newGateway.Status.Listeners[0].SupportedKinds, []gatewayv1beta1.RouteGroupKind{
+				require.Equal(t, newGateway.Status.Listeners[0].SupportedKinds, []gatewayv1.RouteGroupKind{
 					{
-						Group: (*gatewayv1beta1.Group)(&gatewayv1beta1.GroupVersion.Group),
+						Group: (*gatewayv1.Group)(&gatewayv1.GroupVersion.Group),
 						Kind:  "UDPRoute",
 					},
 				})
@@ -276,36 +276,36 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 					Namespace: "test-namespace",
 				},
 			},
-			gatewayClass: &gatewayv1beta1.GatewayClass{
+			gatewayClass: &gatewayv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-gatewayclass",
 				},
-				Spec: gatewayv1beta1.GatewayClassSpec{
+				Spec: gatewayv1.GatewayClassSpec{
 					ControllerName: vars.GatewayClassControllerName,
 				},
 			},
-			gateway: &gatewayv1beta1.Gateway{
+			gateway: &gatewayv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "test-namespace",
 				},
-				Spec: gatewayv1beta1.GatewaySpec{
+				Spec: gatewayv1.GatewaySpec{
 					GatewayClassName: "test-gatewayclass",
-					Listeners: []gatewayv1beta1.Listener{
+					Listeners: []gatewayv1.Listener{
 						{
 							Name:          "udp",
-							Protocol:      gatewayv1beta1.UDPProtocolType,
+							Protocol:      gatewayv1.UDPProtocolType,
 							Port:          9875,
-							AllowedRoutes: &gatewayv1beta1.AllowedRoutes{},
+							AllowedRoutes: &gatewayv1.AllowedRoutes{},
 						},
 					},
 				},
 			},
-			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
+			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1.Gateway) {
 				ctx := context.Background()
 				_, err := reconciler.Reconcile(ctx, gatewayReq)
 				require.NoError(t, err)
-				newGateway := &gatewayv1beta1.Gateway{}
+				newGateway := &gatewayv1.Gateway{}
 				err = reconciler.Client.Get(ctx, gatewayReq.NamespacedName, newGateway)
 				require.NoError(t, err)
 				require.Len(t, newGateway.Status.Addresses, 0)
@@ -313,14 +313,14 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 				require.Equal(t, newGateway.Status.Conditions[0].Status, metav1.ConditionTrue)
 				require.Equal(t, newGateway.Status.Conditions[1].Status, metav1.ConditionFalse)
 				require.Len(t, newGateway.Status.Listeners, 1)
-				require.Equal(t, newGateway.Status.Listeners[0].SupportedKinds, []gatewayv1beta1.RouteGroupKind{
+				require.Equal(t, newGateway.Status.Listeners[0].SupportedKinds, []gatewayv1.RouteGroupKind{
 					{
-						Group: (*gatewayv1beta1.Group)(&gatewayv1beta1.GroupVersion.Group),
+						Group: (*gatewayv1.Group)(&gatewayv1.GroupVersion.Group),
 						Kind:  "UDPRoute",
 					},
 				})
 				for _, c := range newGateway.Status.Listeners[0].Conditions {
-					if c.Type == string(gatewayv1beta1.ListenerConditionResolvedRefs) {
+					if c.Type == string(gatewayv1.ListenerConditionResolvedRefs) {
 						require.Equal(t, c.Status, metav1.ConditionTrue)
 					} else {
 						require.Equal(t, c.Status, metav1.ConditionFalse)
@@ -336,33 +336,33 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 					Namespace: "test-namespace",
 				},
 			},
-			gatewayClass: &gatewayv1beta1.GatewayClass{
+			gatewayClass: &gatewayv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-gatewayclass",
 				},
-				Spec: gatewayv1beta1.GatewayClassSpec{
+				Spec: gatewayv1.GatewayClassSpec{
 					ControllerName: vars.GatewayClassControllerName,
 				},
 			},
-			gateway: &gatewayv1beta1.Gateway{
+			gateway: &gatewayv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "test-namespace",
 				},
-				Spec: gatewayv1beta1.GatewaySpec{
+				Spec: gatewayv1.GatewaySpec{
 					GatewayClassName: "test-gatewayclass",
-					Listeners: []gatewayv1beta1.Listener{
+					Listeners: []gatewayv1.Listener{
 						{
 							Name:          "http",
-							Protocol:      gatewayv1beta1.HTTPProtocolType,
+							Protocol:      gatewayv1.HTTPProtocolType,
 							Port:          9875,
-							AllowedRoutes: &gatewayv1beta1.AllowedRoutes{},
+							AllowedRoutes: &gatewayv1.AllowedRoutes{},
 						},
 						{
 							Name:          "udp",
-							Protocol:      gatewayv1beta1.UDPProtocolType,
+							Protocol:      gatewayv1.UDPProtocolType,
 							Port:          9875,
-							AllowedRoutes: &gatewayv1beta1.AllowedRoutes{},
+							AllowedRoutes: &gatewayv1.AllowedRoutes{},
 						},
 					},
 				},
@@ -404,7 +404,7 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 					},
 				},
 			},
-			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1beta1.Gateway) {
+			run: func(t *testing.T, reconciler GatewayReconciler, gatewayReq reconcile.Request, gateway *gatewayv1.Gateway) {
 				ctx := context.Background()
 				// first reconcile to initialize the Gateway status
 				_, err := reconciler.Reconcile(ctx, gatewayReq)
@@ -412,7 +412,7 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 				// second reconcile to have a complete status
 				_, err = reconciler.Reconcile(ctx, gatewayReq)
 				require.NoError(t, err)
-				newGateway := &gatewayv1beta1.Gateway{}
+				newGateway := &gatewayv1.Gateway{}
 				err = reconciler.Client.Get(ctx, gatewayReq.NamespacedName, newGateway)
 				require.NoError(t, err)
 				require.Len(t, newGateway.Status.Addresses, 0)
@@ -424,7 +424,7 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 					if l.Name == "http" {
 						require.Len(t, l.SupportedKinds, 1)
 						for _, c := range l.Conditions {
-							if c.Type == string(gatewayv1beta1.ListenerConditionResolvedRefs) {
+							if c.Type == string(gatewayv1.ListenerConditionResolvedRefs) {
 								require.Equal(t, c.Status, metav1.ConditionTrue) // TODO: https://github.com/kubernetes-sigs/gateway-api/issues/2403
 							} else {
 								require.Equal(t, c.Status, metav1.ConditionFalse)
@@ -432,9 +432,9 @@ func TestGatewayReconciler_reconcile(t *testing.T) {
 						}
 					}
 					if l.Name == "udp" {
-						require.Equal(t, l.SupportedKinds, []gatewayv1beta1.RouteGroupKind{
+						require.Equal(t, l.SupportedKinds, []gatewayv1.RouteGroupKind{
 							{
-								Group: (*gatewayv1beta1.Group)(&gatewayv1beta1.GroupVersion.Group),
+								Group: (*gatewayv1.Group)(&gatewayv1.GroupVersion.Group),
 								Kind:  "UDPRoute",
 							},
 						})

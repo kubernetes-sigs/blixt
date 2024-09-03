@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways,verbs=get;list;watch;create;update;patch;delete
@@ -65,7 +65,7 @@ func (r *GatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Log = log.FromContext(context.Background())
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&gatewayv1beta1.Gateway{},
+		For(&gatewayv1.Gateway{},
 			builder.WithPredicates(predicate.NewPredicateFuncs(r.gatewayHasMatchingGatewayClass)),
 		).
 		Watches(
@@ -73,20 +73,20 @@ func (r *GatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(mapServiceToGateway),
 		).
 		Watches(
-			&gatewayv1beta1.GatewayClass{},
+			&gatewayv1.GatewayClass{},
 			handler.EnqueueRequestsFromMapFunc(r.mapGatewayClassToGateway),
 		).
 		Complete(r)
 }
 
 func (r *GatewayReconciler) gatewayHasMatchingGatewayClass(obj client.Object) bool {
-	gateway, ok := obj.(*gatewayv1beta1.Gateway)
+	gateway, ok := obj.(*gatewayv1.Gateway)
 	if !ok {
-		r.Log.Error(fmt.Errorf("unexpected object type in gateway watch predicates"), "expected", "*gatewayv1beta1.Gateway", "found", reflect.TypeOf(obj))
+		r.Log.Error(fmt.Errorf("unexpected object type in gateway watch predicates"), "expected", "*gatewayv1.Gateway", "found", reflect.TypeOf(obj))
 		return false
 	}
 
-	gatewayClass := &gatewayv1beta1.GatewayClass{}
+	gatewayClass := &gatewayv1.GatewayClass{}
 	if err := r.Client.Get(context.Background(), client.ObjectKey{Name: string(gateway.Spec.GatewayClassName)}, gatewayClass); err != nil {
 		if errors.IsNotFound(err) {
 			return false
@@ -103,7 +103,7 @@ func (r *GatewayReconciler) gatewayHasMatchingGatewayClass(obj client.Object) bo
 func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	gateway := new(gatewayv1beta1.Gateway)
+	gateway := new(gatewayv1.Gateway)
 	if err := r.Client.Get(ctx, req.NamespacedName, gateway); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("object enqueued no longer exists, skipping")
@@ -112,7 +112,7 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	gatewayClass := new(gatewayv1beta1.GatewayClass)
+	gatewayClass := new(gatewayv1.GatewayClass)
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, gatewayClass); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -161,11 +161,11 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if strings.Contains(err.Error(), "Failed to allocate IP") {
 				r.Log.Info("failed to allocate IP for Gateway", gateway.Namespace, gateway.Name)
 				setCond(gateway, metav1.Condition{
-					Type:               string(gatewayv1beta1.GatewayConditionProgrammed),
+					Type:               string(gatewayv1.GatewayConditionProgrammed),
 					ObservedGeneration: gateway.Generation,
 					Status:             metav1.ConditionFalse,
 					LastTransitionTime: metav1.Now(),
-					Reason:             string(gatewayv1beta1.GatewayReasonAddressNotUsable),
+					Reason:             string(gatewayv1.GatewayReasonAddressNotUsable),
 					Message:            err.Error(),
 				})
 				updateConditionGeneration(gateway)

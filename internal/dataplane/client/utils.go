@@ -24,13 +24,13 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 // CompileUDPRouteToDataPlaneBackend takes a UDPRoute and the Gateway it is
 // attached to and produces Backend Targets for the DataPlane to configure.
-func CompileUDPRouteToDataPlaneBackend(ctx context.Context, c client.Client, udproute *gatewayv1alpha2.UDPRoute, gateway *gatewayv1beta1.Gateway) (*Targets, error) {
+func CompileUDPRouteToDataPlaneBackend(ctx context.Context, c client.Client, udproute *gatewayv1alpha2.UDPRoute, gateway *gatewayv1.Gateway) (*Targets, error) {
 	gatewayIP, err := GetGatewayIP(gateway)
 	if gatewayIP == nil {
 		return nil, err
@@ -98,7 +98,7 @@ func CompileUDPRouteToDataPlaneBackend(ctx context.Context, c client.Client, udp
 // CompileTCPRouteToDataPlaneBackend takes a TCPRoute and the Gateway it is
 // attached to and produces Backend Targets for the DataPlane to configure.
 func CompileTCPRouteToDataPlaneBackend(ctx context.Context, c client.Client,
-	tcproute *gatewayv1alpha2.TCPRoute, gateway *gatewayv1beta1.Gateway) (*Targets, error) {
+	tcproute *gatewayv1alpha2.TCPRoute, gateway *gatewayv1.Gateway) (*Targets, error) {
 	gatewayIP, err := GetGatewayIP(gateway)
 	if gatewayIP == nil {
 		return nil, err
@@ -208,13 +208,13 @@ func getBackendPort(ctx context.Context, c client.Client, ns string, backendRef 
 	return 0, fmt.Errorf("could not find target port for backend ref: %s", key.String())
 }
 
-func GetGatewayIP(gw *gatewayv1beta1.Gateway) (ip net.IP, err error) {
+func GetGatewayIP(gw *gatewayv1.Gateway) (ip net.IP, err error) {
 	if len(gw.Status.Addresses) > 1 {
 		return nil, fmt.Errorf("Gateway %s/%s had %d addresses but we only currently support 1", gw.Namespace, gw.Name, len(gw.Status.Addresses))
 	}
 
 	for _, address := range gw.Status.Addresses {
-		if address.Type != nil && *address.Type == gatewayv1beta1.IPAddressType {
+		if address.Type != nil && *address.Type == gatewayv1.IPAddressType {
 			ip = net.ParseIP(address.Value)
 			return
 		}
@@ -224,7 +224,7 @@ func GetGatewayIP(gw *gatewayv1beta1.Gateway) (ip net.IP, err error) {
 	return
 }
 
-func GetGatewayPort(gw *gatewayv1beta1.Gateway, refs []gatewayv1alpha2.ParentReference) (uint32, error) {
+func GetGatewayPort(gw *gatewayv1.Gateway, refs []gatewayv1alpha2.ParentReference) (uint32, error) {
 	if len(refs) > 1 {
 		// TODO: https://github.com/Kong/blixt/issues/10
 		return 0, fmt.Errorf("multiple parentRefs not yet supported")

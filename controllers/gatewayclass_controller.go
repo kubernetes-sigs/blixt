@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/kubernetes-sigs/blixt/pkg/vars"
 )
@@ -44,9 +44,9 @@ type GatewayClassReconciler struct {
 // SetupWithManager loads the controller into the provided controller manager.
 func (r *GatewayClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&gatewayv1beta1.GatewayClass{}).
+		For(&gatewayv1.GatewayClass{}).
 		WithEventFilter(predicate.NewPredicateFuncs(func(obj client.Object) bool {
-			gwc, ok := obj.(*gatewayv1beta1.GatewayClass)
+			gwc, ok := obj.(*gatewayv1.GatewayClass)
 			if !ok {
 				return false
 			}
@@ -59,7 +59,7 @@ func (r *GatewayClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	gwc := new(gatewayv1beta1.GatewayClass)
+	gwc := new(gatewayv1.GatewayClass)
 	if err := r.Client.Get(ctx, req.NamespacedName, gwc); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("object enqueued no longer exists, skipping")
@@ -81,9 +81,9 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 }
 
-func (r *GatewayClassReconciler) isAccepted(gwc *gatewayv1beta1.GatewayClass) bool {
+func (r *GatewayClassReconciler) isAccepted(gwc *gatewayv1.GatewayClass) bool {
 	for _, cond := range gwc.Status.Conditions {
-		if cond.Type == string(gatewayv1beta1.GatewayClassConditionStatusAccepted) {
+		if cond.Type == string(gatewayv1.GatewayClassConditionStatusAccepted) {
 			if cond.Status == metav1.ConditionTrue {
 				return true
 			}
@@ -93,21 +93,21 @@ func (r *GatewayClassReconciler) isAccepted(gwc *gatewayv1beta1.GatewayClass) bo
 	return false
 }
 
-func (r *GatewayClassReconciler) accept(ctx context.Context, gwc *gatewayv1beta1.GatewayClass) error {
+func (r *GatewayClassReconciler) accept(ctx context.Context, gwc *gatewayv1.GatewayClass) error {
 	previousGWC := gwc.DeepCopy()
 	acceptedCond := metav1.Condition{
-		Type:               string(gatewayv1beta1.GatewayClassConditionStatusAccepted),
+		Type:               string(gatewayv1.GatewayClassConditionStatusAccepted),
 		Status:             metav1.ConditionTrue,
 		ObservedGeneration: gwc.Generation,
 		LastTransitionTime: metav1.Now(),
-		Reason:             string(gatewayv1beta1.GatewayClassReasonAccepted),
+		Reason:             string(gatewayv1.GatewayClassReasonAccepted),
 		Message:            "the gatewayclass has been accepted by the operator",
 	}
 	setCondition(acceptedCond, gwc)
 	return r.Status().Patch(ctx, gwc, client.MergeFrom(previousGWC))
 }
 
-func setCondition(condition metav1.Condition, gwc *gatewayv1beta1.GatewayClass) {
+func setCondition(condition metav1.Condition, gwc *gatewayv1.GatewayClass) {
 	newConds := make([]metav1.Condition, 0, len(gwc.Status.Conditions))
 
 	for i := 0; i < len(gwc.Status.Conditions); i++ {
