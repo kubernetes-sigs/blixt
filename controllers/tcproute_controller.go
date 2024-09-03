@@ -65,8 +65,7 @@ func (r *TCPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gatewayv1alpha2.TCPRoute{}).
 		WatchesRawSource(
-			&source.Channel{Source: r.ClientReconcileRequestChan},
-			handler.EnqueueRequestsFromMapFunc(r.mapDataPlaneDaemonsetToTCPRoutes),
+			source.Channel(r.ClientReconcileRequestChan, handler.EnqueueRequestsFromMapFunc(r.mapDataPlaneDaemonsetToTCPRoutes)),
 		).
 		Watches(
 			&gatewayv1.Gateway{},

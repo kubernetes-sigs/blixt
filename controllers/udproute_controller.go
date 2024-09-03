@@ -65,8 +65,7 @@ func (r *UDPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gatewayv1alpha2.UDPRoute{}).
 		WatchesRawSource(
-			&source.Channel{Source: r.ClientReconcileRequestChan},
-			handler.EnqueueRequestsFromMapFunc(r.mapDataPlaneDaemonsetToUDPRoutes),
+			source.Channel(r.ClientReconcileRequestChan, handler.EnqueueRequestsFromMapFunc(r.mapDataPlaneDaemonsetToUDPRoutes)),
 		).
 		Watches(
 			&gatewayv1.Gateway{},
