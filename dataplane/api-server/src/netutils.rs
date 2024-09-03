@@ -5,59 +5,89 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 */
 
 use anyhow::Error;
-use libc::if_nametoindex as libc_if_nametoindex;
-use regex::Regex;
-use std::ffi::CString;
+use netlink_packet_core::{
+    NetlinkHeader, NetlinkMessage, NetlinkPayload, NLM_F_DUMP_FILTERED, NLM_F_REQUEST,
+};
+use netlink_packet_route::{
+    route::{RouteAddress, RouteAttribute, RouteFlags, RouteHeader, RouteMessage},
+    AddressFamily, RouteNetlinkMessage,
+};
+use netlink_sys::{protocols::NETLINK_ROUTE, Socket, SocketAddr};
 use std::net::Ipv4Addr;
-use std::process::{Command, Stdio};
-use std::str::from_utf8;
 
-/// Returns an ifindex for a provided ifname. Wraps libc.
-pub fn if_nametoindex(ifname: String) -> Result<u32, Error> {
-    let ifname_c = CString::new(ifname)?;
-    let ifindex = unsafe { libc_if_nametoindex(ifname_c.into_raw()) };
-    Ok(ifindex)
-}
+// pub fn if_nametoindex(ifname: String) -> Result<u32, Error> {
+//     let ifname_c = CString::new(ifname)?;
+//     let ifindex = unsafe { libc_if_nametoindex(ifname_c.into_raw()) };
+//     Ok(ifindex)
+// }
 
-/// Given an IPv4 address will return the local system's network interface
-/// which is responsible for routing that address. Not portable: only works on
-/// Linux systems with iproute2 installed.
-///
-/// TODO: replace this https://github.com/Kong/blixt/issues/49
-pub fn if_name_for_routing_ip(ip_addr: Ipv4Addr) -> Result<String, Error> {
-    // run the linux command "ip route" to get the device responsible for
-    // routing the given IP address.
-    let ip = ip_addr.to_string();
-    let mut cmd = Command::new("ip");
-    let child = cmd
-        .arg("route")
-        .arg("get")
-        .arg("to")
-        .arg(&ip)
-        .stdout(Stdio::piped())
-        .spawn()?;
+/// Returns an net interface index for a Ipv4 address, like `ip route get to`
+pub fn if_index_for_routing_ip(ip_addr: Ipv4Addr) -> Result<u32, Error> {
+    // run the linux command "ip route" to get the device's index responsible for
+    // routing the given Ipv4 address.
+    let mut socket = Socket::new(NETLINK_ROUTE).unwrap();
+    let _port_number = socket.bind_auto().unwrap().port_number();
+    socket.connect(&SocketAddr::new(0, 0)).unwrap();
 
-    // grab the output from the "ip route" command
-    let output = child.wait_with_output()?;
-    let stdout = from_utf8(output.stdout.as_slice())?;
+    let mut nl_hdr = NetlinkHeader::default();
+    nl_hdr.flags = NLM_F_REQUEST | NLM_F_DUMP_FILTERED;
 
-    // construct a regex to match the output
-    let mut regex_str = ip.clone();
-    regex_str.push_str(r" (via [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+ )?dev ([a-zA-Z0-9]+)\s+");
-    let re = Regex::new(&regex_str)?;
+    // construct RouteMessage
+    let route_header = RouteHeader {
+        address_family: AddressFamily::Inet,
+        flags: RouteFlags::LookupTable,
+        destination_prefix_length: 32,
+        table: RouteHeader::RT_TABLE_MAIN,
+        ..Default::default()
+    };
+    let route_attribute = RouteAttribute::Destination(RouteAddress::Inet(ip_addr));
+    let mut route_message = RouteMessage::default();
+    route_message.attributes = vec![route_attribute];
+    route_message.header = route_header;
 
-    // match on the output to find the network device responsible for routing
-    // the provided IP address.
-    let match_err = format!("no device found to route {}", ip);
-    let device = re
-        .captures(stdout)
-        .ok_or_else(|| Error::msg(match_err.clone()))?
-        .iter()
-        .last()
-        .ok_or_else(|| Error::msg(match_err.clone()))?
-        .ok_or_else(|| Error::msg(match_err))?
-        .as_str()
-        .to_owned();
+    let no_device_err: String = format!("no device found to route {}", ip_addr);
+    let con_packet_err: String = "construct packet failed".to_string();
+    let nl_send_msg_err: String = "netlink send message failed".to_string();
+    let nl_recv_msg_err: String = "netlink receive message failed".to_string();
 
-    Ok(device)
+    let mut packet = NetlinkMessage::new(
+        nl_hdr,
+        NetlinkPayload::from(RouteNetlinkMessage::GetRoute(route_message)),
+    );
+    packet.finalize();
+    let mut buf = vec![0; packet.header.length as usize];
+    // check packet
+    if buf.len() != packet.buffer_len() {
+        return Err(Error::msg(con_packet_err));
+    }
+    packet.serialize(&mut buf[..]);
+    socket
+        .send(&buf[..], 0)
+        .map_err(|_| Error::msg(nl_send_msg_err))?;
+
+    let mut receive_buffer = vec![0; 4096];
+    socket
+        .recv(&mut &mut receive_buffer[..], 0)
+        .map_err(|_| Error::msg(nl_recv_msg_err))?;
+
+    let bytes = &receive_buffer[..];
+
+    // extract returned RouteNetLinkMessage
+    let (_, payload) = <NetlinkMessage<RouteNetlinkMessage>>::deserialize(bytes)
+        .map_err(|_| Error::msg(no_device_err.clone()))?
+        .into_parts();
+    match payload {
+        NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewRoute(v)) => {
+            if let Some(RouteAttribute::Oif(idex_if)) = v
+                .attributes
+                .iter()
+                .find(|attr| matches!(attr, RouteAttribute::Oif(_)))
+            {
+                return Ok(*idex_if);
+            }
+            Err(Error::msg(no_device_err.clone()))
+        }
+
+        _ => Err(Error::msg(no_device_err)),
+    }
 }
