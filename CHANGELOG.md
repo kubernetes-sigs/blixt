@@ -2,12 +2,16 @@
 
 ## Table of Contents
 
+- [v0.3.0](#v030)
 - [v0.2.0](#v020)
 - [v0.1.0](#v010)
 
 ## Unreleased
 
-### Added
+- The Golang control-plane has been removed, and replaced by a control-plane
+  written in Rust using [kube-rs](https://github.com/kube-rs).
+
+## v0.3.0
 
 - A new test suite was added to run conformance tests. We now have initial
   support for running [Gateway API Conformance][gwconf] tests.
