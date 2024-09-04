@@ -100,7 +100,7 @@ impl Backends for BackendService {
         let ip_addr = std::net::Ipv4Addr::from(ip);
 
         let ifindex = match if_index_for_routing_ip(ip_addr) {
-            Ok(device) => device,
+            Ok(ifindex) => ifindex,
             Err(err) => return Err(Status::internal(err.to_string())),
         };
 

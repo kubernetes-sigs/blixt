@@ -15,19 +15,11 @@ use netlink_packet_route::{
 use netlink_sys::{protocols::NETLINK_ROUTE, Socket, SocketAddr};
 use std::net::Ipv4Addr;
 
-// pub fn if_nametoindex(ifname: String) -> Result<u32, Error> {
-//     let ifname_c = CString::new(ifname)?;
-//     let ifindex = unsafe { libc_if_nametoindex(ifname_c.into_raw()) };
-//     Ok(ifindex)
-// }
-
-/// Returns an net interface index for a Ipv4 address, like `ip route get to`
+/// Returns an network interface index for a Ipv4 address (like the command `ip route get to $IP`)
 pub fn if_index_for_routing_ip(ip_addr: Ipv4Addr) -> Result<u32, Error> {
-    // run the linux command "ip route" to get the device's index responsible for
-    // routing the given Ipv4 address.
-    let mut socket = Socket::new(NETLINK_ROUTE).unwrap();
-    let _port_number = socket.bind_auto().unwrap().port_number();
-    socket.connect(&SocketAddr::new(0, 0)).unwrap();
+    let mut socket = Socket::new(NETLINK_ROUTE)?;
+    let _port_number = socket.bind_auto()?.port_number();
+    socket.connect(&SocketAddr::new(0, 0))?;
 
     let mut nl_hdr = NetlinkHeader::default();
     nl_hdr.flags = NLM_F_REQUEST | NLM_F_DUMP_FILTERED;
@@ -45,10 +37,8 @@ pub fn if_index_for_routing_ip(ip_addr: Ipv4Addr) -> Result<u32, Error> {
     route_message.attributes = vec![route_attribute];
     route_message.header = route_header;
 
-    let no_device_err: String = format!("no device found to route {}", ip_addr);
-    let con_packet_err: String = "construct packet failed".to_string();
-    let nl_send_msg_err: String = "netlink send message failed".to_string();
-    let nl_recv_msg_err: String = "netlink receive message failed".to_string();
+    let no_ifindex_err = format!("no ifindex found to route {}", ip_addr);
+    let con_packet_err = "construct packet failed".to_string();
 
     let mut packet = NetlinkMessage::new(
         nl_hdr,
@@ -61,21 +51,15 @@ pub fn if_index_for_routing_ip(ip_addr: Ipv4Addr) -> Result<u32, Error> {
         return Err(Error::msg(con_packet_err));
     }
     packet.serialize(&mut buf[..]);
-    socket
-        .send(&buf[..], 0)
-        .map_err(|_| Error::msg(nl_send_msg_err))?;
+    socket.send(&buf[..], 0)?;
 
     let mut receive_buffer = vec![0; 4096];
-    socket
-        .recv(&mut &mut receive_buffer[..], 0)
-        .map_err(|_| Error::msg(nl_recv_msg_err))?;
+    socket.recv(&mut &mut receive_buffer[..], 0)?;
 
     let bytes = &receive_buffer[..];
 
     // extract returned RouteNetLinkMessage
-    let (_, payload) = <NetlinkMessage<RouteNetlinkMessage>>::deserialize(bytes)
-        .map_err(|_| Error::msg(no_device_err.clone()))?
-        .into_parts();
+    let (_, payload) = <NetlinkMessage<RouteNetlinkMessage>>::deserialize(bytes)?.into_parts();
     match payload {
         NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewRoute(v)) => {
             if let Some(RouteAttribute::Oif(idex_if)) = v
@@ -85,9 +69,9 @@ pub fn if_index_for_routing_ip(ip_addr: Ipv4Addr) -> Result<u32, Error> {
             {
                 return Ok(*idex_if);
             }
-            Err(Error::msg(no_device_err.clone()))
+            Err(Error::msg(no_ifindex_err.clone()))
         }
 
-        _ => Err(Error::msg(no_device_err)),
+        _ => Err(Error::msg(no_ifindex_err)),
     }
 }
