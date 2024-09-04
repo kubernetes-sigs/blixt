@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
 	"dataplane/api-server",
 	"dataplane/common",
@@ -15,7 +16,7 @@ repository = "https://github.com/kubernetes-sigs/blixt"
 version = "0.3.0"
 
 [workspace.dependencies]
-anyhow = { version = "1", default-features = false }
+anyhow = { version = "1", default-features = true }
 api-server = { version = "0.3.0", path = "./dataplane/api-server" }
 aya = { version = "0.12.0", default-features = false }
 aya-ebpf = { git = "https://github.com/aya-rs/aya", default-features = false }
