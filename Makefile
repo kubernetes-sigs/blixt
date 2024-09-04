@@ -267,7 +267,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 ##@ Build Dependencies
 
 ## Location to install dependencies to
-LOCALBIN ?= $(shell pwd)/bin
+LOCALBIN ?= $(shell pwd)/build/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
