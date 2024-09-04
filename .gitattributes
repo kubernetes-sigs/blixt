@@ -1,8 +1,4 @@
 bin/** linguist-detectable=false
 config/** linguist-detectable=false
-controllers/** linguist-detectable=false
-internal/** linguist-detectable=false
-pkg/** linguist-detectable=false
 test/** linguist-detectable=false
 tools/** linguist-detectable=false
-hack/** linguist-detectable=false
