@@ -38,12 +38,12 @@ jobs:
 
     - name: Build all rust crates (dataplane, test server) 
       run: |
-        make build.rust
+        make build
 
     - name: Check formatting
       run: |
-        make check.format.rust
+        make check.format
 
     - name: Check clippy
       run: |
-        make lint.rust
+        make lint
