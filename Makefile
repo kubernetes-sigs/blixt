@@ -4,9 +4,9 @@ BLIXT_DATAPLANE_IMAGE ?= ghcr.io/kubernetes-sigs/blixt-dataplane
 BLIXT_UDP_SERVER_IMAGE ?= ghcr.io/kubernetes-sigs/blixt-udp-test-server
 
 # Dockerfile paths for each service
-CONTROLPLANE_DOCKERFILE ?= Containerfile.controlplane
-DATAPLANE_DOCKERFILE ?= Containerfile.dataplane
-UDP_SERVER_DOCKERFILE ?= Containerfile.udp_server
+CONTROLPLANE_DOCKERFILE ?= build/Containerfile.controlplane
+DATAPLANE_DOCKERFILE ?= build/Containerfile.dataplane
+UDP_SERVER_DOCKERFILE ?= build/Containerfile.udp_server
 
 # Other testing variables
 EXISTING_CLUSTER ?=
