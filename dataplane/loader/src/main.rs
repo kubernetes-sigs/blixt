@@ -4,11 +4,11 @@ Copyright 2023 The Kubernetes Authors.
 SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 */
 
-use std::{net::Ipv4Addr, path::Path};
+use std::net::Ipv4Addr;
 
 use anyhow::Context;
 use api_server::start as start_api_server;
-use aya::maps::{HashMap, Map, MapData};
+use aya::maps::HashMap;
 use aya::programs::{tc, SchedClassifier, TcAttachType};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
@@ -26,42 +26,8 @@ struct Opt {
 async fn main() -> Result<(), anyhow::Error> {
     let opt = Opt::parse();
 
-    // TODO(astoycos) Let's determine a better way to let processes know bpfd is up and running,
-    // Maybe if we're not running as a privileged deployment ALWAYS wait for bpfd?.
-    std::thread::sleep(std::time::Duration::from_secs(5));
     env_logger::init();
 
-    // If bpfd loaded the programs just load the maps.
-    let bpfd_maps = Path::new("/run/bpfd/fs/maps");
-
-    if bpfd_maps.exists() {
-        info!("programs loaded via bpfd");
-        let backends: HashMap<_, BackendKey, BackendList> = Map::HashMap(
-            MapData::from_pin(bpfd_maps.join("BACKENDS")).expect("no maps named BACKENDS"),
-        )
-        .try_into()?;
-
-        let gateway_indexes: HashMap<_, BackendKey, u16> = Map::HashMap(
-            MapData::from_pin(bpfd_maps.join("GATEWAY_INDEXES"))
-                .expect("no maps named GATEWAY_INDEXES"),
-        )
-        .try_into()?;
-        let tcp_conns: HashMap<_, ClientKey, LoadBalancerMapping> = Map::HashMap(
-            MapData::from_pin(bpfd_maps.join("LB_CONNECTIONS"))
-                .expect("no maps named LB_CONNECTIONS"),
-        )
-        .try_into()?;
-
-        info!("starting api server");
-        start_api_server(
-            Ipv4Addr::new(0, 0, 0, 0),
-            9874,
-            backends,
-            gateway_indexes,
-            tcp_conns,
-        )
-        .await?;
-    } else {
         info!("loading ebpf programs");
 
         #[cfg(debug_assertions)]
@@ -115,7 +81,6 @@ async fn main() -> Result<(), anyhow::Error> {
             tcp_conns,
         )
         .await?;
-    }
 
     info!("Exiting...");
 

@@ -55,20 +55,13 @@ var (
 	useExistingCluster   = func() bool { return os.Getenv("BLIX_USE_EXISTING_KIND_CLUSTER") == "true" }()
 	keepTestCluster      = func() bool { return os.Getenv("BLIXT_TEST_KEEP_CLUSTER") == "true" || useExistingCluster }()
 	keepKustomizeDeploys = func() bool { return os.Getenv("BLIXT_TEST_KEEP_KUSTOMIZE_DEPLOYS") == "true" }()
-	blixtUseBpfd         = func() bool { return os.Getenv("BLIXT_USE_BPFD") == "true" && useExistingCluster }()
 
 	mainCleanupKey = "main"
 )
 
 const (
 	gwCRDsKustomize          = "https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.8.1"
-	testKustomizeBpfdInstall = "../../config/bpfd-install"
 	testKustomize            = "../../config/tests/integration"
-	testKustomizeBpfd        = "../../config/tests/integration-bpfd"
-	bpfdNs                   = "bpfd"
-	bpfdConfigName           = "bpfd-config"
-	bpfdOperatorName         = "bpfd-operator"
-	bpfdDsName               = "bpfd-daemon"
 )
 
 func TestMain(m *testing.M) {
@@ -128,23 +121,6 @@ func TestMain(m *testing.M) {
 	gwclient, err = versioned.NewForConfig(env.Cluster().Config())
 	exitOnErr(err)
 
-	if blixtUseBpfd {
-		// deploy bpfd for blixt
-		fmt.Println("INFO: deploying bpfd")
-		exitOnErr(clusters.KustomizeDeployForCluster(ctx, env.Cluster(), testKustomizeBpfdInstall))
-		if !keepKustomizeDeploys {
-			addCleanup(mainCleanupKey, func(context.Context) error {
-				cleanupLog("delete bpfd configmap to cleanup bpfd daemon")
-				env.Cluster().Client().CoreV1().ConfigMaps(bpfdNs).Delete(ctx, bpfdConfigName, metav1.DeleteOptions{})
-				waitForBpfdConfigDelete(ctx, env)
-				cleanupLog("deleting bpfd namespace")
-				return env.Cluster().Client().CoreV1().Namespaces().Delete(ctx, bpfdNs, metav1.DeleteOptions{})
-			})
-		}
-
-		exitOnErr(waitForBpfdReadiness(ctx, env))
-	}
-
 	// deploy the Gateway API CRDs
 	fmt.Println("INFO: deploying Gateway API CRDs")
 	exitOnErr(clusters.KustomizeDeployForCluster(ctx, env.Cluster(), gwCRDsKustomize))
@@ -155,28 +131,15 @@ func TestMain(m *testing.M) {
 		})
 	}
 
-	if blixtUseBpfd {
-		// deploy the blixt controlplane and dataplane, rbac permissions, e.t.c.
-		// this is what the tests will actually run against.
-		fmt.Println("INFO: deploying blixt via config/test-bpfd kustomize")
-		exitOnErr(clusters.KustomizeDeployForCluster(ctx, env.Cluster(), testKustomizeBpfd))
-		if !keepKustomizeDeploys {
-			addCleanup(mainCleanupKey, func(context.Context) error {
-				cleanupLog("cleaning up blixt via config/test kustomize")
-				return clusters.KustomizeDeleteForCluster(ctx, env.Cluster(), testKustomizeBpfd)
-			})
-		}
-	} else {
-		// deploy the blixt controlplane and dataplane, rbac permissions, e.t.c.
-		// this is what the tests will actually run against.
-		fmt.Println("INFO: deploying blixt via config/test kustomize")
-		exitOnErr(clusters.KustomizeDeployForCluster(ctx, env.Cluster(), testKustomize))
-		if !keepKustomizeDeploys {
-			addCleanup(mainCleanupKey, func(context.Context) error {
-				cleanupLog("cleaning up blixt via config/test kustomize")
-				return clusters.KustomizeDeleteForCluster(ctx, env.Cluster(), testKustomize)
-			})
-		}
+	// deploy the blixt controlplane and dataplane, rbac permissions, e.t.c.
+	// this is what the tests will actually run against.
+	fmt.Println("INFO: deploying blixt via config/test kustomize")
+	exitOnErr(clusters.KustomizeDeployForCluster(ctx, env.Cluster(), testKustomize))
+	if !keepKustomizeDeploys {
+		addCleanup(mainCleanupKey, func(context.Context) error {
+			cleanupLog("cleaning up blixt via config/test kustomize")
+			return clusters.KustomizeDeleteForCluster(ctx, env.Cluster(), testKustomize)
+		})
 	}
 
 	fmt.Println("INFO: waiting for Blixt component readiness")
@@ -243,75 +206,6 @@ func runCleanup(cleanupKey string) (cleanupErr error) {
 	}
 	delete(cleanup, cleanupKey)
 	return
-}
-
-func waitForBpfdReadiness(ctx context.Context, env environments.Environment) error {
-	for {
-		time.Sleep(2 * time.Second)
-		select {
-		case <-ctx.Done():
-			if err := ctx.Err(); err != nil {
-				return fmt.Errorf("context completed while waiting for components: %w", err)
-			}
-			return fmt.Errorf("context completed while waiting for components")
-		default:
-			fmt.Println("INFO: waiting for bpfd")
-			var controlplaneReady, dataplaneReady bool
-
-			controlplane, err := env.Cluster().Client().AppsV1().Deployments(bpfdNs).Get(ctx, bpfdOperatorName, metav1.GetOptions{})
-			if err != nil {
-				if errors.IsNotFound(err) {
-					fmt.Println("INFO: bpfd-operator dep not found yet")
-					continue
-				}
-				return err
-			}
-			if controlplane.Status.AvailableReplicas > 0 {
-				controlplaneReady = true
-			}
-
-			dataplane, err := env.Cluster().Client().AppsV1().DaemonSets(bpfdNs).Get(ctx, bpfdDsName, metav1.GetOptions{})
-			if err != nil {
-				if errors.IsNotFound(err) {
-					fmt.Println("INFO: bpfd daemon not found yet")
-					continue
-				}
-				return err
-			}
-			if dataplane.Status.NumberAvailable > 0 {
-				dataplaneReady = true
-			}
-
-			if controlplaneReady && dataplaneReady {
-				fmt.Println("INFO: bpfd-operator is ready")
-				return nil
-			}
-		}
-	}
-}
-
-func waitForBpfdConfigDelete(ctx context.Context, env environments.Environment) error {
-	for {
-		time.Sleep(2 * time.Second)
-		select {
-		case <-ctx.Done():
-			if err := ctx.Err(); err != nil {
-				return fmt.Errorf("context completed while waiting for components: %w", err)
-			}
-			return fmt.Errorf("context completed while waiting for components")
-		default:
-			fmt.Println("INFO: waiting for bpfd config deletion")
-
-			_, err := env.Cluster().Client().CoreV1().ConfigMaps(bpfdNs).Get(ctx, bpfdConfigName, metav1.GetOptions{})
-			if err != nil {
-				if errors.IsNotFound(err) {
-					fmt.Println("INFO: bpfd configmap deleted successfully")
-					return nil
-				}
-				return err
-			}
-		}
-	}
 }
 
 func waitForDataplaneReadiness(ctx context.Context, env environments.Environment) error {
