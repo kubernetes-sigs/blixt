@@ -211,6 +211,10 @@ lint: ## Lint Rust code
 # Testing
 # ------------------------------------------------------------------------------
 
+.PHONY: test
+test: ## Run tests
+	cargo test -vv
+
 .PHONY: test.integration.deprecated
 test.integration.deprecated: ## Run the deprecated Golang integration tests
 	go clean -testcache
