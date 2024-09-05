@@ -47,3 +47,7 @@ jobs:
     - name: Check clippy
       run: |
         make lint
+
+    - name: Run Tests
+      run: |
+        make test
