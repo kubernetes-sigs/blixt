@@ -15,6 +15,7 @@ UDP_SERVER_DOCKERFILE ?= build/Containerfile.udp_server
 
 # Other testing variables
 EXISTING_CLUSTER ?=
+TEST_CERTS_PATH ?= test/integration/certs
 
 # Image URL to use all building/pushing image targets
 TAG ?= integration-tests
@@ -99,12 +100,15 @@ $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
 ## Tool Binaries
+CFSSL ?= $(LOCALBIN)/cfssl
+CFSSLJSON ?= $(LOCALBIN)/cfssljson
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 KIND ?= $(LOCALBIN)/kind
 KTF ?= $(LOCALBIN)/ktf
 
 ## Tool Versions
+CFSSL_VERSION ?= v1.6.5
 KUSTOMIZE_VERSION ?= v5.3.0
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
 KIND_VERSION ?= v0.22.0
@@ -114,6 +118,16 @@ KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/k
 # ------------------------------------------------------------------------------
 # Build Dependencies
 # ------------------------------------------------------------------------------
+
+.PHONY: cfssl
+cfssl: $(CFSSL) ## Download cfssl locally if necessary
+$(CFSSL): $(LOCALBIN)
+	test -s $(LOCALBIN)/cfssl ||  GOBIN=$(LOCALBIN) go install github.com/cloudflare/cfssl/cmd/cfssl@$(CFSSL_VERSION)
+
+.PHONY: cfssljson
+cfssljson: $(CFSSLJSON)
+$(CFSSLJSON): $(LOCALBIN)
+	test -s $(LOCALBIN)/cfssljson || GOBIN=$(LOCALBIN) go install github.com/cloudflare/cfssl/cmd/cfssljson@$(CFSSL_VERSION)
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -216,6 +230,36 @@ lint: ## Lint Rust code
 test: ## Run tests
 	cargo test -vv
 
+.PHONY: test.gencert
+test.gencert: cfssl cfssljson
+	$(CFSSL) gencert \
+		-initca $(TEST_CERTS_PATH)/ca-csr.json | $(CFSSLJSON) -bare ca
+	$(CFSSL) gencert \
+		-ca=ca.pem \
+		-ca-key=ca-key.pem \
+		-config=$(TEST_CERTS_PATH)/ca-config.json \
+		-profile=server \
+		$(TEST_CERTS_PATH)/server-csr.json | $(CFSSLJSON) -bare server
+	$(CFSSL) gencert \
+		-ca=ca.pem \
+		-ca-key=ca-key.pem \
+		-config=$(TEST_CERTS_PATH)/ca-config.json \
+		-profile=clinet \
+		$(TEST_CERTS_PATH)/client-csr.json | $(CFSSLJSON) -bare client
+	mv *.pem *.csr $(TEST_CERTS_PATH)
+
+.PHONY: test.rmcert
+test.rmcert:
+	rm $(TEST_CERTS_PATH)/{*.pem,*.csr}
+
+.PHONY: test.dataplane.integration
+test.dataplane.integration: test.gencert
+	go clean -testcache
+	TEST_CERTS_PATH=$(TEST_CERTS_PATH) \
+	BLIXT_DATAPLANE_IMAGE=$(BLIXT_DATAPLANE_IMAGE):$(TAG) \
+	GOFLAGS="-tags=dataplane_tests" go test -race -v ./test/integration/...
+	$(MAKE) test.rmcert
+	
 .PHONY: test.integration.deprecated
 test.integration.deprecated: ## Run the deprecated Golang integration tests
 	go clean -testcache
