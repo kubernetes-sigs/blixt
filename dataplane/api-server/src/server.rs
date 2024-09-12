@@ -14,7 +14,7 @@ use tonic::{Request, Response, Status};
 
 use crate::backends::backends_server::Backends;
 use crate::backends::{Confirmation, InterfaceIndexConfirmation, PodIp, Targets, Vip};
-use crate::netutils::{if_name_for_routing_ip, if_nametoindex};
+use crate::netutils::if_index_for_routing_ip;
 use common::{
     Backend, BackendKey, BackendList, ClientKey, LoadBalancerMapping, BACKENDS_ARRAY_CAPACITY,
 };
@@ -99,12 +99,7 @@ impl Backends for BackendService {
         let ip = pod.ip;
         let ip_addr = std::net::Ipv4Addr::from(ip);
 
-        let device = match if_name_for_routing_ip(ip_addr) {
-            Ok(device) => device,
-            Err(err) => return Err(Status::internal(err.to_string())),
-        };
-
-        let ifindex = match if_nametoindex(device) {
+        let ifindex = match if_index_for_routing_ip(ip_addr) {
             Ok(ifindex) => ifindex,
             Err(err) => return Err(Status::internal(err.to_string())),
         };
@@ -134,17 +129,7 @@ impl Backends for BackendService {
                 Some(ifindex) => ifindex,
                 None => {
                     let ip_addr = Ipv4Addr::from(backend_target.daddr);
-                    let ifname = match if_name_for_routing_ip(ip_addr) {
-                        Ok(ifname) => ifname,
-                        Err(err) => {
-                            return Err(Status::internal(format!(
-                                "failed to determine ifname: {}",
-                                err
-                            )))
-                        }
-                    };
-
-                    match if_nametoindex(ifname) {
+                    match if_index_for_routing_ip(ip_addr) {
                         Ok(ifindex) => ifindex,
                         Err(err) => {
                             return Err(Status::internal(format!(
