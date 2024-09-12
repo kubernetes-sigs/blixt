@@ -5,9 +5,7 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 */
 
 use anyhow::Error;
-use netlink_packet_core::{
-    NetlinkHeader, NetlinkMessage, NetlinkPayload, NLM_F_DUMP_FILTERED, NLM_F_REQUEST,
-};
+use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NetlinkPayload, NLM_F_REQUEST};
 use netlink_packet_route::{
     route::{RouteAddress, RouteAttribute, RouteFlags, RouteHeader, RouteMessage},
     AddressFamily, RouteNetlinkMessage,
@@ -15,14 +13,18 @@ use netlink_packet_route::{
 use netlink_sys::{protocols::NETLINK_ROUTE, Socket, SocketAddr};
 use std::net::Ipv4Addr;
 
+const ERR_NO_IFINDEX: &str = "no ifindex found to route";
+const ERR_PACKET_CONSTRUCTION: &str = "construct packet failed";
+
 /// Returns an network interface index for a Ipv4 address (like the command `ip route get to $IP`)
 pub fn if_index_for_routing_ip(ip_addr: Ipv4Addr) -> Result<u32, Error> {
-    let mut socket = Socket::new(NETLINK_ROUTE)?;
-    let _port_number = socket.bind_auto()?.port_number();
+    let socket = Socket::new(NETLINK_ROUTE)?;
     socket.connect(&SocketAddr::new(0, 0))?;
 
     let mut nl_hdr = NetlinkHeader::default();
-    nl_hdr.flags = NLM_F_REQUEST | NLM_F_DUMP_FILTERED;
+
+    // NNLM_F_REQUEST: Must be set on all request messages
+    nl_hdr.flags = NLM_F_REQUEST;
 
     // construct RouteMessage
     let route_header = RouteHeader {
@@ -37,9 +39,7 @@ pub fn if_index_for_routing_ip(ip_addr: Ipv4Addr) -> Result<u32, Error> {
     route_message.attributes = vec![route_attribute];
     route_message.header = route_header;
 
-    let no_ifindex_err = format!("no ifindex found to route {}", ip_addr);
-    let con_packet_err = "construct packet failed".to_string();
-
+    // construct a message packet for netlink and serialize it to send it over the socket
     let mut packet = NetlinkMessage::new(
         nl_hdr,
         NetlinkPayload::from(RouteNetlinkMessage::GetRoute(route_message)),
@@ -48,30 +48,29 @@ pub fn if_index_for_routing_ip(ip_addr: Ipv4Addr) -> Result<u32, Error> {
     let mut buf = vec![0; packet.header.length as usize];
     // check packet
     if buf.len() != packet.buffer_len() {
-        return Err(Error::msg(con_packet_err));
+        return Err(Error::msg(ERR_PACKET_CONSTRUCTION));
     }
     packet.serialize(&mut buf[..]);
+
+    // send the serialized netlink message packet over the socket
     socket.send(&buf[..], 0)?;
 
-    let mut receive_buffer = vec![0; 4096];
-    socket.recv(&mut &mut receive_buffer[..], 0)?;
-
-    let bytes = &receive_buffer[..];
+    // read all returned messages at once
+    let (raw_netlink_message, _) = socket.recv_from_full()?;
+    let recv_route_message =
+        <NetlinkMessage<RouteNetlinkMessage>>::deserialize(&raw_netlink_message)?;
 
     // extract returned RouteNetLinkMessage
-    let (_, payload) = <NetlinkMessage<RouteNetlinkMessage>>::deserialize(bytes)?.into_parts();
-    match payload {
-        NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewRoute(v)) => {
-            if let Some(RouteAttribute::Oif(idex_if)) = v
-                .attributes
-                .iter()
-                .find(|attr| matches!(attr, RouteAttribute::Oif(_)))
-            {
-                return Ok(*idex_if);
-            }
-            Err(Error::msg(no_ifindex_err.clone()))
+    if let NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewRoute(message)) =
+        recv_route_message.payload
+    {
+        if let Some(RouteAttribute::Oif(idex_if)) = message
+            .attributes
+            .iter()
+            .find(|attr| matches!(attr, RouteAttribute::Oif(_)))
+        {
+            return Ok(*idex_if);
         }
-
-        _ => Err(Error::msg(no_ifindex_err)),
     }
+    Err(Error::msg(format!("{} {}", ERR_NO_IFINDEX, ip_addr)))
 }
