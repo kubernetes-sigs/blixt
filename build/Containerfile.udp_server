@@ -1,4 +1,4 @@
-FROM rust as builder
+FROM rust AS builder
 
 RUN apt-get update && \
     apt-get install musl-tools -yq && \
@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/workspace/target/ \
 
 FROM alpine
 
-LABEL org.opencontainers.image.source https://github.com/kubernetes-sigs/blixt
+LABEL org.opencontainers.image.source=https://github.com/kubernetes-sigs/blixt
 
 WORKDIR /
 

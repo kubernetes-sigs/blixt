@@ -3,9 +3,10 @@
 # ------------------------------------------------------------------------------
 
 # IMAGES used when running tests.
-BLIXT_CONTROLPLANE_IMAGE ?= ghcr.io/kubernetes-sigs/blixt-controlplane
-BLIXT_DATAPLANE_IMAGE ?= ghcr.io/kubernetes-sigs/blixt-dataplane
-BLIXT_UDP_SERVER_IMAGE ?= ghcr.io/kubernetes-sigs/blixt-udp-test-server
+REGISTRY ?= ghcr.io/kubernetes-sigs
+BLIXT_CONTROLPLANE_IMAGE ?= $(REGISTRY)/blixt-controlplane
+BLIXT_DATAPLANE_IMAGE ?= $(REGISTRY)/blixt-dataplane
+BLIXT_UDP_SERVER_IMAGE ?= $(REGISTRY)/blixt-udp-test-server
 
 # Dockerfile paths for each service
 CONTROLPLANE_DOCKERFILE ?= build/Containerfile.controlplane
