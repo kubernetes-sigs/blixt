@@ -17,7 +17,7 @@ EXISTING_CLUSTER ?=
 
 # Image URL to use all building/pushing image targets
 TAG ?= integration-tests
-ifeq ($(shell uname -m),arm64)
+ifeq ($(shell uname -m),$(filter $(shell uname -m),arm64 aarch64))
 BUILD_PLATFORMS ?= linux/arm64
 else
 BUILD_PLATFORMS ?= linux/amd64
