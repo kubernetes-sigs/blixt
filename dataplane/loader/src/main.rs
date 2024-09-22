@@ -7,7 +7,7 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 use std::net::Ipv4Addr;
 
 use anyhow::Context;
-use api_server::config::GrpcConfig;
+use api_server::config::TLSConfig;
 use api_server::start as start_api_server;
 use aya::maps::HashMap;
 use aya::programs::{tc, SchedClassifier, TcAttachType};
@@ -22,7 +22,7 @@ struct Opt {
     #[clap(short, long, default_value = "lo")]
     iface: String,
     #[clap(flatten)]
-    tls_config: GrpcConfig,
+    tls_config: TLSConfig,
 }
 
 #[tokio::main]
