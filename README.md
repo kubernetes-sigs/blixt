@@ -32,12 +32,12 @@ not have end-users** and is a safe place to learn, break stuff and have fun!
 
 Current project goals are the following:
 
-- [ ] support [Gateway]/[GatewayClass] (partially complete)
-- [ ] support [UDPRoute] (partially complete)
-- [ ] support [TCPRoute] (partially complete)
+- [ ] support the [Kubernetes Service API][svc] (upcoming)
+- [ ] support [Gateway]/[GatewayClass] + [UDPRoute] / [TCPRoute] (in progress, partially complete)
 
 After these goals are achieved, further goals may be decided.
 
+[svc]:https://kubernetes.io/docs/concepts/services-networking/service/
 [Gateway]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.Gateway
 [GatewayClass]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.GatewayClass
 [UDPRoute]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.UDPRoute
