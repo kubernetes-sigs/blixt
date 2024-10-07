@@ -8,6 +8,7 @@ version.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 aya = { workspace = true, features = ["async_tokio"] }
+clap = { workspace = true, features = ["derive"] }
 common = { workspace = true, features = ["user"] }
 libc = { workspace = true }
 log = { workspace = true }
@@ -27,3 +28,7 @@ tonic-health = { workspace = true }
 
 [build-dependencies]
 tonic-build = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.3.0"
+rcgen = "0.9.3"
