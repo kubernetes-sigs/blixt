@@ -1,5 +1,5 @@
 use anyhow::Result;
-use api_server::config::TLSConfig;
+use api_server::config::{MutualTLSConfig, ServerOnlyTLSConfig, TLSConfig};
 use api_server::setup_tls;
 use rcgen::{generate_simple_self_signed, Certificate, CertificateParams};
 use std::fs;
@@ -25,13 +25,10 @@ async fn test_tls_self_signed_cert() -> Result<()> {
     fs::write(&key_path, key_pem.as_bytes())?;
 
     // Set up a TLS config with paths to the cert and key
-    let tls_config = TLSConfig {
-        enable_tls: true,
-        enable_mtls: false,
-        server_certificate_path: Some(cert_path.clone()),
-        server_private_key_path: Some(key_path.clone()),
-        client_certificate_authority_root_path: None,
-    };
+    let tls_config = Some(TLSConfig::TLS(ServerOnlyTLSConfig {
+        server_certificate_path: cert_path.clone(),
+        server_private_key_path: key_path.clone(),
+    }));
 
     // Prepare a dummy server builder
     let builder = Server::builder();
@@ -71,13 +68,11 @@ async fn test_mtls_self_signed_cert() -> Result<()> {
     fs::write(&ca_cert_path, ca_cert_pem.as_bytes())?;
 
     // Set up a TLS config with paths to the cert and key
-    let tls_config = TLSConfig {
-        enable_tls: true,
-        enable_mtls: false,
-        server_certificate_path: Some(cert_path.clone()),
-        server_private_key_path: Some(key_path.clone()),
-        client_certificate_authority_root_path: Some(ca_cert_path.clone()),
-    };
+    let tls_config = Some(TLSConfig::MutualTLS(MutualTLSConfig {
+        server_certificate_path: cert_path.clone(),
+        server_private_key_path: key_path.clone(),
+        client_certificate_authority_root_path: ca_cert_path.clone(),
+    }));
 
     // Prepare a dummy server builder
     let builder = Server::builder();
