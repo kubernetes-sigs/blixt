@@ -30,6 +30,7 @@ COPY dataplane dataplane
 COPY tools/udp-test-server tools/udp-test-server
 COPY xtask xtask
 COPY Cargo.toml Cargo.toml
+COPY Cargo.lock Cargo.lock
 COPY .cargo .cargo
 
 # We need to tell bpf-linker where it can find LLVM's shared library file.
