@@ -1,8 +1,9 @@
 FROM rust AS builder
 
+ARG TARGETARCH
+
 RUN apt-get update && \
-    apt-get install musl-tools -yq && \
-    rustup target add x86_64-unknown-linux-musl
+    apt-get install musl-tools -yq
 
 WORKDIR /workspace
 
@@ -13,15 +14,24 @@ COPY tools/udp-test-server/Cargo.lock tools/udp-test-server/Cargo.lock
 COPY tools/udp-test-server/src/main.rs tools/udp-test-server/src/main.rs
 COPY xtask xtask
 
+# Docker uses the amd64/arm64 convention while Rust uses the x86_64/aarch64 convention.
+# Since Dockerfile doesn't support conditional variables (sigh), write the arch in Rust's
+# convention to a file for later usage.
+RUN if [ "$TARGETARCH" = "amd64" ]; \
+    then echo "x86_64" >> arch; \
+    else echo "aarch64" >> arch; \
+    fi
+RUN rustup target add $(eval cat arch)-unknown-linux-musl
+
 RUN --mount=type=cache,target=/workspace/target/ \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
     RUSTFLAGS=-Ctarget-feature=+crt-static cargo build \
     --package=udp-test-server \
     --release \
-    --target=x86_64-unknown-linux-musl
+    --target=$(eval cat arch)-unknown-linux-musl
 
 RUN --mount=type=cache,target=/workspace/target/ \
-    cp /workspace/target/x86_64-unknown-linux-musl/release/udp-test-server /workspace/udp-test-server
+    cp /workspace/target/$(eval cat arch)-unknown-linux-musl/release/udp-test-server /workspace/udp-test-server
 
 FROM alpine
 

@@ -18,9 +18,9 @@ version = "0.3.0"
 [workspace.dependencies]
 anyhow = { version = "1", default-features = true }
 api-server = { version = "0.3.0", path = "./dataplane/api-server" }
-aya = { version = "0.12.0", default-features = false }
+aya = { version = "0.13.0", default-features = false }
 aya-ebpf = { git = "https://github.com/aya-rs/aya", default-features = false }
-aya-log = { version = "0.2.0", default-features = false }
+aya-log = { version = "0.2.1", default-features = false }
 aya-log-ebpf = { git = "https://github.com/aya-rs/aya", default-features = false }
 clap = { version = "4.5", default-features = true }
 common = { version = "0.3.0", path = "./dataplane/common" }

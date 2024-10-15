@@ -51,3 +51,25 @@ jobs:
     - name: Run Tests
       run: |
         make test
+  docker-build:
+    name: docker-build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3.2.0
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
+        with:
+          buildkitd-flags: "--debug"
+      - name: Build multi-arch container image
+        uses: docker/build-push-action@5cd11c3a4ced054e52742c5fd54dca954e0edd85 # v6.7.0
+        with:
+          push: false
+          builder: ${{ steps.buildx.outputs.name }}
+          context: .
+          platforms: linux/amd64,linux/arm64
+          file: build/Containerfile.dataplane
+          tags: kong/blixt-dataplane:${{ github.head_ref }}-${{ github.sha }}
