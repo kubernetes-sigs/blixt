@@ -7,6 +7,7 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 use std::net::Ipv4Addr;
 
 use anyhow::Context;
+use api_server::config::TLSConfig;
 use api_server::start as start_api_server;
 use aya::maps::HashMap;
 use aya::programs::{tc, SchedClassifier, TcAttachType};
@@ -16,12 +17,51 @@ use clap::Parser;
 use common::{BackendKey, BackendList, ClientKey, LoadBalancerMapping};
 use log::{info, warn};
 
+/// Command-line options for the application.
+///
+/// This struct defines the options available for the command-line interface,
+/// including an interface name (`iface`) and an optional TLS configuration (`tls_config`).
 #[derive(Debug, Parser)]
 struct Opt {
+    /// Name of the network interface to attach the eBPF programs to.
+    ///
+    /// By default, this is set to `"lo"` (the loopback interface).
     #[clap(short, long, default_value = "lo")]
     iface: String,
+    /// Optional TLS configuration for securing the API server.
+    ///
+    /// If no TLS configuration is provided, the server will start without TLS.
+    /// You can specify either `tls` for server-only TLS or `mutual-tls` for mutual TLS.
+    #[clap(subcommand)]
+    tls_config: Option<TLSConfig>,
 }
 
+/// Main function for the application.
+///
+/// This function sets up and runs eBPF programs on the specified network interface
+/// and optionally configures TLS for the API server.
+///
+/// The program supports an optional TLS configuration, allowing the user to choose between:
+/// - `tls`: Server-only TLS.
+/// - `mutual-tls`: Mutual TLS, where both server and client authenticate with certificates.
+///
+/// # Arguments
+///
+/// - `iface`: The network interface to attach the eBPF programs to.
+/// - `tls_config`: Optional subcommand to configure TLS for the API server.
+///
+/// # Example
+///
+/// ```bash
+/// # Running with default interface and no TLS config:
+/// $ dataplane
+///
+/// # Running with a specified interface and server-only TLS config:
+/// $ dataplane --iface eth0 tls --server-certificate-path /path/to/cert --server-private-key-path /path/to/key
+///
+/// # Running with mutual TLS config:
+/// $ dataplane --iface eth0 mutual-tls --server-certificate-path /path/to/cert --server-private-key-path /path/to/key --client-certificate-authority-root-path /path/to/ca
+/// ```
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let opt = Opt::parse();
@@ -62,6 +102,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .context("failed to attach the egress TC program")?;
 
     info!("starting api server");
+    info!("Using tls config: {:?}", &opt.tls_config);
     let backends: HashMap<_, BackendKey, BackendList> = HashMap::try_from(
         bpf_program
             .take_map("BACKENDS")
@@ -84,6 +125,7 @@ async fn main() -> Result<(), anyhow::Error> {
         backends,
         gateway_indexes,
         tcp_conns,
+        opt.tls_config,
     )
     .await?;
 
