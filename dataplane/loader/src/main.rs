@@ -35,7 +35,7 @@ async fn main() -> Result<(), anyhow::Error> {
         "../../target/bpfel-unknown-none/debug/loader"
     ))?;
     #[cfg(not(debug_assertions))]
-    let mut bpf = Ebpf::load(include_bytes_aligned!(
+    let mut bpf_program = Ebpf::load(include_bytes_aligned!(
         "../../target/bpfel-unknown-none/release/loader"
     ))?;
     if let Err(e) = EbpfLogger::init(&mut bpf_program) {
