@@ -44,19 +44,6 @@ var (
 
 // TestGRPCClient tests the gRPC client against a running Docker container.
 func TestGRPCClient(t *testing.T) {
-	// Step 1: Get the image name from the environment
-	imageName := os.Getenv("BLIXT_DATAPLANE_IMAGE")
-	if imageName == "" {
-		t.Fatal("Environment variable BLIXT_DATAPLANE_IMAGE must be set")
-	}
-
-	// Step 2: Build and run the Docker image
-	containerName := "test_dataplane"
-	if err := runDockerImage(containerName, imageName); err != nil {
-		t.Fatalf("Failed to run Docker image: %v", err)
-	}
-	defer cleanupDockerImage(containerName)
-
 	// Step 3: Wait for the Docker container to be ready
 	if err := waitForContainer(containerName); err != nil {
 		t.Fatalf("Container did not start successfully: %v", err)
@@ -130,36 +117,6 @@ type TLSConfig struct {
 	Server        bool
 }
 
-// runCommand is a wrapper around exec.Command to provide more informative
-// errors back to the user
-func runCommand(command string) error {
-	cmd := exec.Command("sh", "-c", command)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Printf("Error executing command: %s\nOutput: %s\n", command, string(output))
-		return err
-	}
-	fmt.Printf("Command succeeded: %s\nOutput: %s\n", command, string(output))
-	return nil
-}
-
-// runDockerImage starts the Docker container with the specified name.
-func runDockerImage(containerName, imageName string) error {
-	cmd := exec.Command(
-		"docker",
-		"run",
-		"--name", containerName,
-		"-d",
-		"-p", "9874:9874",
-		"-v", os.Getenv("PWD")+"/certs:/app/certs",
-		imageName,
-		"mutual-tls",
-		"--server-certificate-path", "/app/certs/server.pem",
-		"--server-private-key-path", "/app/certs/server-key.pem",
-		"--client-certificate-authority-root-path", "/app/certs/root.pem",
-	)
-	return cmd.Run()
-}
 
 // waitForContainer waits until the specified Docker container is running.
 func waitForContainer(containerName string) error {

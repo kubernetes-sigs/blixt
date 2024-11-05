@@ -15,7 +15,7 @@ UDP_SERVER_DOCKERFILE ?= build/Containerfile.udp_server
 
 # Other testing variables
 EXISTING_CLUSTER ?=
-TEST_CERTS_PATH ?= test/integration/certs
+TEST_CERTS_PATH ?= config/tests/auth/certs
 
 # Image URL to use all building/pushing image targets
 TAG ?= integration-tests
@@ -317,8 +317,8 @@ load.image.controlplane: build.image.controlplane
 .PHONY: load.image.dataplane
 load.image.dataplane: build.image.dataplane
 	kubectl create namespace blixt-system || true && \
-	kind load docker-image $(BLIXT_DATAPLANE_IMAGE):$(TAG) --name $(KIND_CLUSTER) \
-		kubectl -n blixt-system rollout restart daemonset blixt-dataplane || true
+	kind load docker-image $(BLIXT_DATAPLANE_IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
+		kubectl -n blixt-system rollout restart daemonset dataplane || true
 
 .PHONY: load.all.images
 load.all.images: build.all.images
