@@ -6,3 +6,11 @@ resources:
 - ../../dataplane
 patches:
 - path: dataplane_mtls_patch.yaml
+configMapGenerator:
+  - name: mtls-certs
+    files:
+      - server.pem=certs/server.pem
+      - server-key.pem=certs/server-key.pem
+      - ca.pem=certs/ca.pem
+generatorOptions:
+  disableNameSuffixHash: true
