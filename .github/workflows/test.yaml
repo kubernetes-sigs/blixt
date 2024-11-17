@@ -53,7 +53,7 @@ jobs:
       - name: Generate Self-Signed Certs
         run: make test.gencert
 
-      - name: Load Dataplane into Cluster
+      - name: Create Dataplane in Cluster
         run: kubectl apply -k config/tests/auth
 
       - name: Waiting for dataplane to be ready
@@ -62,7 +62,9 @@ jobs:
           -n blixt-system \
           wait --for=condition=Ready pod \
           -l app=blixt,component=dataplane \
-          --timeout=120s
+          --timeout=120s || 
+          kubectl -n blixt-system logs -l app=blixt,component=dataplane ||
+          kubectl -n blixt-system describe pod -l app=blixt,component=dataplane
 
       - name: Forward gRPC Port
         run: kubectl -n blixt-system port-forward ds/dataplane 9874
