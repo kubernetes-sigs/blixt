@@ -57,7 +57,12 @@ jobs:
         run: kubectl apply -k config/tests/auth
 
       - name: Waiting for dataplane to be ready
-        run: kubectl -n system wait --for=condition=Ready pod -l app=blixt,component=dataplane --timeout=120s
+        run: |
+          kubectl \
+          -n blixt-system \
+          wait --for=condition=Ready pod \
+          -l app=blixt,component=dataplane \
+          --timeout=120s
 
       - name: Forward gRPC Port
         run: kubectl -n blixt-system port-forward ds/dataplane 9874
