@@ -12,7 +12,7 @@ spec:
         args:
         - "-i"
         - "eth0"
-        - "tls"
+        - "mutual-tls"
         - "--server-certificate-path"
         - "/app/certs/server.pem"
         - "--server-private-key-path"
@@ -23,6 +23,15 @@ spec:
             - name: mtls-certs
               mountPath: /app/certs
               readOnly: true
+        startupProbe:
+          grpc:
+            port: 9875
+        livenessProbe:
+          grpc:
+            port: 9875
+        readinessProbe:
+          grpc:
+            port: 9875
       volumes:
         - name: mtls-certs
           configMap:

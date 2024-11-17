@@ -253,9 +253,9 @@ test.rmcert:
 	rm $(TEST_CERTS_PATH)/{*.pem,*.csr}
 
 .PHONY: test.dataplane.integration
-test.dataplane.integration: test.gencert
+test.dataplane.integration:
 	go clean -testcache
-	TEST_CERTS_PATH=$(TEST_CERTS_PATH) \
+	TEST_CERTS_PATH=./$(TEST_CERTS_PATH) \
 	BLIXT_DATAPLANE_IMAGE=$(BLIXT_DATAPLANE_IMAGE):$(TAG) \
 	GOFLAGS="-tags=dataplane_tests" go test -race -v ./test/integration/...
 	$(MAKE) test.rmcert

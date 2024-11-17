@@ -24,10 +24,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -44,12 +42,14 @@ var (
 
 // TestGRPCClient tests the gRPC client against a running Docker container.
 func TestGRPCClient(t *testing.T) {
-	// Step 3: Wait for the Docker container to be ready
-	if err := waitForContainer(containerName); err != nil {
-		t.Fatalf("Container did not start successfully: %v", err)
+	// Get the current working directory
+	dir, err := os.Getwd()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
 	}
 
-	// Step 4: Load TLS config
+	fmt.Println("Current working directory:", dir)
 	clientTLSConfig, err := setupTLSConfig(TLSConfig{
 		CAFile:   CAFile,
 		CertFile: ClientCertFile,
@@ -57,7 +57,6 @@ func TestGRPCClient(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Step 5: Dial grpc to test hand-shake
 	clientCreds := credentials.NewTLS(clientTLSConfig)
 	conn, err := grpc.Dial("localhost:9874", grpc.WithTransportCredentials(clientCreds))
 	require.NoError(t, err)
@@ -66,9 +65,10 @@ func TestGRPCClient(t *testing.T) {
 
 // Helper functions
 func certFile(filename string) string {
-	return filepath.Join("certs", filename)
-	if dir := os.Getenv("TEST_CERTS_PATH"); dir != "" {
-		return filepath.Join(dir, filename)
+	wd, _ := os.Getwd()
+	projectDir := filepath.Clean(filepath.Join(wd, "..", ".."))
+	if certsDir := os.Getenv("TEST_CERTS_PATH"); certsDir != "" {
+		return filepath.Join(projectDir, certsDir, filename)
 	}
 	panic("Env var TEST_CERTS_PATH not found. Please specify path to mTLS test certs")
 }
@@ -115,25 +115,4 @@ type TLSConfig struct {
 	CAFile        string
 	ServerAddress string
 	Server        bool
-}
-
-
-// waitForContainer waits until the specified Docker container is running.
-func waitForContainer(containerName string) error {
-	for i := 0; i < 10; i++ { // Wait up to 10 seconds
-		cmd := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", containerName)
-		output, err := cmd.Output()
-		if err == nil && string(output) == "true\n" {
-			print(output)
-			return nil
-		}
-		time.Sleep(1 * time.Second)
-	}
-	return fmt.Errorf("container %s is not running", containerName)
-}
-
-// cleanupDockerImage removes the Docker container.
-func cleanupDockerImage(containerName string) {
-	cmd := exec.Command("docker", "rm", "-f", containerName)
-	cmd.Run()
 }

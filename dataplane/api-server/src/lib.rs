@@ -31,16 +31,38 @@ pub async fn start(
     tcp_conns_map: HashMap<MapData, ClientKey, LoadBalancerMapping>,
     tls_config: Option<TLSConfig>,
 ) -> Result<()> {
-    let (_, health_service) = tonic_health::server::health_reporter();
+    // Tonic itself doesn't provide a built-in mechanism for selectively
+    // applying TLS based on routes, as TLS configuration is tied to the
+    // entire server and managed at the transport layer, not at the
+    // application layer where routes are defined.
+    //
+    // Solution: separate gRPC services
+    //
+    // Public server without mTLS for healthchecks
+    let healthchecks = tokio::spawn(async move {
+        let (_, health_service) = tonic_health::server::health_reporter();
+        let mut server_builder = Server::builder();
+        server_builder
+            .add_service(health_service)
+            .serve(SocketAddrV4::new(addr, port + 1).into())
+            .await
+            .unwrap();
+    });
 
-    let server = server::BackendService::new(backends_map, gateway_indexes_map, tcp_conns_map);
-    let mut server_builder = Server::builder();
-    server_builder = setup_tls(server_builder, &tls_config)?;
-    server_builder
-        .add_service(health_service)
-        .add_service(BackendsServer::new(server))
-        .serve(SocketAddrV4::new(addr, port).into())
-        .await?;
+    // Secure server with (optional) mTLS
+    let backends = tokio::spawn(async move {
+        let server = server::BackendService::new(backends_map, gateway_indexes_map, tcp_conns_map);
+        let mut server_builder = Server::builder();
+        server_builder = setup_tls(server_builder, &tls_config).unwrap();
+        server_builder
+            .add_service(BackendsServer::new(server))
+            .serve(SocketAddrV4::new(addr, port).into())
+            .await
+            .unwrap();
+    });
+
+    tokio::try_join!(healthchecks, backends)?;
+
     Ok(())
 }
 
