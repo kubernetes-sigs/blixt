@@ -67,7 +67,7 @@ jobs:
           kubectl -n blixt-system describe pod -l app=blixt,component=dataplane
 
       - name: Forward gRPC Port
-        run: kubectl -n blixt-system port-forward ds/dataplane 9874
+        run: nohup kubectl -n blixt-system port-forward ds/dataplane 9874 &
 
       - name: Dataplane Integration Tests
         run: make test.dataplane.integration
