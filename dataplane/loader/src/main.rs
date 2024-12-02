@@ -12,7 +12,7 @@ use anyhow::Context;
 use api_server::start as start_api_server;
 use aya::maps::HashMap;
 use aya::programs::{tc, SchedClassifier, TcAttachType};
-use aya::{include_bytes_aligned, Ebpf};
+use aya::Ebpf;
 use aya_log::EbpfLogger;
 use clap::Parser;
 use common::{BackendKey, BackendList, ClientKey, LoadBalancerMapping};
