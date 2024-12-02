@@ -32,15 +32,19 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("loading ebpf programs");
 
-    let mut bpf_program = if cfg!(debug_assertion) {
+    let mut bpf_program = if cfg!(debug_assertions) {
         let path = "../../target/bpfel-unknown-none/debug/loader";
-        let bytes = fs::read(Path::new(path));
-        Ebpf::load(&bytes);
+        let bytes = fs::read(Path::new(path)).expect("Failed to read debug loader");
+        Ebpf::load(&bytes).expect("Failed to load eBPF program")
     } else {
         let path = "../../target/bpfel-unknown-none/release/loader";
-        let bytes = fs::read(Path::new(path));
-        Ebpf::load(&byte);
+        let bytes = fs::read(Path::new(path)).expect("Failed to read release loader");
+        Ebpf::load(&bytes).expect("Failed to load eBPF program")
     };
+    
+    if let Err(e) = EbpfLogger::init(&mut bpf_program) {
+        warn!("failed to initialize eBPF logger: {}", e);
+    }
 
     info!("attaching tc_ingress program to {}", &opt.iface);
 
