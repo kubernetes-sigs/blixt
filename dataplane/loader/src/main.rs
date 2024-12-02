@@ -4,6 +4,7 @@ Copyright 2023 The Kubernetes Authors.
 SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 */
 
+use std::fs;
 use std::net::Ipv4Addr;
 
 use anyhow::Context;
@@ -30,14 +31,14 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("loading ebpf programs");
 
+    let path = "../../target/bpfel-unknown-none/debug/loader";
+    let bytes = fs::read(path);
+
     #[cfg(debug_assertions)]
-    let mut bpf_program = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/debug/loader"
-    ))?;
+    let mut bpf_program = Ebpf::load(&bytes)?;
+    
     #[cfg(not(debug_assertions))]
-    let mut bpf = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/loader"
-    ))?;
+    let mut bpf = Ebpf::load(&bytes)?;
     if let Err(e) = EbpfLogger::init(&mut bpf_program) {
         warn!("failed to initialize eBPF logger: {}", e);
     }
