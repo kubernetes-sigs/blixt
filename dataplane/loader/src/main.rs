@@ -32,15 +32,14 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("loading ebpf programs");
 
-    let mut bpf_program = if cfg!(debug_assertions) {
-        let path = "../../target/bpfel-unknown-none/debug/loader";
-        let bytes = fs::read(Path::new(path)).expect("Failed to read debug loader");
-        Ebpf::load(&bytes).expect("Failed to load eBPF program")
+    let path = if cfg!(debug_assertions) {
+        "../../target/bpfel-unknown-none/debug/loader"
     } else {
-        let path = "../../target/bpfel-unknown-none/release/loader";
-        let bytes = fs::read(Path::new(path)).expect("Failed to read release loader");
-        Ebpf::load(&bytes).expect("Failed to load eBPF program")
+        "../../target/bpfel-unknown-none/release/loader"
     };
+
+    let bytes = fs::read(Path::new(path))?;
+    let mut bpf_program = Ebpf::load(&bytes)?;
     
     if let Err(e) = EbpfLogger::init(&mut bpf_program) {
         warn!("failed to initialize eBPF logger: {}", e);
