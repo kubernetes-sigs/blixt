@@ -1,30 +1,30 @@
 ![blixt](https://github.com/kubernetes-sigs/blixt/assets/5332524/387ce94a-88fd-43a9-bde9-73fb9005564d)
 
-> **Warning**: The `main` branch is under heavy development, and is not fully
-> functional yet as we are [rewriting our control-plane][rewrite]. if you're
-> interested in using or testing Blixt, use the `archive/golang-control-plane`
-> branch temporarily.
+> **Warning**: The `main` branch is under heavy development as we are [rewriting
+> our control-plane][rewrite]. if you're interested in using or testing Blixt,
+> consider using the `archive/golang-control-plane` branch temporarily. If you
+> have any questions or issues, check in with us in the `#blixt` channel on
+> [Kubernetes Slack]!
 
-> **Warning**: Experimental. There is no intention to ever make this viable for production. **DO NOT USE IN PRODUCTION**.
+> **Warning**: Experimental. We currently intend this project to be a sandbox
+> for experimenting with networking functionality, and a safe place to learn.
+> For the moment there is no intention to ever make this viable for production
+> use cases. **DO NOT USE IN PRODUCTION**.
 
 [rewrite]:https://github.com/kubernetes-sigs/blixt/milestone/8
+[Kubernetes Slack]:https://kubernetes.slack.com
 
 # Blixt
 
 An experimental [layer 4][osi] load-balancer for [Kubernetes] written in [Rust]
-and employing [Gateway API] for the control-plane and [eBPF]/[Aya] for the
-data-plane.
-
-This project is a sandbox for experimentation and learning. This repo is mainly
-meant for those interested in experimenting. This project **intentionally does
-not have end-users** and is a safe place to learn, break stuff and have fun!
+using [Kube-RS] for the control-plane and [eBPF] with [Aya] for the data-plane.
 
 > **Note**: The word "blixt" means "lightning" in Swedish.
 
 [osi]:https://en.wikipedia.org/wiki/OSI_model
 [Kubernetes]:https://kubernetes.io
 [Rust]:https://rust-lang.org
-[Gateway API]:https://gateway-api.sigs.k8s.io
+[Kube-RS]:https://github.com/kube-rs
 [eBPF]:https://www.tigera.io/learn/guides/ebpf/ebpf-xdp/
 [Aya]:https://aya-rs.dev
 
@@ -48,7 +48,7 @@ After these goals are achieved, further goals may be decided.
 > **Warning**: Currently our container images are under migration from a private
 > repository. At this moment, you **must** build and load images yourself locally.
 
-> **Warning**: Currently usage is only possible on [Kubernetes In Docker
+> **Warning**: Currently usage is only intended on [Kubernetes In Docker
 > (KIND)][kind] clusters. You can generate a new development cluster for testing
 > with `make build.cluster`.
 
@@ -121,7 +121,7 @@ make load.image.controlplane
 > **Warning**: The integration tests are currently written in Golang, which is
 > a little awkward, but it is a temporary situation as we rewrite them in Rust.
 > Run `make test.integration.deprecated` after deploying your custom images to
-> the cluster.
+> the cluster to run them.
 
 > **Note**: We use [Cargo workspaces] to manage the various crates spread across
 > the Rust parts of the repo. However, there is one exception. The
@@ -135,7 +135,7 @@ make load.image.controlplane
 
 You can reach out to the community by creating [issues] or [discussions]. You
 can also reach out on [Kubernetes Slack] on the `#blixt` channel. There is also
-an `#ebpf` channel on Kubernetes Slack for general eBPF related help!
+an `#ebpf` channel on Kubernetes Slack for general eBPF related help as well.
 
 [issues]:https://github.com/kubernetes-sigs/blixt/issues
 [discussions]:https://github.com/kubernetes-sigs/blixt/discussions
