@@ -7,13 +7,18 @@ edition = "2021"
 
 [[bin]]
 doc = false
-name = "controller"
+name = "manager"
 path = "src/main.rs"
 
 [dependencies]
 futures = "0.3.28"
 tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
-kube = { version = "^0.88.0", default-features = false, features = ["runtime", "client", "derive", "rustls-tls"] }
+kube = { version = "^0.88.0", default-features = false, features = [
+    "runtime",
+    "client",
+    "derive",
+    "rustls-tls",
+] }
 k8s-openapi = { version = "0.21.1", features = ["latest"] }
 serde = { version = "1.0.185", features = ["derive"] }
 chrono = { version = "0.4.33", features = ["serde"] }
@@ -24,4 +29,3 @@ tracing-subscriber = "0.3"
 thiserror = "1.0.47"
 anyhow = "1.0.75"
 gateway-api = "0.9.0"
-
