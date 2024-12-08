@@ -38,7 +38,7 @@ pub async fn start(
     //
     // Solution: separate gRPC services
     //
-    // Public server without mTLS for healthchecks
+    // Public server without TLS (healthchecks ONLY)
     let healthchecks = tokio::spawn(async move {
         let (_, health_service) = tonic_health::server::health_reporter();
         let mut server_builder = Server::builder();
