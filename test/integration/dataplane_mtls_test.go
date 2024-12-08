@@ -40,8 +40,10 @@ var (
 	ServerKeyFile  = certFile("server-key.pem")
 )
 
-// TestGRPCClient tests the gRPC client against a running Docker container.
-func TestGRPCClient(t *testing.T) {
+// TestGRPCClientWithMTLS tests the client connectivity to the dataplane's gRPC API server. Mutual TLS (mTLS)
+// is required to connect to the dataplane API server, and so as a part of this test we create a client certificate
+// using the same CA the server used in order to establish mutual trust.
+func TestGRPCClientWithMTLS(t *testing.T) {
 	// Get the current working directory
 	dir, err := os.Getwd()
 	if err != nil {
