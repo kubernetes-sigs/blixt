@@ -171,8 +171,9 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: clean
-clean: ## Cargo clean
+clean: ## clean repo
 	cargo clean
+	rm $(TEST_CERTS_PATH)/{*.pem,*.csr}
 
 .PHONY: build
 build: ## Build dataplane
@@ -233,20 +234,19 @@ test: ## Run tests
 .PHONY: test.gencert
 test.gencert: cfssl cfssljson
 	$(CFSSL) gencert \
-		-initca $(TEST_CERTS_PATH)/ca-csr.json | $(CFSSLJSON) -bare ca
+		-initca $(TEST_CERTS_PATH)/ca-csr.json | $(CFSSLJSON) -bare $(TEST_CERTS_PATH)/ca
 	$(CFSSL) gencert \
 		-ca=ca.pem \
 		-ca-key=ca-key.pem \
 		-config=$(TEST_CERTS_PATH)/ca-config.json \
 		-profile=server \
-		$(TEST_CERTS_PATH)/server-csr.json | $(CFSSLJSON) -bare server
+		$(TEST_CERTS_PATH)/server-csr.json | $(CFSSLJSON) -bare $(TEST_CERTS_PATH)/server
 	$(CFSSL) gencert \
 		-ca=ca.pem \
 		-ca-key=ca-key.pem \
 		-config=$(TEST_CERTS_PATH)/ca-config.json \
 		-profile=clinet \
-		$(TEST_CERTS_PATH)/client-csr.json | $(CFSSLJSON) -bare client
-	mv *.pem *.csr $(TEST_CERTS_PATH)
+		$(TEST_CERTS_PATH)/client-csr.json | $(CFSSLJSON) -bare $(TEST_CERTS_PATH)/client
 
 .PHONY: test.rmcert
 test.rmcert:
