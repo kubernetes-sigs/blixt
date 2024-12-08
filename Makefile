@@ -236,14 +236,14 @@ test.gencert: cfssl cfssljson
 	$(CFSSL) gencert \
 		-initca $(TEST_CERTS_PATH)/ca-csr.json | $(CFSSLJSON) -bare $(TEST_CERTS_PATH)/ca
 	$(CFSSL) gencert \
-		-ca=ca.pem \
-		-ca-key=ca-key.pem \
+		-ca=$(TEST_CERTS_PATH)/ca.pem \
+		-ca-key=$(TEST_CERTS_PATH)/ca-key.pem \
 		-config=$(TEST_CERTS_PATH)/ca-config.json \
 		-profile=server \
 		$(TEST_CERTS_PATH)/server-csr.json | $(CFSSLJSON) -bare $(TEST_CERTS_PATH)/server
 	$(CFSSL) gencert \
-		-ca=ca.pem \
-		-ca-key=ca-key.pem \
+		-ca=$(TEST_CERTS_PATH)/ca.pem \
+		-ca-key=$(TEST_CERTS_PATH)/ca-key.pem \
 		-config=$(TEST_CERTS_PATH)/ca-config.json \
 		-profile=clinet \
 		$(TEST_CERTS_PATH)/client-csr.json | $(CFSSLJSON) -bare $(TEST_CERTS_PATH)/client
