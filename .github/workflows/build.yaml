@@ -83,4 +83,4 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           file: build/Containerfile.dataplane
-          tags: kong/blixt-dataplane:${{ github.head_ref }}-${{ github.sha }}
+          tags: kong/blixt-dataplane:pr-${{ github.event.pull_request.number }}-${{ github.sha }}

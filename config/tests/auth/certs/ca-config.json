@@ -1,0 +1,22 @@
+{
+	"signing": {
+		"profiles": {
+			"server": {
+				"expiry": "1h",
+				"usages": [
+					"signing",
+					"key encipherment",
+					"server auth"
+				]
+			},
+			"client": {
+				"expiry": "1h",
+				"usages": [
+					"signing",
+					"key encipherment",
+					"client auth"
+				]
+			}
+		}
+	}
+}

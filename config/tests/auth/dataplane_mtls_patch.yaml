@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dataplane
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - name: dataplane
+        image: ghcr.io/kubernetes-sigs/blixt-dataplane:integration-tests
+        args:
+        - "-i"
+        - "eth0"
+        - "mutual-tls"
+        - "--server-certificate-path"
+        - "/app/certs/server.pem"
+        - "--server-private-key-path"
+        - "/app/certs/server-key.pem"
+        - "--client-certificate-authority-root-path"
+        - "/app/certs/ca.pem"
+        volumeMounts:
+            - name: mtls-certs
+              mountPath: /app/certs
+              readOnly: true
+        startupProbe:
+          grpc:
+            port: 9875
+        livenessProbe:
+          grpc:
+            port: 9875
+        readinessProbe:
+          grpc:
+            port: 9875
+      volumes:
+        - name: mtls-certs
+          configMap:
+            name: mtls-certs
