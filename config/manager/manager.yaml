@@ -43,6 +43,7 @@ spec:
         name: manager
         securityContext:
           allowPrivilegeEscalation: false
+          runAsUser: 1000
           capabilities:
             drop:
               - "ALL"
