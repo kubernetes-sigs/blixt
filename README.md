@@ -55,7 +55,7 @@ After these goals are achieved, further goals may be decided.
 Deploy the [Gateway API] [CRDs]:
 
 ```console
-kubectl apply -k https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.8.1
+kubectl apply -k https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v1.2.1
 ```
 
 Build container images:
