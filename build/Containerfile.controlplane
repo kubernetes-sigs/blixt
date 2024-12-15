@@ -26,4 +26,3 @@ WORKDIR /
 
 COPY --from=builder /workspace/manager /manager
 
-RUN chmod +x /manager
