@@ -4,11 +4,9 @@ Copyright 2023 The Kubernetes Authors.
 SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 */
 
-use core::mem;
-
 use aya_ebpf::{
     bindings::{TC_ACT_OK, TC_ACT_PIPE},
-    helpers::bpf_csum_diff,
+    helpers::{bpf_l3_csum_replace, bpf_l4_csum_replace},
     programs::TcContext,
 };
 use aya_log_ebpf::info;
@@ -16,7 +14,7 @@ use common::ClientKey;
 use network_types::{eth::EthHdr, ip::Ipv4Hdr, tcp::TcpHdr};
 
 use crate::{
-    utils::{csum_fold_helper, ptr_at, update_tcp_conns},
+    utils::{ptr_at, update_tcp_conns},
     LB_CONNECTIONS,
 };
 
@@ -70,7 +68,7 @@ pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
     let ret = unsafe {
         bpf_l3_csum_replace(
             ctx.skb.skb,
-            Ipv4Addr::Len as u32,
+            4u32,
             old_src_addr as u64,
             lb_mapping.backend_key.ip.to_be() as u64,
             4,
@@ -97,6 +95,7 @@ pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
         return Ok(TC_ACT_OK);
     }
 
+    let tcp_hdr_ref = unsafe { tcp_hdr.as_ref().ok_or(TC_ACT_OK)? };
     // If the packet has the RST flag set, it means the connection is being terminated, so remove it
     // from our map.
     if tcp_hdr_ref.rst() == 1 {
