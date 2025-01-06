@@ -1,7 +1,7 @@
 use anyhow::Result;
 use api_server::config::{MutualTLSConfig, ServerOnlyTLSConfig, TLSConfig};
 use api_server::setup_tls;
-use rcgen::{generate_simple_self_signed, Certificate, CertificateParams};
+use rcgen::{generate_simple_self_signed, CertificateParams, CertifiedKey};
 use std::fs;
 use tempfile::tempdir;
 use tonic::transport::Server;
@@ -12,9 +12,9 @@ async fn test_tls_self_signed_cert() -> Result<()> {
     let temp_dir = tempdir().unwrap();
 
     // Generate self-signed certificate
-    let cert = generate_simple_self_signed(vec!["localhost".into()])?;
-    let cert_pem = cert.serialize_pem()?;
-    let key_pem = cert.serialize_private_key_pem();
+    let CertifiedKey { cert, key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
+    let cert_pem = cert.pem();
+    let key_pem = key_pair.serialize_pem();
 
     // Paths for the server cert and private key
     let cert_path = temp_dir.path().join("server.crt");
@@ -46,8 +46,8 @@ async fn test_tls_missing_cert() -> Result<()> {
     let temp_dir = tempdir().unwrap();
 
     // Generate private key but skip certificate generation
-    let cert = generate_simple_self_signed(vec!["localhost".into()])?;
-    let key_pem = cert.serialize_private_key_pem();
+    let CertifiedKey { cert: _, key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
+    let key_pem = key_pair.serialize_pem();
 
     // Only write the key file, omit the certificate
     let missing_cert_path = temp_dir.path().join("missing_server.crt");
@@ -76,8 +76,8 @@ async fn test_tls_missing_key() -> Result<()> {
     let temp_dir = tempdir().unwrap();
 
     // Generate certificate but skip private key generation
-    let cert = generate_simple_self_signed(vec!["localhost".into()])?;
-    let cert_pem = cert.serialize_pem()?;
+    let CertifiedKey { cert, key_pair: _ } = generate_simple_self_signed(vec!["localhost".into()])?;
+    let cert_pem = cert.pem();
 
     // Only write the certificate file, omit the private key
     let cert_path = temp_dir.path().join("server.crt");
@@ -107,14 +107,14 @@ async fn test_mtls_self_signed_cert() -> Result<()> {
     let temp_dir = tempdir().unwrap();
 
     // Generate self-signed certificate
-    let cert = generate_simple_self_signed(vec!["localhost".into()])?;
-    let cert_pem = cert.serialize_pem()?;
-    let key_pem = cert.serialize_private_key_pem();
+    let CertifiedKey { cert, key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
+    let cert_pem = cert.pem();
+    let key_pem = key_pair.serialize_pem();
 
     // Generate CA
     let ca_params = CertificateParams::default();
-    let ca_cert = Certificate::from_params(ca_params)?;
-    let ca_cert_pem = ca_cert.serialize_pem()?;
+    let ca_cert = ca_params.self_signed(&key_pair)?;
+    let ca_cert_pem = ca_cert.pem();
 
     // Cert file paths
     let cert_path = temp_dir.path().join("server.crt");
@@ -150,9 +150,9 @@ async fn test_mtls_invalid_ca_cert() -> Result<()> {
     let temp_dir = tempdir().unwrap();
 
     // Generate server cert and key
-    let cert = generate_simple_self_signed(vec!["localhost".into()])?;
-    let cert_pem = cert.serialize_pem()?;
-    let key_pem = cert.serialize_private_key_pem();
+    let CertifiedKey { cert, key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
+    let cert_pem = cert.pem();
+    let key_pem = key_pair.serialize_pem();
 
     // Write valid server cert and key
     let cert_path = temp_dir.path().join("server.crt");
@@ -186,9 +186,9 @@ async fn test_mtls_missing_ca_cert() -> Result<()> {
     let temp_dir = tempdir().unwrap();
 
     // Generate server cert and key
-    let cert = generate_simple_self_signed(vec!["localhost".into()])?;
-    let cert_pem = cert.serialize_pem()?;
-    let key_pem = cert.serialize_private_key_pem();
+    let CertifiedKey { cert, key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
+    let cert_pem = cert.pem();
+    let key_pem = key_pair.serialize_pem();
 
     // Write valid server cert and key
     let cert_path = temp_dir.path().join("server.crt");
