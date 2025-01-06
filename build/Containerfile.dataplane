@@ -1,4 +1,4 @@
-FROM rust:1.79-slim-bookworm as builder
+FROM rust:1.79-slim-bookworm AS builder
 
 ARG TARGETARCH
 ARG LLVM_VERSION=19
