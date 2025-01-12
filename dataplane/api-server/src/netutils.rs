@@ -16,7 +16,7 @@ use std::net::Ipv4Addr;
 const ERR_NO_IFINDEX: &str = "no ifindex found to route";
 const ERR_PACKET_CONSTRUCTION: &str = "construct packet failed";
 
-/// Returns an network interface index for a Ipv4 address (like the command `ip route get to $IP`)
+/// Returns a network interface index for an IPv4 address (like the command `ip route get to $IP`)
 pub fn if_index_for_routing_ip(ip_addr: Ipv4Addr) -> Result<u32, Error> {
     let socket = Socket::new(NETLINK_ROUTE)?;
     socket.connect(&SocketAddr::new(0, 0))?;
