@@ -36,7 +36,7 @@ pub async fn run() {
     };
 
     if let Err(error) = gateway_controller::controller(ctx).await {
-        error!("failed to start Gateway contoller: {error:?}");
+        error!("failed to start Gateway controller: {error:?}");
         std::process::exit(1);
     }
 }

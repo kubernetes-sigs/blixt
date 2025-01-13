@@ -142,7 +142,7 @@ pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Actio
         service = create_svc_for_gateway(ctx.clone(), gateway.as_ref()).await?;
     }
 
-    // invalid_lb_condition is a Condition that signfies that the Loadbalancer service is invalid.
+    // invalid_lb_condition is a Condition that signifies that the Loadbalancer service is invalid.
     let mut invalid_lb_condition = metav1::Condition {
         last_transition_time: metav1::Time(Utc::now()),
         observed_generation: gateway.meta().generation,
