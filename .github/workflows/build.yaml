@@ -51,12 +51,13 @@ jobs:
     - name: Run Tests
       run: |
         make test
-  docker-build:
-    name: docker-build
+
+  docker-build-amd64:
+    name: docker-build-amd64
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -67,20 +68,54 @@ jobs:
               - 'build/Containerfile.dataplane'
       - name: Setup QEMU
         if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
-        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3.2.0
+        uses: docker/setup-qemu-action@v3
       - name: Setup Docker Buildx
         if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
         id: buildx
-        uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
+        uses: docker/setup-buildx-action@v3
         with:
           buildkitd-flags: "--debug"
-      - name: Build multi-arch container image
+      - name: Build container image for amd64
         if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
-        uses: docker/build-push-action@5cd11c3a4ced054e52742c5fd54dca954e0edd85 # v6.7.0
+        uses: docker/build-push-action@v6
         with:
           push: false
           builder: ${{ steps.buildx.outputs.name }}
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           file: build/Containerfile.dataplane
-          tags: kong/blixt-dataplane:pr-${{ github.event.pull_request.number }}-${{ github.sha }}
+          tags: kong/blixt-dataplane:pr-${{ github.event.pull_request.number }}-amd64-${{ github.sha }}
+
+  docker-build-arm64:
+    name: docker-build-arm64
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            dataplane:
+              - 'dataplane/**'
+            containerfile:
+              - 'build/Containerfile.dataplane'
+      - name: Setup QEMU
+        if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
+        uses: docker/setup-qemu-action@v3
+      - name: Setup Docker Buildx
+        if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-flags: "--debug"
+      - name: Build container image for arm64
+        if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
+        uses: docker/build-push-action@v6
+        with:
+          push: false
+          builder: ${{ steps.buildx.outputs.name }}
+          context: .
+          platforms: linux/arm64
+          file: build/Containerfile.dataplane
+          tags: kong/blixt-dataplane:pr-${{ github.event.pull_request.number }}-arm64-${{ github.sha }}
