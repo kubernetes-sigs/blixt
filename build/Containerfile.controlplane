@@ -1,16 +1,28 @@
 FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx-tools
 
-FROM --platform=$BUILDPLATFORM rust:alpine
+FROM --platform=$BUILDPLATFORM rust:alpine AS builder
+
+RUN apk add --no-cache clang lld
+
+WORKDIR /workspace
+
+COPY --from=xx-tools / /
+
 ARG TARGETPLATFORM
 ARG PROJECT_DIR=/workspace
 ARG BUILD_DIR=$PROJECT_DIR/build
 
-RUN apk add --no-cache clang lld
-COPY --from=xx-tools / /
-
-WORKDIR /workspace
 RUN --mount=type=bind,source=../controlplane/src/,target=src \
     --mount=type=bind,source=../controlplane/Cargo.toml,target=Cargo.toml \
     --mount=type=bind,source=../controlplane/Cargo.lock,target=Cargo.lock \
     xx-cargo build --release --target-dir $BUILD_DIR && \
     xx-verify ./build/$(xx-cargo --print-target-triple)/release/controller
+
+RUN cp ./build/$(xx-cargo --print-target-triple)/release/controller /workspace/manager
+
+FROM alpine:latest
+
+WORKDIR /
+
+USER 1000:1000
+COPY --from=builder /workspace/manager /manager

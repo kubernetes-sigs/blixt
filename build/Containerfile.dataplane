@@ -34,6 +34,7 @@ RUN if [ "$TARGETARCH" = "amd64" ]; \
 RUN rustup target add $(eval cat arch)-unknown-linux-musl
 
 COPY dataplane dataplane 
+COPY controlplane controlplane
 COPY tools/udp-test-server tools/udp-test-server
 COPY xtask xtask
 COPY Cargo.toml Cargo.toml
@@ -57,6 +58,7 @@ RUN --mount=type=cache,target=/workspace/target/ \
     RUSTFLAGS=-Ctarget-feature=+crt-static cargo build \
     --workspace \
     --exclude ebpf \ 
+    --package loader \
     --release \
     --target=$(eval cat arch)-unknown-linux-musl
 RUN --mount=type=cache,target=/workspace/target/ \

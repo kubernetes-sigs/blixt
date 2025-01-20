@@ -9,11 +9,13 @@ use std::{os::unix::process::CommandExt, process::Command};
 use anyhow::Context as _;
 use clap::Parser;
 
+#[cfg(target_os = "linux")]
 use crate::build_ebpf::{build_ebpf, Architecture, Options as BuildOptions};
 
 #[derive(Debug, Parser)]
 pub struct Options {
     /// Set the endianness of the BPF target
+    #[cfg(target_os = "linux")]
     #[clap(default_value = "bpfel-unknown-none", long)]
     pub bpf_target: Architecture,
     /// Build and run the release target
@@ -27,9 +29,10 @@ pub struct Options {
     pub run_args: Vec<String>,
 }
 
-/// Build the project
-fn build(opts: &Options) -> Result<(), anyhow::Error> {
-    let mut args = vec!["build"];
+/// Build the dataplane
+#[cfg(target_os = "linux")]
+fn build_dataplane(opts: &Options) -> Result<(), anyhow::Error> {
+    let mut args = vec!["build", "--package", "loader"];
     if opts.release {
         args.push("--release")
     }
@@ -41,15 +44,30 @@ fn build(opts: &Options) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Build and run the project
-pub fn run(opts: Options) -> Result<(), anyhow::Error> {
+/// Build the controlplane
+fn build_contrlplane(opts: &Options) -> Result<(), anyhow::Error> {
+    let mut args = vec!["build", "--package", "controlplane"];
+    if opts.release {
+        args.push("--release")
+    }
+    let status = Command::new("cargo")
+        .args(&args)
+        .status()
+        .expect("failed to build userspace");
+    assert!(status.success());
+    Ok(())
+}
+
+/// Build and run the dataplane
+#[cfg(target_os = "linux")]
+pub fn run_dataplane(opts: Options) -> Result<(), anyhow::Error> {
     // build our ebpf program followed by our application
     build_ebpf(BuildOptions {
         target: opts.bpf_target,
         release: opts.release,
     })
     .context("Error while building eBPF program")?;
-    build(&opts).context("Error while building userspace application")?;
+    build_dataplane(&opts).context("Error while building dataplane's userspace application")?;
 
     // profile we are building (release or debug)
     let profile = if opts.release { "release" } else { "debug" };
@@ -71,4 +89,18 @@ pub fn run(opts: Options) -> Result<(), anyhow::Error> {
 
     // we shouldn't get here unless the command failed to spawn
     Err(anyhow::Error::from(err).context(format!("Failed to run `{}`", args.join(" "))))
+}
+
+pub fn run_controlplane(opts: Options) -> Result<(), anyhow::Error> {
+    build_contrlplane(&opts).context("Error while building controlplane")?;
+
+    // profile we are building (release or debug)
+    let profile = if opts.release { "release" } else { "debug" };
+    let bin_path = format!("target/{}/controller", profile);
+
+    // spawn the command
+    let err = Command::new(&bin_path).env("RUST_LOG", "info").exec();
+
+    // we shouldn't get here unless the command failed to spawn
+    Err(anyhow::Error::from(err).context(format!("Failed to run `{}`", bin_path)))
 }
