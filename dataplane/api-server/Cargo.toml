@@ -7,14 +7,14 @@ version.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
-aya = { workspace = true, features = ["async_tokio"] }
+aya = { version = "0.13.1", features = ["async_tokio"] }
 clap = { workspace = true, features = ["derive"] }
-common = { workspace = true, features = ["user"] }
+common = { path = "../common", features = ["user"] }
 libc = { workspace = true }
 log = { workspace = true }
-netlink-packet-core = { workspace = true }
-netlink-packet-route = { workspace = true }
-netlink-sys = { workspace = true }
+netlink-packet-core = { version = "0.7.0" }
+netlink-packet-route = { version = "0.20.1" }
+netlink-sys = { version = "0.8.7" }
 prost = { workspace = true }
 tokio = { workspace = true, features = [
     "macros",
