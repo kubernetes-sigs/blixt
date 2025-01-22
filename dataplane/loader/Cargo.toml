@@ -10,11 +10,11 @@ name = "loader"
 path = "src/main.rs"
 
 [dependencies]
+aya = { version = "0.13.1" , features=["async_tokio"] }
+aya-log = { version = "0.2.1" }
 anyhow = { workspace = true }
-api-server = { workspace = true }
-aya = { workspace = true , features=["async_tokio"] }
-aya-log = { workspace = true } 
-common = { workspace = true, features=["user"] }
+api-server = { path = "../api-server" }
+common = { path = "../common", features = ["user"] }
 clap = { workspace = true, features = ["derive"] }
 env_logger = { workspace = true }
 log = { workspace = true }
