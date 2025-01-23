@@ -7,6 +7,7 @@ members = [
 	"dataplane/loader",
 	"tools/udp-test-server",
 	"xtask",
+	"lib/backends",
 ]
 exclude = ["dataplane/ebpf"]
 
@@ -16,6 +17,13 @@ license = "Apache-2.0"
 repository = "https://github.com/kubernetes-sigs/blixt"
 version = "0.3.0"
 
+# Note: We intend to support running the control-plane on multiple operating systems to enable
+# more development and testing from non-Linux systems, even though the dataplane strongly requires
+# Linux (due largely to eBPF). This library is utilized by the controlplane, and as such we must
+# not include any crates that are linux only. doing so this should not include any crates that are
+# linux only. Doing so will break the controlplane on other systems (e.g. MacOS which along with
+# Linux is a common development environment for our contributors). This includes crates belonging
+# to this workspace that import third party linux only crates.
 [workspace.dependencies]
 anyhow = { version = "1", default-features = true }
 chrono = { version = "0.4.33", default-features = false }
@@ -41,3 +49,4 @@ tonic-build = { version = "0.11.0", default-features = false }
 tonic-health = { version = "0.11.0", default-features = false }
 tracing = { version = "0.1.37", default-features = false }
 tracing-subscriber = { version = "0.3", default-features = false }
+backends = { path = "./lib/backends" }

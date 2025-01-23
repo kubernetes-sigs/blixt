@@ -4,7 +4,6 @@ Copyright 2023 The Kubernetes Authors.
 SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 */
 
-pub mod backends;
 pub mod config;
 pub mod netutils;
 pub mod server;
@@ -19,7 +18,7 @@ use aya::maps::{HashMap, MapData};
 use log::info;
 use tonic::transport::{Certificate, Identity, Server, ServerTlsConfig};
 
-use backends::backends_server::BackendsServer;
+use backends::backends::backends_server::BackendsServer;
 use common::{BackendKey, BackendList, ClientKey, LoadBalancerMapping};
 use config::TLSConfig;
 

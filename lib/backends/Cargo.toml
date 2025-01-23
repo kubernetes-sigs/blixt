@@ -1,0 +1,14 @@
+[package]
+name = "backends"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+tonic = { workspace = true, features = ["codegen", "prost"] }
+prost = { workspace = true }
+tonic-build = { workspace = true, features = ["prost"] }
+
+[build-dependencies]
+tonic-build = { workspace = true, features = ["prost"] }

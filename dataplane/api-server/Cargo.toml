@@ -8,6 +8,7 @@ version.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 aya = { version = "0.13.1", features = ["async_tokio"] }
+backends = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 common = { path = "../common", features = ["user"] }
 libc = { workspace = true }
@@ -15,7 +16,6 @@ log = { workspace = true }
 netlink-packet-core = { version = "0.7.0" }
 netlink-packet-route = { version = "0.20.1" }
 netlink-sys = { version = "0.8.7" }
-prost = { workspace = true }
 tokio = { workspace = true, features = [
     "macros",
     "rt",
@@ -25,9 +25,6 @@ tokio = { workspace = true, features = [
 ] }
 tonic = { workspace = true, features = ["tls"] }
 tonic-health = { workspace = true }
-
-[build-dependencies]
-tonic-build = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.14.0"

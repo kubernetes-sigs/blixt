@@ -5,20 +5,18 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 */
 
 use clap::Parser;
+use std::process::Command;
 
 #[derive(Debug, Parser)]
 pub struct Options {}
 
 pub(crate) fn build_proto(_opts: Options) -> Result<(), anyhow::Error> {
-    let proto_file = "./dataplane/api-server/proto/backends.proto";
+    let args = vec!["build", "--package", "backends"];
 
-    println!("building proto {}", proto_file);
-
-    tonic_build::configure()
-        .protoc_arg("--experimental_allow_proto3_optional")
-        .build_server(true)
-        .out_dir("./dataplane/api-server/src")
-        .compile(&[proto_file], &["."])?;
-
+    let status = Command::new("cargo")
+        .args(&args)
+        .status()
+        .expect("failed to build proto bindings");
+    assert!(status.success());
     Ok(())
 }

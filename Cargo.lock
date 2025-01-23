@@ -120,6 +120,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "aya",
+ "backends",
  "clap",
  "common",
  "libc",
@@ -127,12 +128,10 @@ dependencies = [
  "netlink-packet-core",
  "netlink-packet-route",
  "netlink-sys",
- "prost",
  "rcgen",
  "tempfile",
  "tokio",
  "tonic",
- "tonic-build",
  "tonic-health",
 ]
 
@@ -279,6 +278,15 @@ dependencies = [
  "log",
  "object 0.36.5",
  "thiserror",
+]
+
+[[package]]
+name = "backends"
+version = "0.3.0"
+dependencies = [
+ "prost",
+ "tonic",
+ "tonic-build",
 ]
 
 [[package]]
@@ -2659,6 +2667,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "api-server",
+ "backends",
  "clap",
  "controlplane",
  "prost",

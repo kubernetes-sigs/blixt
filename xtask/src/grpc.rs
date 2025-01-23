@@ -10,8 +10,9 @@ use std::str::FromStr;
 use anyhow::Error;
 use clap::Parser;
 
-use api_server::backends::backends_client::BackendsClient;
-use api_server::backends::{Target, Targets, Vip};
+use backends::backends::backends_client::BackendsClient;
+use backends::backends::{Target, Targets, Vip};
+use tonic::transport::Endpoint;
 
 #[derive(Debug, Parser)]
 pub struct Options {
@@ -36,7 +37,8 @@ pub struct Options {
 pub async fn update(opts: Options) -> Result<(), Error> {
     let server_addr: SocketAddr = format!("{}:{}", opts.server_ip, opts.server_port).parse()?;
 
-    let mut client = BackendsClient::connect(format!("http://{}", server_addr)).await?;
+    let conn = Endpoint::new(format!("http://{}", server_addr))?.connect().await?;
+    let mut client = BackendsClient::new(conn);
 
     let addr = net::Ipv4Addr::from_str(&opts.vip_ip)?;
     let daddr = net::Ipv4Addr::from_str(&opts.daddr)?;
