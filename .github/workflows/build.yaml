@@ -33,9 +33,6 @@ jobs:
       run: |
         cargo install bpf-linker
 
-    # TODO: Once we migrate the controller from Go to Rust,
-    # add the controller build step here.
-
     - name: Build all rust crates (dataplane, test server) 
       run: |
         make build
@@ -66,23 +63,12 @@ jobs:
               - 'dataplane/**'
             containerfile:
               - 'build/Containerfile.dataplane'
-      - name: Setup QEMU
-        if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
-        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3.2.0
-      - name: Setup Docker Buildx
-        if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
-        id: buildx
-        uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
-        with:
-          buildkitd-flags: "--debug"
       - name: Build container image for amd64
         if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
         uses: docker/build-push-action@5cd11c3a4ced054e52742c5fd54dca954e0edd85 # v6.7.0
         with:
           push: false
-          builder: ${{ steps.buildx.outputs.name }}
           context: .
-          platforms: linux/amd64
           file: build/Containerfile.dataplane
           tags: kong/blixt-dataplane:pr-${{ github.event.pull_request.number }}-amd64-${{ github.sha }}
 
@@ -100,22 +86,11 @@ jobs:
               - 'dataplane/**'
             containerfile:
               - 'build/Containerfile.dataplane'
-      - name: Setup QEMU
-        if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
-        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3.2.0
-      - name: Setup Docker Buildx
-        if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
-        id: buildx
-        uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
-        with:
-          buildkitd-flags: "--debug"
       - name: Build container image for arm64
         if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
         uses: docker/build-push-action@5cd11c3a4ced054e52742c5fd54dca954e0edd85 # v6.7.0
         with:
           push: false
-          builder: ${{ steps.buildx.outputs.name }}
           context: .
-          platforms: linux/arm64
           file: build/Containerfile.dataplane
           tags: kong/blixt-dataplane:pr-${{ github.event.pull_request.number }}-arm64-${{ github.sha }}
