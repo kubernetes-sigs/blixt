@@ -1,13 +1,14 @@
 [workspace]
 resolver = "2"
 members = [
+	"controlplane",
 	"dataplane/api-server",
 	"dataplane/common",
 	"dataplane/loader",
 	"tools/udp-test-server",
 	"xtask",
 ]
-exclude = ["dataplane/ebpf", "controlplane"]
+exclude = ["dataplane/ebpf"]
 
 [workspace.package]
 edition = "2021"
@@ -17,27 +18,26 @@ version = "0.3.0"
 
 [workspace.dependencies]
 anyhow = { version = "1", default-features = true }
-api-server = { version = "0.3.0", path = "./dataplane/api-server" }
-aya = { version = "0.13.1", default-features = false }
-aya-ebpf = { git = "https://github.com/aya-rs/aya", default-features = false }
-aya-log = { version = "0.2.1", default-features = false }
-aya-log-ebpf = { git = "https://github.com/aya-rs/aya", default-features = false }
+chrono = { version = "0.4.33", default-features = false }
 clap = { version = "4.5", default-features = true }
-common = { version = "0.3.0", path = "./dataplane/common" }
 env_logger = { version = "0.11", default-features = false }
+gateway-api = { version = "0.9.0", default-features = false }
+futures = { version="0.3.28", default-features = true }
+kube = { version = "^0.88.0", default-features = false }
+k8s-openapi = { version = "0.21.1", default-features = false }
 libc = { version = "0.2", default-features = false }
-loader = { version = "0.3.0", path = "./dataplane/loader" }
 log = { version = "0.4", default-features = false }
 memoffset = { version = "0.9", default-features = false }
-netlink-packet-core = { version = "0.7.0", default-features = false }
-netlink-packet-route = { version = "0.20.1", default-features = false }
-netlink-sys = { version = "0.8.7", default-features = false }
 network-types = { version = "0.0.5", default-features = false }
 prost = { version = "0.12.6", default-features = false }
 regex = { version = "1", default-features = true }
+serde = { version = "1.0.185", default-features = false }
+serde_json = { version = "1.0.105", default-features = false }
+serde_yaml = { version = "0.9.25", default-features = false }
+thiserror = { version = "1.0.47", default-features = true }
 tokio = { version = "1.43.0", default-features = false }
 tonic = { version = "0.11.0", default-features = false }
 tonic-build = { version = "0.11.0", default-features = false }
 tonic-health = { version = "0.11.0", default-features = false }
-udp-test-server = { version = "0.3.0", path = "./tools/udp-test-server" }
-xtask = { version = "0.3.0", path = "./dataplane/xtask" }
+tracing = { version = "0.1.37", default-features = false }
+tracing-subscriber = { version = "0.3", default-features = false }
