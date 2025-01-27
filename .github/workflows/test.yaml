@@ -75,7 +75,7 @@ jobs:
       ## Upload diagnostics if integration test step failed.
       - name: upload diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: blixt-integration-test-diag
           path: /tmp/ktf-diag*
