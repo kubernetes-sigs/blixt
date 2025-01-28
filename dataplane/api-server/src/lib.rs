@@ -16,7 +16,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use aya::maps::{HashMap, MapData};
-use log::info;
+use log::{debug, info};
 use tonic::transport::{Certificate, Identity, Server, ServerTlsConfig};
 
 use backends::backends_server::BackendsServer;
@@ -42,23 +42,35 @@ pub async fn start(
     let healthchecks = tokio::spawn(async move {
         let (_, health_service) = tonic_health::server::health_reporter();
         let mut server_builder = Server::builder();
-        server_builder
+
+        // by convention we add 1 to the API listen port and use that
+        // for the health check port.
+        let port = port + 1;
+        let addr = SocketAddrV4::new(addr, port);
+        let server = server_builder
             .add_service(health_service)
-            .serve(SocketAddrV4::new(addr, port + 1).into())
+            .serve(addr.into());
+
+        debug!("gRPC Health Checking service listens on {}", addr);
+        server
             .await
-            .unwrap();
+            .expect("Failed to serve gRPC Health Checking service");
     });
 
     // Secure server with (optional) mTLS
     let backends = tokio::spawn(async move {
         let server = server::BackendService::new(backends_map, gateway_indexes_map, tcp_conns_map);
+
         let mut server_builder = Server::builder();
         server_builder = setup_tls(server_builder, &tls_config).unwrap();
-        server_builder
+
+        let tls_addr = SocketAddrV4::new(addr, port);
+        let tls_server = server_builder
             .add_service(BackendsServer::new(server))
-            .serve(SocketAddrV4::new(addr, port).into())
-            .await
-            .unwrap();
+            .serve(tls_addr.into());
+
+        debug!("TLS server listens on {}", tls_addr);
+        tls_server.await.expect("Failed to serve TLS");
     });
 
     tokio::try_join!(healthchecks, backends)?;
@@ -127,6 +139,9 @@ pub fn setup_tls(mut builder: Server, tls_config: &Option<TLSConfig>) -> Result<
             info!("gRPC mTLS enabled");
             Ok(builder)
         }
-        None => Ok(builder),
+        None => {
+            info!("gRPC TLS is not enabled");
+            Ok(builder)
+        }
     }
 }
