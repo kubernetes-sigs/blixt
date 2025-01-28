@@ -16,7 +16,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use aya::maps::{HashMap, MapData};
-use log::info;
+use log::{debug, info, error};
 use tonic::transport::{Certificate, Identity, Server, ServerTlsConfig};
 
 use backends::backends_server::BackendsServer;
@@ -31,6 +31,8 @@ pub async fn start(
     tcp_conns_map: HashMap<MapData, ClientKey, LoadBalancerMapping>,
     tls_config: Option<TLSConfig>,
 ) -> Result<()> {
+    debug!("starting api server on {}", addr);
+
     // Tonic itself doesn't provide a built-in mechanism for selectively
     // applying TLS based on routes, as TLS configuration is tied to the
     // entire server and managed at the transport layer, not at the
@@ -42,23 +44,37 @@ pub async fn start(
     let healthchecks = tokio::spawn(async move {
         let (_, health_service) = tonic_health::server::health_reporter();
         let mut server_builder = Server::builder();
-        server_builder
+
+        let port = port + 1;
+        let addr = SocketAddrV4::new(addr, port);
+        let server = server_builder
             .add_service(health_service)
-            .serve(SocketAddrV4::new(addr, port + 1).into())
-            .await
-            .unwrap();
+            .serve(addr.into());
+
+        debug!("gRPC Health Checking service listens on port {}", port);
+        server.await.map_err(|e| {
+            error!("Failed serve gRPC Health Checking service, err: {:?}", e);
+            e
+        }).unwrap();
     });
 
     // Secure server with (optional) mTLS
     let backends = tokio::spawn(async move {
         let server = server::BackendService::new(backends_map, gateway_indexes_map, tcp_conns_map);
+
         let mut server_builder = Server::builder();
         server_builder = setup_tls(server_builder, &tls_config).unwrap();
-        server_builder
+
+        let tls_addr = SocketAddrV4::new(addr, port);
+        let tls_server = server_builder
             .add_service(BackendsServer::new(server))
-            .serve(SocketAddrV4::new(addr, port).into())
-            .await
-            .unwrap();
+            .serve(tls_addr.into());
+
+        debug!("TLS server listens on port {}", port);
+        tls_server.await.map_err(|e| {
+            error!("Failed to serve TLS, err: {:?}", e);
+            e
+        }).unwrap();
     });
 
     tokio::try_join!(healthchecks, backends)?;
@@ -127,6 +143,9 @@ pub fn setup_tls(mut builder: Server, tls_config: &Option<TLSConfig>) -> Result<
             info!("gRPC mTLS enabled");
             Ok(builder)
         }
-        None => Ok(builder),
+        None => {
+            info!("gRPC TLS is not enabled");
+            Ok(builder)
+        },
     }
 }
