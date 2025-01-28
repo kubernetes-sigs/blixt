@@ -45,6 +45,8 @@ pub async fn start(
         let (_, health_service) = tonic_health::server::health_reporter();
         let mut server_builder = Server::builder();
 
+        // by convention we add 1 to the API listen port and use that
+        // for the health check port.
         let port = port + 1;
         let addr = SocketAddrV4::new(addr, port);
         let server = server_builder
