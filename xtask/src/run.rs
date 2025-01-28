@@ -84,7 +84,7 @@ pub fn run_dataplane(opts: Options) -> Result<(), anyhow::Error> {
     // spawn the command
     let err = Command::new(args.first().expect("No first argument"))
         .args(args.iter().skip(1))
-        .env("RUST_LOG", "info")
+        .env("RUST_LOG", "info,api_server=debug")
         .exec();
 
     // we shouldn't get here unless the command failed to spawn
