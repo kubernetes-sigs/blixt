@@ -16,7 +16,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use aya::maps::{HashMap, MapData};
-use log::{debug, info, error};
+use log::{debug, info};
 use tonic::transport::{Certificate, Identity, Server, ServerTlsConfig};
 
 use backends::backends_server::BackendsServer;
@@ -52,7 +52,9 @@ pub async fn start(
             .serve(addr.into());
 
         debug!("gRPC Health Checking service listens on {}", addr);
-        server.await.expect("Failed to serve gRPC Health Checking service");
+        server
+            .await
+            .expect("Failed to serve gRPC Health Checking service");
     });
 
     // Secure server with (optional) mTLS
@@ -140,6 +142,6 @@ pub fn setup_tls(mut builder: Server, tls_config: &Option<TLSConfig>) -> Result<
         None => {
             info!("gRPC TLS is not enabled");
             Ok(builder)
-        },
+        }
     }
 }
