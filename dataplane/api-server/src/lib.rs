@@ -31,8 +31,6 @@ pub async fn start(
     tcp_conns_map: HashMap<MapData, ClientKey, LoadBalancerMapping>,
     tls_config: Option<TLSConfig>,
 ) -> Result<()> {
-    debug!("starting api server on {}", addr);
-
     // Tonic itself doesn't provide a built-in mechanism for selectively
     // applying TLS based on routes, as TLS configuration is tied to the
     // entire server and managed at the transport layer, not at the
@@ -53,11 +51,8 @@ pub async fn start(
             .add_service(health_service)
             .serve(addr.into());
 
-        debug!("gRPC Health Checking service listens on port {}", port);
-        server.await.map_err(|e| {
-            error!("Failed serve gRPC Health Checking service, err: {:?}", e);
-            e
-        }).unwrap();
+        debug!("gRPC Health Checking service listens on {}", addr);
+        server.await.expect("Failed to serve gRPC Health Checking service");
     });
 
     // Secure server with (optional) mTLS
@@ -72,11 +67,8 @@ pub async fn start(
             .add_service(BackendsServer::new(server))
             .serve(tls_addr.into());
 
-        debug!("TLS server listens on port {}", port);
-        tls_server.await.map_err(|e| {
-            error!("Failed to serve TLS, err: {:?}", e);
-            e
-        }).unwrap();
+        debug!("TLS server listens on {}", tls_addr);
+        tls_server.await.expect("Failed to serve TLS");
     });
 
     tokio::try_join!(healthchecks, backends)?;
