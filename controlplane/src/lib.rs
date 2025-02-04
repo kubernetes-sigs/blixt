@@ -19,6 +19,10 @@ use thiserror::Error;
 
 pub mod gateway_controller;
 pub mod gateway_utils;
+pub mod gatewayclass_controller;
+pub mod gatewayclass_utils;
+mod traits;
+pub mod utils;
 
 // Context for our reconciler
 #[derive(Clone)]
