@@ -314,30 +314,6 @@ pub async fn patch_status(
     Ok(())
 }
 
-// Sets the provided condition on the Gateway object. The condition on the Gateway is only updated
-// if the new condition has a different status (except for the observed generation which is always
-// updated).
-pub fn set_condition(gateway: &mut Gateway, new_cond: metav1::Condition) {
-    if let Some(ref mut status) = gateway.status {
-        if let Some(ref mut conditions) = status.conditions {
-            for condition in conditions.iter_mut() {
-                if condition.type_ == new_cond.type_ {
-                    if condition.status == new_cond.status {
-                        // always update the observed generation
-                        condition.observed_generation = new_cond.observed_generation;
-                        return;
-                    }
-                    *condition = new_cond;
-                    return;
-                }
-            }
-            conditions.push(new_cond);
-        } else {
-            status.conditions = Some(vec![new_cond]);
-        }
-    }
-}
-
 // Inspects the provided Gateway and returns a Condition of type "Accepted" with appropriate reason and status.
 // Ideally, this should be called after the Gateway object reflects the latest status of its
 // listeners.
