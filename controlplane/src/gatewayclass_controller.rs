@@ -38,7 +38,7 @@ pub async fn reconcile(gateway_class: Arc<GatewayClass>, ctx: Arc<Context>) -> R
         .metadata
         .name
         .clone()
-        .ok_or(Error::InvalidConfigError("invalid name".to_string()))?;
+        .ok_or(Error::InvalidConfigError("no name provided for gatewayclass".to_string()))?;
 
     let gatewayclass_api = Api::<GatewayClass>::all(client);
     let mut gwc = GatewayClass {
