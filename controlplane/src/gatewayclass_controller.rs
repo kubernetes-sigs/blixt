@@ -56,6 +56,7 @@ pub async fn reconcile(gateway_class: Arc<GatewayClass>, ctx: Arc<Context>) -> R
     if !is_accepted(&gateway_class) {
         info!("marking gateway class {:?} as accepted", name);
         accept(&mut gwc);
+        let gatewayclass_api = Api::<GatewayClass>::all(client);
         patch_status(&gatewayclass_api, name, &gwc.status.unwrap_or_default()).await?;
     }
 
