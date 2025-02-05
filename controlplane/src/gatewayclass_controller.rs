@@ -50,10 +50,7 @@ pub async fn reconcile(gateway_class: Arc<GatewayClass>, ctx: Arc<Context>) -> R
 
     if gateway_class.spec.controller_name != GATEWAY_CLASS_CONTROLLER_NAME {
         // Skip reconciling because we don't manage this resource
-        // NOTE: May want to requeue in case this resource becomes relevant again in the
-        // future (e.g. the controllerName is changed to match ours in the event of typo,
-        // etc.)
-        return Ok(Action::requeue(Duration::from_secs(3600 / 2)));
+        return Ok(Action::await_change());
     }
 
     if !is_accepted(&gateway_class) {
