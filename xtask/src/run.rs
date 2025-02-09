@@ -45,7 +45,7 @@ fn build_dataplane(opts: &Options) -> Result<(), anyhow::Error> {
 }
 
 /// Build the controlplane
-fn build_contrlplane(opts: &Options) -> Result<(), anyhow::Error> {
+fn build_controlplane(opts: &Options) -> Result<(), anyhow::Error> {
     let mut args = vec!["build", "--package", "controlplane"];
     if opts.release {
         args.push("--release")
@@ -84,7 +84,7 @@ pub fn run_dataplane(opts: Options) -> Result<(), anyhow::Error> {
     // spawn the command
     let err = Command::new(args.first().expect("No first argument"))
         .args(args.iter().skip(1))
-        .env("RUST_LOG", "info")
+        .env("RUST_LOG", "info,api_server=debug")
         .exec();
 
     // we shouldn't get here unless the command failed to spawn
@@ -92,7 +92,7 @@ pub fn run_dataplane(opts: Options) -> Result<(), anyhow::Error> {
 }
 
 pub fn run_controlplane(opts: Options) -> Result<(), anyhow::Error> {
-    build_contrlplane(&opts).context("Error while building controlplane")?;
+    build_controlplane(&opts).context("Error while building controlplane")?;
 
     // profile we are building (release or debug)
     let profile = if opts.release { "release" } else { "debug" };

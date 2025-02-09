@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2 # v4.1.7
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -88,7 +88,7 @@ jobs:
               - 'build/Containerfile.dataplane'
       - name: Build container image for arm64
         if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
-        uses: docker/build-push-action@5cd11c3a4ced054e52742c5fd54dca954e0edd85 # v6.7.0
+        uses: docker/build-push-action@ca877d9245402d1537745e0e356eab47c3520991 # v6.13.0
         with:
           push: false
           context: .

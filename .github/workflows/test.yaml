@@ -16,12 +16,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: setup golang
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: '^1.19'
 
       - name: cache go modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-build-codegen-${{ hashFiles('**/go.sum') }}
@@ -29,7 +29,7 @@ jobs:
             ${{ runner.os }}-build-codegen-
 
       - name: cache image builds
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: /var/lib/docker/
           key: ${{ runner.os }}-build-image-cache
@@ -37,7 +37,7 @@ jobs:
             ${{ runner.os }}-build-image-cache-
 
       - name: checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -75,7 +75,7 @@ jobs:
       ## Upload diagnostics if integration test step failed.
       - name: upload diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: blixt-integration-test-diag
           path: /tmp/ktf-diag*
