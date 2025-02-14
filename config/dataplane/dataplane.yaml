@@ -36,17 +36,17 @@ spec:
         # take some time to see if we can clean up and improve the start time overall.
         startupProbe:
           grpc:
-            port: 9874
+            port: 9875
           failureThreshold: 30
           periodSeconds: 10
         livenessProbe:
           grpc:
-            port: 9874
+            port: 9875
           initialDelaySeconds: 5
           periodSeconds: 5
         readinessProbe:
           grpc:
-            port: 9874
+            port: 9875
           initialDelaySeconds: 5
           periodSeconds: 5
 
