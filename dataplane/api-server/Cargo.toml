@@ -30,5 +30,5 @@ tonic-health = { workspace = true }
 tonic-build = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.16.0"
+tempfile = "3.17.1"
 rcgen = "0.13.2"
