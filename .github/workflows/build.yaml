@@ -14,43 +14,40 @@ on:
 jobs:
   rust-build:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
-
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         override: true
-
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
         components: rust-src, clippy, rustfmt
         override: false
-
     - name: Install bpf-linker
       run: |
         cargo install bpf-linker
+    - name: Install Protoc
+      uses: arduino/setup-protoc@v3
+      with:
+        version: "26.1"
 
     # TODO: Once we migrate the controller from Go to Rust,
     # add the controller build step here.
-
     - name: Build all rust crates (dataplane, test server) 
       run: |
         make build
-
     - name: Check formatting
       run: |
         make check.format
-
     - name: Check clippy
       run: |
         make lint
-
     - name: Run Tests
       run: |
         make test
+
   docker-build:
     name: docker-build
     runs-on: ubuntu-22.04

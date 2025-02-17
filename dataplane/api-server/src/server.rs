@@ -12,9 +12,10 @@ use aya::maps::{HashMap, MapData, MapError};
 use tokio::sync::Mutex;
 use tonic::{Request, Response, Status};
 
-use crate::backends::backends_server::Backends;
-use crate::backends::{Confirmation, InterfaceIndexConfirmation, PodIp, Targets, Vip};
+use backends::backends::{Confirmation, InterfaceIndexConfirmation, PodIp, Targets, Vip};
+
 use crate::netutils::if_index_for_routing_ip;
+use backends::backends::backends_server::Backends;
 use common::{
     Backend, BackendKey, BackendList, ClientKey, LoadBalancerMapping, BACKENDS_ARRAY_CAPACITY,
 };
