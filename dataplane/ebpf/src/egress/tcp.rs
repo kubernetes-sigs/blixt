@@ -4,11 +4,9 @@ Copyright 2023 The Kubernetes Authors.
 SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 */
 
-use core::mem;
-
 use aya_ebpf::{
     bindings::{TC_ACT_OK, TC_ACT_PIPE},
-    helpers::bpf_csum_diff,
+    helpers::{bpf_l3_csum_replace, bpf_l4_csum_replace},
     programs::TcContext,
 };
 use aya_log_ebpf::info;
@@ -16,7 +14,7 @@ use common::ClientKey;
 use network_types::{eth::EthHdr, ip::Ipv4Hdr, tcp::TcpHdr};
 
 use crate::{
-    utils::{csum_fold_helper, ptr_at, update_tcp_conns},
+    utils::{ptr_at, update_tcp_conns},
     LB_CONNECTIONS,
 };
 
@@ -36,6 +34,13 @@ pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
         ip: u32::from_be(client_addr),
         port: u16::from_be(dest_port) as u32,
     };
+
+    // Store the old source IP address for checksum calculation
+    let old_src_addr = unsafe { (*ip_hdr).src_addr };
+
+    // Store the old source port for checksum calculation
+    let old_src_port = unsafe { (*tcp_hdr).source };
+
     let lb_mapping = unsafe { LB_CONNECTIONS.get(&client_key) }.ok_or(TC_ACT_PIPE)?;
 
     info!(
@@ -60,21 +65,37 @@ pub fn handle_tcp_egress(ctx: TcContext) -> Result<i32, i64> {
         return Ok(TC_ACT_OK);
     }
 
-    unsafe { (*ip_hdr).check = 0 };
-    let full_cksum = unsafe {
-        bpf_csum_diff(
-            mem::MaybeUninit::zeroed().assume_init(),
-            0,
-            ip_hdr as *mut u32,
-            Ipv4Hdr::LEN as u32,
-            0,
+    let ret = unsafe {
+        bpf_l3_csum_replace(
+            ctx.skb.skb,
+            4u32,
+            old_src_addr as u64,
+            lb_mapping.backend_key.ip.to_be() as u64,
+            4,
         )
-    } as u64;
-    unsafe { (*ip_hdr).check = csum_fold_helper(full_cksum) };
-    unsafe { (*tcp_hdr).check = 0 };
+    };
+
+    if ret != 0 {
+        info!(&ctx, "Failed to update IP checksum");
+        return Ok(TC_ACT_OK);
+    }
+
+    let ret = unsafe {
+        bpf_l4_csum_replace(
+            ctx.skb.skb,
+            tcp_header_offset as u32,
+            old_src_port as u64,
+            lb_mapping.backend_key.port.to_be() as u64,
+            2, 
+        )
+    };
+
+    if ret != 0 {
+        info!(&ctx, "Failed to update TCP checksum");
+        return Ok(TC_ACT_OK);
+    }
 
     let tcp_hdr_ref = unsafe { tcp_hdr.as_ref().ok_or(TC_ACT_OK)? };
-
     // If the packet has the RST flag set, it means the connection is being terminated, so remove it
     // from our map.
     if tcp_hdr_ref.rst() == 1 {
