@@ -31,7 +31,7 @@ memoffset = { version = "0.9", default-features = false }
 network-types = { version = "0.0.5", default-features = false }
 prost = { version = "0.12.6", default-features = false }
 regex = { version = "1", default-features = true }
-serde = { version = "1.0.185", default-features = false }
+serde = { version = "1.0.219", default-features = false }
 serde_json = { version = "1.0.140", default-features = false }
 serde_yaml = { version = "0.9.25", default-features = false }
 thiserror = { version = "1.0.69", default-features = true }
