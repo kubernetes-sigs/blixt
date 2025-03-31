@@ -15,11 +15,13 @@ limitations under the License.
 */
 
 use futures::StreamExt;
+use log::debug;
 use std::{
     ops::Sub,
     sync::Arc,
     time::{Duration, Instant},
 };
+use utils::set_condition;
 
 use crate::*;
 use gateway_api::apis::standard::gateways::{Gateway, GatewayStatus};
@@ -74,6 +76,14 @@ pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Actio
         "found a supported GatewayClass: {:?}",
         gateway_class.name_any()
     );
+    // Only reconcile the Gateway object if our GatewayClass has already been accepted
+    if !gatewayclass_utils::is_accepted(&gateway_class) {
+        debug!(
+            "GatewayClass {:?} not yet accepted",
+            gateway_class.name_any()
+        );
+        return Ok(Action::await_change());
+    }
 
     set_listener_status(&mut gw)?;
     let accepted_cond = get_accepted_condition(&gw);
@@ -127,11 +137,11 @@ pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Actio
         let updated = update_service_for_gateway(gateway.as_ref(), &mut service)?;
         if updated {
             info!("drift detected; updating loadbalancer service");
-            let patch_parmas = PatchParams::default();
+            let patch_params = PatchParams::default();
             service_api
                 .patch(
                     val.name_any().as_str(),
-                    &patch_parmas,
+                    &patch_params,
                     &Patch::Strategic(&service),
                 )
                 .await
