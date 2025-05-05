@@ -13,7 +13,7 @@ common = { path = "../common", features = ["user"] }
 libc = { workspace = true }
 log = { workspace = true }
 netlink-packet-core = { version = "0.7.0" }
-netlink-packet-route = { version = "0.22.0" }
+netlink-packet-route = { version = "0.23.0" }
 netlink-sys = { version = "0.8.7" }
 prost = { workspace = true }
 tokio = { workspace = true, features = [
