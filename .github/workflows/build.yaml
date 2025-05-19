@@ -65,7 +65,7 @@ jobs:
               - 'build/Containerfile.dataplane'
       - name: Build container image for amd64
         if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
-        uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
+        uses: docker/build-push-action@1dc73863535b631f98b2378be8619f83b136f4a0 # v6.17.0
         with:
           push: false
           context: .
@@ -80,7 +80,7 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: Build container image for arm64
         if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
-        uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
+        uses: docker/build-push-action@1dc73863535b631f98b2378be8619f83b136f4a0 # v6.17.0
         with:
           push: false
           context: .
