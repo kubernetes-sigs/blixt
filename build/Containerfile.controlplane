@@ -12,11 +12,15 @@ ARG TARGETPLATFORM
 ARG PROJECT_DIR=/workspace
 ARG BUILD_DIR=$PROJECT_DIR/build
 
-RUN --mount=type=bind,source=../controlplane/src/,target=src \
-    --mount=type=bind,source=../controlplane/Cargo.toml,target=Cargo.toml \
-    --mount=type=bind,source=../controlplane/Cargo.lock,target=Cargo.lock \
-    xx-cargo build --release --target-dir $BUILD_DIR && \
-    xx-verify ./build/$(xx-cargo --print-target-triple)/release/controller
+RUN --mount=type=bind,source=./controlplane,target=/workspace/controlplane \
+    --mount=type=bind,source=./dataplane,target=/workspace/dataplane \
+    --mount=type=bind,source=./xtask,target=/workspace/xtask \
+    --mount=type=bind,source=./tools,target=/workspace/tools \
+    --mount=type=bind,source=./Cargo.toml,target=/workspace/Cargo.toml \
+    --mount=type=bind,source=./Cargo.lock,target=/workspace/Cargo.lock \
+    cd /workspace && \
+    xx-cargo build --release --target-dir $BUILD_DIR -p controlplane && \
+    xx-verify $BUILD_DIR/$(xx-cargo --print-target-triple)/release/controller
 
 RUN cp ./build/$(xx-cargo --print-target-triple)/release/controller /workspace/manager
 

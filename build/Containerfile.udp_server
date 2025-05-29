@@ -13,6 +13,7 @@ COPY tools/udp-test-server/Cargo.toml tools/udp-test-server/Cargo.toml
 COPY tools/udp-test-server/Cargo.lock tools/udp-test-server/Cargo.lock
 COPY tools/udp-test-server/src/main.rs tools/udp-test-server/src/main.rs
 COPY xtask xtask
+COPY controlplane controlplane
 
 # Docker uses the amd64/arm64 convention while Rust uses the x86_64/aarch64 convention.
 # Since Dockerfile doesn't support conditional variables (sigh), write the arch in Rust's
