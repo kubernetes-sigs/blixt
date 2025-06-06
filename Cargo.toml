@@ -22,7 +22,7 @@ chrono = { version = "0.4.41", default-features = false }
 clap = { version = "4.5", default-features = true }
 env_logger = { version = "0.11", default-features = false }
 gateway-api = { version = "0.16.0", default-features = false }
-futures = { version="0.3.28", default-features = true }
+futures = { version="0.3.31", default-features = true }
 kube = { version = "1.1.0", default-features = false }
 k8s-openapi = { version = "0.25.0", default-features = false }
 libc = { version = "0.2", default-features = false }
@@ -33,7 +33,7 @@ prost = { version = "0.12.6", default-features = false }
 regex = { version = "1", default-features = true }
 serde = { version = "1.0.219", default-features = false }
 serde_json = { version = "1.0.140", default-features = false }
-serde_yaml = { version = "0.9.25", default-features = false }
+serde_yaml = { version = "0.9.34", default-features = false }
 thiserror = { version = "1.0.69", default-features = true }
 tokio = { version = "1.45.1", default-features = false }
 tonic = { version = "0.11.0", default-features = false }
