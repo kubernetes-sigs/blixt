@@ -33,9 +33,9 @@ use gateway_api::apis::standard::{
     },
 };
 use kube::{
+    Resource, ResourceExt,
     api::{Api, Patch, PatchParams, PostParams},
     core::ObjectMeta,
-    Resource, ResourceExt,
 };
 
 use k8s_openapi::api::core::v1::{
@@ -399,7 +399,7 @@ pub fn set_listener_status(gateway: &mut Gateway) -> Result<()> {
         }
     }
 
-    let gen = gateway
+    let generation = gateway
         .metadata
         .generation
         .ok_or(Error::InvalidConfigError(
@@ -407,7 +407,7 @@ pub fn set_listener_status(gateway: &mut Gateway) -> Result<()> {
         ))?;
     for listener in &gateway_spec.listeners {
         let mut final_conditions = vec![];
-        let (supported_kinds, conditions) = get_listener_status(listener, gen);
+        let (supported_kinds, conditions) = get_listener_status(listener, generation);
         if let Some(current_listener_status) = current_listener_statuses.get(&listener.name) {
             for condition in conditions {
                 let mut present = false;
