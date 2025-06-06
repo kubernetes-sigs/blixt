@@ -4,6 +4,8 @@ Copyright 2023 The Kubernetes Authors.
 SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 */
 
+#![allow(static_mut_refs)]
+
 use aya_ebpf::{
     bindings::TC_ACT_OK,
     helpers::{bpf_l3_csum_replace, bpf_l4_csum_replace, bpf_skb_store_bytes},
