@@ -18,7 +18,7 @@ pub(crate) fn build_proto(_opts: Options) -> Result<(), anyhow::Error> {
         .protoc_arg("--experimental_allow_proto3_optional")
         .build_server(true)
         .out_dir("./dataplane/api-server/src")
-        .compile(&[proto_file], &["."])?;
+        .compile_protos(&[proto_file], &["."])?;
 
     Ok(())
 }

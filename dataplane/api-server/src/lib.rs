@@ -41,15 +41,13 @@ pub async fn start(
     // Public server without TLS (healthchecks ONLY)
     let healthchecks = tokio::spawn(async move {
         let (_, health_service) = tonic_health::server::health_reporter();
-        let mut server_builder = Server::builder();
+        let server_builder = Server::builder();
 
         // by convention we add 1 to the API listen port and use that
         // for the health check port.
         let port = port + 1;
         let addr = SocketAddrV4::new(addr, port);
-        let server = server_builder
-            .add_service(health_service)
-            .serve(addr.into());
+        let server = server_builder.serve(addr.into(), health_service);
 
         debug!("gRPC Health Checking service listens on {}", addr);
         server
@@ -65,9 +63,7 @@ pub async fn start(
         server_builder = setup_tls(server_builder, &tls_config).unwrap();
 
         let tls_addr = SocketAddrV4::new(addr, port);
-        let tls_server = server_builder
-            .add_service(BackendsServer::new(server))
-            .serve(tls_addr.into());
+        let tls_server = server_builder.serve(tls_addr.into(), BackendsServer::new(server));
 
         debug!("TLS server listens on {}", tls_addr);
         tls_server.await.expect("Failed to serve TLS");

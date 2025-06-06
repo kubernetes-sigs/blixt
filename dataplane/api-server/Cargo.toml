@@ -23,7 +23,7 @@ tokio = { workspace = true, features = [
     "net",
     "signal",
 ] }
-tonic = { workspace = true, features = ["tls"] }
+tonic = { workspace = true, features = ["tls-ring", "transport"] }
 tonic-health = { workspace = true }
 
 [build-dependencies]

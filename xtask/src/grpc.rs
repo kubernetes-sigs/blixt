@@ -47,7 +47,7 @@ pub async fn update(opts: Options) -> Result<(), Error> {
     };
 
     if opts.delete {
-        let res = client.delete(vip.clone()).await?;
+        let res = client.delete(vip).await?;
         println!(
             "grpc server responded to DELETE: {}",
             res.into_inner().confirmation
@@ -55,7 +55,7 @@ pub async fn update(opts: Options) -> Result<(), Error> {
     } else {
         let res = client
             .update(Targets {
-                vip: Some(vip.clone()),
+                vip: Some(vip),
                 targets: vec![Target {
                     daddr: daddr.into(),
                     dport: opts.dport,
