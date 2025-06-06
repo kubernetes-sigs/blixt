@@ -6,10 +6,8 @@
 > have any questions or issues, check in with us in the `#blixt` channel on
 > [Kubernetes Slack]!
 
-> **Warning**: Experimental. We currently intend this project to be a sandbox
-> for experimenting with networking functionality, and a safe place to learn.
-> For the moment there is no intention to ever make this viable for production
-> use cases. **DO NOT USE IN PRODUCTION**.
+> **Warning**: Experimental. For the moment there is no intention to ever make
+> this viable for production use cases. **DO NOT USE IN PRODUCTION**.
 
 [rewrite]:https://github.com/kubernetes-sigs/blixt/milestone/8
 [Kubernetes Slack]:https://kubernetes.slack.com
@@ -25,19 +23,20 @@ using [Kube-RS] for the control-plane and [eBPF] with [Aya] for the data-plane.
 [Kubernetes]:https://kubernetes.io
 [Rust]:https://rust-lang.org
 [Kube-RS]:https://github.com/kube-rs
-[eBPF]:https://www.tigera.io/learn/guides/ebpf/ebpf-xdp/
+[eBPF]:https://ebpf.io/what-is-ebpf/
 [Aya]:https://aya-rs.dev
 
 ## Current Status
 
 Current project goals are the following:
 
-- [ ] support the [Kubernetes Service API][svc] (upcoming)
+- [ ] support the [Kubernetes Service API][svc] ([upcoming])
 - [ ] support [Gateway]/[GatewayClass] + [UDPRoute] / [TCPRoute] (in progress, partially complete)
 
 After these goals are achieved, further goals may be decided.
 
 [svc]:https://kubernetes.io/docs/concepts/services-networking/service/
+[upcoming]:https://github.com/kubernetes-sigs/blixt/issues/279
 [Gateway]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.Gateway
 [GatewayClass]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.GatewayClass
 [UDPRoute]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.UDPRoute
@@ -134,8 +133,9 @@ make load.image.controlplane
 ## Community
 
 You can reach out to the community by creating [issues] or [discussions]. You
-can also reach out on [Kubernetes Slack] on the `#blixt` channel. There is also
-an `#ebpf` channel on Kubernetes Slack for general eBPF related help as well.
+can also reach out on [Kubernetes Slack] on the `#blixt` channel. If desired, 
+an `#ebpf` channel on Kubernetes Slack for general eBPF related help is
+available as well.
 
 [issues]:https://github.com/kubernetes-sigs/blixt/issues
 [discussions]:https://github.com/kubernetes-sigs/blixt/discussions
