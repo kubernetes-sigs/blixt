@@ -13,7 +13,7 @@ path = "src/main.rs"
 futures = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 kube = { workspace = true, features = ["runtime", "client", "derive", "rustls-tls"] }
-k8s-openapi = { workspace = true, features = ["latest"] }
+k8s-openapi = { workspace = true, features = ["v1_32", "schemars"] }
 serde = { workspace = true, features = ["derive"] }
 chrono = { workspace = true, features = ["serde"] }
 serde_json = { workspace = true }
