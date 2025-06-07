@@ -111,7 +111,7 @@ CLOUD_PROVIDER_KIND ?= $(LOCALBIN)/cloud-provider-kind
 CFSSL_VERSION ?= v1.6.5
 KUSTOMIZE_VERSION ?= v5.3.0
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
-KIND_VERSION ?= v0.22.0
+KIND_VERSION ?= v0.29.0
 CLOUD_PROVIDER_KIND_VERSION ?= v0.6.0
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
