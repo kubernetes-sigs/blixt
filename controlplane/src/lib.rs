@@ -17,12 +17,15 @@ limitations under the License.
 use kube::Client;
 use thiserror::Error;
 
-pub mod gateway_controller;
-pub mod gateway_utils;
-pub mod gatewayclass_controller;
-pub mod gatewayclass_utils;
+pub use gateway_controller::controller as gateway_controller;
+pub use gatewayclass_controller::controller as gatewayclass_controller;
+
+mod gateway_controller;
+mod gateway_utils;
+mod gatewayclass_controller;
+mod gatewayclass_utils;
 mod traits;
-pub mod utils;
+mod utils;
 
 // Context for our reconciler
 #[derive(Clone)]

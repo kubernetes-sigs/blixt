@@ -32,9 +32,9 @@ use gateway_api::apis::standard::{
 use k8s_openapi::api::core::v1::{Service, ServiceSpec, ServiceStatus};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams},
-    runtime::{controller::Action, watcher::Config, Controller},
     Resource, ResourceExt,
+    api::{Api, ListParams, Patch, PatchParams},
+    runtime::{Controller, controller::Action, watcher::Config},
 };
 
 use chrono::Utc;
@@ -49,6 +49,7 @@ pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Actio
         .name
         .clone()
         .ok_or(Error::InvalidConfigError("invalid name".to_string()))?;
+
     let ns = gateway
         .metadata
         .namespace
@@ -76,6 +77,7 @@ pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Actio
         "found a supported GatewayClass: {:?}",
         gateway_class.name_any()
     );
+
     // Only reconcile the Gateway object if our GatewayClass has already been accepted
     if !gatewayclass_utils::is_accepted(&gateway_class) {
         debug!(

@@ -25,7 +25,7 @@ use crate::*;
 use gateway_api::apis::standard::gatewayclasses::GatewayClass;
 use kube::{
     api::{Api, ListParams},
-    runtime::{controller::Action, watcher::Config, Controller},
+    runtime::{Controller, controller::Action, watcher::Config},
 };
 
 use gatewayclass_utils::*;
@@ -38,13 +38,14 @@ pub async fn reconcile(gateway_class: Arc<GatewayClass>, ctx: Arc<Context>) -> R
         .metadata
         .name
         .clone()
-        .ok_or(Error::InvalidConfigError("no name provided for gatewayclass".to_string()))?;
+        .ok_or(Error::InvalidConfigError(
+            "no name provided for gatewayclass".to_string(),
+        ))?;
 
     let mut gwc = GatewayClass {
         metadata: gateway_class.metadata.clone(),
         spec: gateway_class.spec.clone(),
         status: gateway_class.status.clone(),
-        // NOTE: Am I missing anything else here?
     };
 
     if gateway_class.spec.controller_name != GATEWAY_CLASS_CONTROLLER_NAME {

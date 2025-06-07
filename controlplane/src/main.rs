@@ -16,6 +16,7 @@ limitations under the License.
 
 use controlplane::*;
 use kube::Client;
+use tokio::try_join;
 use tracing::*;
 
 #[tokio::main]
@@ -35,8 +36,11 @@ pub async fn run() {
         client: client.clone(),
     };
 
-    if let Err(error) = gateway_controller::controller(ctx).await {
-        error!("failed to start Gateway controller: {error:?}");
+    if let Err(error) = try_join!(
+        gateway_controller(ctx.clone()),
+        gatewayclass_controller(ctx)
+    ) {
+        error!("failed to start controllers: {error:?}");
         std::process::exit(1);
     }
 }
