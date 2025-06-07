@@ -3,4 +3,4 @@ config/** linguist-detectable=false
 test/** linguist-detectable=false
 tools/** linguist-detectable=false
 Cargo.lock linguist-generated=false
-Makefile linguist-generated=false
+Makefile linguist-detectable=false
