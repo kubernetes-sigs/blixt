@@ -105,12 +105,14 @@ CFSSLJSON ?= $(LOCALBIN)/cfssljson
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 KIND ?= $(LOCALBIN)/kind
+CLOUD_PROVIDER_KIND ?= $(LOCALBIN)/cloud-provider-kind
 
 ## Tool Versions
 CFSSL_VERSION ?= v1.6.5
 KUSTOMIZE_VERSION ?= v5.3.0
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
 KIND_VERSION ?= v0.22.0
+CLOUD_PROVIDER_KIND_VERSION ?= v0.6.0
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 
@@ -133,8 +135,13 @@ kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
 	test -s $(LOCALBIN)/kustomize || { curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); }
 
+.PHONY: cloud-provider-kind
+cloud-provider-kind: $(CLOUD_PROVIDER_KIND)
+$(CLOUD_PROVIDER_KIND): $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/cloud-provider-kind@$(CLOUD_PROVIDER_KIND_VERSION)
+
 .PHONY: kind
-kind: $(KIND)
+kind: $(CLOUD_PROVIDER_KIND) $(KIND)
 $(KIND): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/kind@$(KIND_VERSION)
 
@@ -300,6 +307,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 .PHONY: build.cluster
 build.cluster: $(KIND) # builds a KIND cluster which can be used for testing and development
 	$(KIND) create cluster --name $(KIND_CLUSTER)
+	echo "use $(CLOUD_PROVIDER_KIND) to enable LoadBalancer type Services"
 
 .PHONY: load.image.controlplane
 load.image.controlplane: build.image.controlplane
