@@ -105,7 +105,6 @@ CFSSLJSON ?= $(LOCALBIN)/cfssljson
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 KIND ?= $(LOCALBIN)/kind
-KTF ?= $(LOCALBIN)/ktf
 
 ## Tool Versions
 CFSSL_VERSION ?= v1.6.5
@@ -137,12 +136,7 @@ $(KUSTOMIZE): $(LOCALBIN)
 .PHONY: kind
 kind: $(KIND)
 $(KIND): $(LOCALBIN)
-	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/kind@$(KIND_VERSION)
-
-.PHONY: ktf
-ktf: $(KTF) $(KIND)
-$(KTF): $(LOCALBIN)
-	test -s $(LOCALBIN)/ktf || GOBIN=$(LOCALBIN) go install github.com/kong/kubernetes-testing-framework/cmd/ktf@latest
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/kind@$(KIND_VERSION)
 
 .PHONY: bundle
 bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
@@ -304,8 +298,8 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: build.cluster
-build.cluster: $(KTF) # builds a KIND cluster which can be used for testing and development
-	PATH="$(LOCALBIN):${PATH}" $(KTF) env create --name $(KIND_CLUSTER) --addon metallb
+build.cluster: $(KIND) # builds a KIND cluster which can be used for testing and development
+	$(KIND) create cluster --name $(KIND_CLUSTER)
 
 .PHONY: load.image.controlplane
 load.image.controlplane: build.image.controlplane
