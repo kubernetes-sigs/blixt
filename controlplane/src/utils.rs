@@ -8,7 +8,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
 // if the new condition has a different status (except for the observed generation which is always
 // updated).
 pub fn set_condition<T: HasConditions>(obj: &mut T, new_cond: metav1::Condition) {
-    if let Some(ref mut conditions) = obj.get_conditions_mut() {
+    if let Some(conditions) = obj.get_conditions_mut() {
         for condition in conditions.iter_mut() {
             if condition.type_ == new_cond.type_ {
                 if condition.status == new_cond.status {
