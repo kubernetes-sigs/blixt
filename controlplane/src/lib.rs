@@ -44,6 +44,8 @@ pub enum Error {
     LoadBalancerError(String),
     #[error("error querying Gateway API CRDs: `{0}`; are the CRDs installed?")]
     CRDNotFoundError(#[source] kube::Error),
+    #[error("dataplane error: {0}")]
+    DataplaneError(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
