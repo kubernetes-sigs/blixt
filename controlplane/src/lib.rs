@@ -50,10 +50,6 @@ pub enum Error {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub const GATEWAY_CLASS_CONTROLLER_NAME: &str = "gateway.networking.k8s.io/blixt";
-pub const BLIXT_FIELD_MANAGER: &str = "blixt-field-manager";
-pub const GATEWAY_SERVICE_LABEL: &str = "blixt.gateway.networking.k8s.io/owned-by-gateway";
-
 pub struct NamespacedName {
     pub name: String,
     pub namespace: String,
