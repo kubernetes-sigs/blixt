@@ -14,18 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-use kube::Client;
-use thiserror::Error;
-
-pub use gateway_controller::controller as gateway_controller;
-pub use gatewayclass_controller::controller as gatewayclass_controller;
-
+pub mod client_manager;
+mod consts;
 mod gateway_controller;
 mod gateway_utils;
 mod gatewayclass_controller;
 mod gatewayclass_utils;
+mod route_utils;
 mod traits;
-mod utils;
+
+pub use gateway_controller::controller as gateway_controller;
+pub use gatewayclass_controller::controller as gatewayclass_controller;
+
+use kube::Client;
+use thiserror::Error;
 
 // Context for our reconciler
 #[derive(Clone)]

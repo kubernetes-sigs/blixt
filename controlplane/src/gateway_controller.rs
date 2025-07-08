@@ -14,16 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-use futures::StreamExt;
-use log::debug;
 use std::{
     ops::Sub,
     sync::Arc,
     time::{Duration, Instant},
 };
-use utils::set_condition;
 
-use crate::*;
+use crate::{
+    consts::{GATEWAY_CLASS_CONTROLLER_NAME, GATEWAY_SERVICE_LABEL},
+    *,
+};
+use gateway_utils::*;
+use route_utils::set_condition;
+
+use chrono::Utc;
+use futures::StreamExt;
 use gateway_api::apis::standard::gateways::{Gateway, GatewayStatus};
 use gateway_api::apis::standard::{
     constants::{GatewayConditionReason, GatewayConditionType},
@@ -36,9 +41,7 @@ use kube::{
     api::{Api, ListParams, Patch, PatchParams},
     runtime::{Controller, controller::Action, watcher::Config},
 };
-
-use chrono::Utc;
-use gateway_utils::*;
+use log::debug;
 use tracing::*;
 
 pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Action> {

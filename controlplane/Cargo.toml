@@ -26,6 +26,4 @@ gateway-api = { workspace = true }
 tonic = { workspace = true, features = ["tls-ring"] }
 tonic-health = { workspace = true }
 prost = { workspace = true }
-
-[build-dependencies]
-tonic-build = { workspace = true }
+api-server = { path = "../dataplane/api-server" }

@@ -21,7 +21,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::*;
+use crate::{consts::GATEWAY_CLASS_CONTROLLER_NAME, *};
 use gateway_api::apis::standard::gatewayclasses::GatewayClass;
 use kube::{
     api::{Api, ListParams},

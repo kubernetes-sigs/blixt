@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-use crate::*;
+use crate::{consts::BLIXT_FIELD_MANAGER, *};
+use route_utils::set_condition;
+
+use chrono::Utc;
 use gateway_api::apis::standard::{
     constants::{GatewayConditionReason, GatewayConditionType},
     gatewayclasses::{GatewayClass, GatewayClassStatus},
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
-
-use chrono::Utc;
 use kube::api::{Api, Patch, PatchParams};
 use serde_json::json;
-use utils::set_condition;
 
 pub fn is_accepted(gateway_class: &GatewayClass) -> bool {
     let mut accepted = false;

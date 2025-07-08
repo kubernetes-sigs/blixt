@@ -21,7 +21,10 @@ use std::{
     sync::Arc,
 };
 
-use crate::*;
+use crate::{
+    consts::{BLIXT_FIELD_MANAGER, GATEWAY_SERVICE_LABEL},
+    *,
+};
 use gateway_api::apis::standard::{
     constants::{
         GatewayConditionReason, GatewayConditionType, ListenerConditionReason,

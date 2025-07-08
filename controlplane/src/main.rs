@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 use controlplane::*;
+
 use kube::Client;
 use tokio::try_join;
 use tracing::*;
@@ -36,9 +37,15 @@ pub async fn run() {
         client: client.clone(),
     };
 
+    // TODO: when TCPRoute and UDPRoute support is implemented
+    //
+    // use std::sync::Arc;
+    // use controlplane::client_manager::DataplaneClientManager;
+    // let dataplane_manager = Arc::new(DataplaneClientManager::new());
+
     if let Err(error) = try_join!(
         gateway_controller(ctx.clone()),
-        gatewayclass_controller(ctx)
+        gatewayclass_controller(ctx),
     ) {
         error!("failed to start controllers: {error:?}");
         std::process::exit(1);
