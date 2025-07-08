@@ -1,9 +1,0 @@
-bases:
-- ../../default
-- perf-server.yaml
-
-images:
-- name: ghcr.io/kubernetes-sigs/blixt-dataplane
-  newTag: performance-tests
-- name: ghcr.io/kubernetes-sigs/blixt-controlplane
-  newTag: performance-tests
