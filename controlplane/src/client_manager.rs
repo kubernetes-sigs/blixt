@@ -32,6 +32,12 @@ pub struct DataplaneClientManager {
     clients: Arc<RwLock<HashMap<String, BackendsClient<Channel>>>>,
 }
 
+impl Default for DataplaneClientManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DataplaneClientManager {
     pub fn new() -> Self {
         Self {
@@ -62,16 +68,15 @@ impl DataplaneClientManager {
 
         for pod in dataplane_pods {
             if let Some(pod_ip) = &pod.status.as_ref().and_then(|s| s.pod_ip.as_ref()) {
-                let endpoint = format!("http://{}:9090", pod_ip);
+                let endpoint = format!("http://{pod_ip}:9090");
                 match BackendsClient::connect(endpoint.clone()).await {
                     Ok(grpc_client) => {
                         info!("Connected to dataplane pod: {}", pod_ip);
                         new_clients.insert(pod_ip.to_string(), grpc_client);
                     }
-                    Err(e) => {
+                    Err(err) => {
                         return Err(crate::Error::DataplaneError(format!(
-                            "Failed to connect to dataplane pod {}: {}",
-                            pod_ip, e
+                            "Failed to connect to dataplane pod {pod_ip}: {err}"
                         )));
                     }
                 }
@@ -97,10 +102,9 @@ impl DataplaneClientManager {
                 Ok(_) => {
                     info!("Successfully updated targets on dataplane pod: {}", pod_ip);
                 }
-                Err(e) => {
+                Err(err) => {
                     return Err(crate::Error::DataplaneError(format!(
-                        "Failed to update targets on dataplane pod {}: {}",
-                        pod_ip, e
+                        "Failed to update targets on dataplane pod {pod_ip}: {err}"
                     )));
                 }
             }
@@ -122,8 +126,8 @@ impl DataplaneClientManager {
                 Ok(_) => {
                     info!("Successfully deleted VIP on dataplane pod: {}", pod_ip);
                 }
-                Err(e) => {
-                    warn!("Failed to delete VIP on dataplane pod {}: {}", pod_ip, e);
+                Err(err) => {
+                    warn!("Failed to delete VIP on dataplane pod {}: {}", pod_ip, err);
                 }
             }
         }

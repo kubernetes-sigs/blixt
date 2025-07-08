@@ -119,8 +119,8 @@ check.format.rust: ## Check Rust code formatting
 	cargo fmt --manifest-path Cargo.toml --all -- --check
 
 .PHONY: lint
-lint: ## Lint Rust code
-	cargo clippy --all -- -D warnings
+lint:
+	cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 # ------------------------------------------------------------------------------
 # Testing

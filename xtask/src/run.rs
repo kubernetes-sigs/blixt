@@ -71,7 +71,7 @@ pub fn run_dataplane(opts: Options) -> Result<(), anyhow::Error> {
 
     // profile we are building (release or debug)
     let profile = if opts.release { "release" } else { "debug" };
-    let bin_path = format!("target/{}/loader", profile);
+    let bin_path = format!("target/{profile}/loader");
 
     // arguments to pass to the application
     let mut run_args: Vec<_> = opts.run_args.iter().map(String::as_str).collect();
@@ -96,11 +96,11 @@ pub fn run_controlplane(opts: Options) -> Result<(), anyhow::Error> {
 
     // profile we are building (release or debug)
     let profile = if opts.release { "release" } else { "debug" };
-    let bin_path = format!("target/{}/controller", profile);
+    let bin_path = format!("target/{profile}/controller");
 
     // spawn the command
     let err = Command::new(&bin_path).env("RUST_LOG", "info").exec();
 
     // we shouldn't get here unless the command failed to spawn
-    Err(anyhow::Error::from(err).context(format!("Failed to run `{}`", bin_path)))
+    Err(anyhow::Error::from(err).context(format!("Failed to run `{bin_path}`")))
 }

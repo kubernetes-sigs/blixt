@@ -72,5 +72,5 @@ pub fn if_index_for_routing_ip(ip_addr: Ipv4Addr) -> Result<u32, Error> {
             return Ok(*idex_if);
         }
     }
-    Err(Error::msg(format!("{} {}", ERR_NO_IFINDEX, ip_addr)))
+    Err(Error::msg(format!("{ERR_NO_IFINDEX} {ip_addr}")))
 }

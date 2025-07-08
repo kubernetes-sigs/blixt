@@ -16,7 +16,7 @@ use crate::backends::backends_server::Backends;
 use crate::backends::{Confirmation, InterfaceIndexConfirmation, PodIp, Targets, Vip};
 use crate::netutils::if_index_for_routing_ip;
 use common::{
-    Backend, BackendKey, BackendList, ClientKey, LoadBalancerMapping, BACKENDS_ARRAY_CAPACITY,
+    BACKENDS_ARRAY_CAPACITY, Backend, BackendKey, BackendList, ClientKey, LoadBalancerMapping,
 };
 
 pub struct BackendService {
@@ -133,9 +133,8 @@ impl Backends for BackendService {
                         Ok(ifindex) => ifindex,
                         Err(err) => {
                             return Err(Status::internal(format!(
-                                "failed to determine ifindex: {}",
-                                err
-                            )))
+                                "failed to determine ifindex: {err}"
+                            )));
                         }
                     }
                 }
@@ -163,13 +162,12 @@ impl Backends for BackendService {
         match self.insert_and_reset_index(key, backend_list).await {
             Ok(_) => Ok(Response::new(Confirmation {
                 confirmation: format!(
-                    "success, vip {}:{} was updated with {} backends",
+                    "success, vip {}:{} was updated with {count} backends",
                     Ipv4Addr::from(vip.ip),
                     vip.port,
-                    count,
                 ),
             })),
-            Err(err) => Err(Status::internal(format!("failure: {}", err))),
+            Err(err) => Err(Status::internal(format!("failure: {err}"))),
         }
     }
 
@@ -185,14 +183,14 @@ impl Backends for BackendService {
 
         match self.remove(key).await {
             Ok(()) => Ok(Response::new(Confirmation {
-                confirmation: format!("success, vip {}:{} was deleted", addr_ddn, vip.port),
+                confirmation: format!("success, vip {addr_ddn}:{} was deleted", vip.port),
             })),
             Err(err) if err.to_string().contains("syscall failed with code -1") => {
                 Ok(Response::new(Confirmation {
-                    confirmation: format!("success, vip {}:{} did not exist", addr_ddn, vip.port),
+                    confirmation: format!("success, vip {addr_ddn}:{} did not exist", vip.port),
                 }))
             }
-            Err(err) => Err(Status::internal(format!("failure: {}", err))),
+            Err(err) => Err(Status::internal(format!("failure: {err}"))),
         }
     }
 }

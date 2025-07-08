@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn run_server(port: u16, start_notifier: Sender<u16>) -> std::io::Result<()> {
-    let bindaddr = format!("0.0.0.0:{}", port);
+    let bindaddr = format!("0.0.0.0:{port}");
     let sock = UdpSocket::bind(&bindaddr).await?;
 
     if let Err(err) = start_notifier.send(port).await {
@@ -43,7 +43,7 @@ async fn run_server(port: u16, start_notifier: Sender<u16>) -> std::io::Result<(
     let mut buf = [0; 1024];
     loop {
         let (len, addr) = sock.recv_from(&mut buf).await?;
-        println!("port {}: {} bytes received from {}", port, len, addr);
+        println!("port {port}: {len} bytes received from {addr}");
         println!(
             "port {}: buffer contents: {}",
             port,
@@ -53,19 +53,19 @@ async fn run_server(port: u16, start_notifier: Sender<u16>) -> std::io::Result<(
 }
 
 async fn run_health_server(port: u16, mut rx: Receiver<u16>) -> std::io::Result<()> {
-    let bindaddr = format!("0.0.0.0:{}", port);
+    let bindaddr = format!("0.0.0.0:{port}");
     let listener = TcpListener::bind(&bindaddr).await?;
 
     println!("waiting for listeners...");
     let mut wait_for = 3;
     while wait_for > 0 {
         if let Some(port) = rx.recv().await {
-            println!("UDP worker listening on port {}", port);
+            println!("UDP worker listening on port {port}");
             wait_for -= 1;
         };
     }
 
-    println!("health check server listening on {}", port);
+    println!("health check server listening on {port}");
 
     let mut peers = Peers::default();
     loop {
@@ -87,7 +87,7 @@ impl Peers {
         }
 
         if !self.peers.contains(&addr.ip()) {
-            println!("received health check from {}", addr);
+            println!("received health check from {addr}");
             self.peers.push(addr.ip());
         }
     }

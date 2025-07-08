@@ -117,7 +117,7 @@ pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Actio
     // Try to fetch any existing Loadbalancer service(s) for this Gateway.
     let service_api: Api<Service> = Api::namespaced(client, &ns);
     let services = service_api
-        .list(&ListParams::default().labels(&format!("{}={}", GATEWAY_SERVICE_LABEL, name)))
+        .list(&ListParams::default().labels(&format!("{GATEWAY_SERVICE_LABEL}={name}")))
         .await
         .map_err(Error::KubeError)?;
 

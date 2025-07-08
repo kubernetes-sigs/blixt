@@ -36,7 +36,7 @@ pub struct Options {
 pub async fn update(opts: Options) -> Result<(), Error> {
     let server_addr: SocketAddr = format!("{}:{}", opts.server_ip, opts.server_port).parse()?;
 
-    let mut client = BackendsClient::connect(format!("http://{}", server_addr)).await?;
+    let mut client = BackendsClient::connect(format!("http://{server_addr}")).await?;
 
     let addr = net::Ipv4Addr::from_str(&opts.vip_ip)?;
     let daddr = net::Ipv4Addr::from_str(&opts.daddr)?;

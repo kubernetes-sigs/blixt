@@ -225,7 +225,7 @@ pub fn update_service_for_gateway(gateway: &Gateway, svc: &mut Service) -> Resul
             let addr = addresses[0].clone();
             if let Some(t) = addr.r#type {
                 if t != "IPAddress" {
-                    return Err(Error::InvalidConfigError(format!("addresses of type {} are not supported; only type IPAddress is supported", t).to_string()));
+                    return Err(Error::InvalidConfigError(format!("addresses of type {t} are not supported; only type IPAddress is supported").to_string()));
                 }
             }
             address = Some(addresses[0].clone());
@@ -353,8 +353,7 @@ pub fn get_accepted_condition(gateway: &Gateway) -> metav1::Condition {
                     accepted.status = String::from("False");
                     accepted.reason = GatewayConditionReason::UnsupportedAddress.to_string();
                     accepted.message = format!(
-                        "found an addres of type {}, only type IPAddress is supported",
-                        addr_type
+                        "found an addres of type {addr_type}, only type IPAddress is supported"
                     );
                     break;
                 }
@@ -615,7 +614,7 @@ fn check_route_kinds(
 
     if let Some(group) = &rgk.group {
         if group.as_str() != "gateway.networking.k8s.io" {
-            return Some(format!("Unsupported API group: {}", group));
+            return Some(format!("Unsupported API group: {group}"));
         }
     }
     None

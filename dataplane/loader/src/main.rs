@@ -79,7 +79,7 @@ async fn main() -> Result<(), anyhow::Error> {
         "../../target/bpfel-unknown-none/release/loader"
     ))?;
     if let Err(e) = EbpfLogger::init(&mut bpf_program) {
-        warn!("failed to initialize eBPF logger: {}", e);
+        warn!("failed to initialize eBPF logger: {e}");
     }
 
     info!("attaching tc_ingress program to {}", &opt.iface);

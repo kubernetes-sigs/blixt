@@ -56,7 +56,7 @@ async fn main() {
     };
 
     if let Err(e) = ret {
-        eprintln!("{:#}", e);
+        eprintln!("{e:#}");
         exit(1);
     }
 }

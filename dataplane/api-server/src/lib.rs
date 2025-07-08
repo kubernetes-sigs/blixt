@@ -49,7 +49,7 @@ pub async fn start(
         let addr = SocketAddrV4::new(addr, port);
         let server = server_builder.serve(addr.into(), health_service);
 
-        debug!("gRPC Health Checking service listens on {}", addr);
+        debug!("gRPC Health Checking service listens on {addr}");
         server
             .await
             .expect("Failed to serve gRPC Health Checking service");
@@ -65,7 +65,7 @@ pub async fn start(
         let tls_addr = SocketAddrV4::new(addr, port);
         let tls_server = server_builder.serve(tls_addr.into(), BackendsServer::new(server));
 
-        debug!("TLS server listens on {}", tls_addr);
+        debug!("TLS server listens on {tls_addr}");
         tls_server.await.expect("Failed to serve TLS");
     });
 
