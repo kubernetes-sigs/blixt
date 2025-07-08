@@ -8,8 +8,3 @@ build/bin/*
 
 # xtask targets
 target/
-
-# Personal TODO lists
-TODO
-
-bin

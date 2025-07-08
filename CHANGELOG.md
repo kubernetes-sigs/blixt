@@ -8,8 +8,9 @@
 
 ## Unreleased
 
-- The Golang control-plane has been removed, and replaced by a control-plane
-  written in Rust using [kube-rs](https://github.com/kube-rs).
+- The control-plane has been re-written back onto [kube-rs].
+
+[kube-rs]:https://github.com/kube-rs
 
 ## v0.3.0
 

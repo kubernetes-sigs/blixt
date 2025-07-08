@@ -1,6 +1,5 @@
+Cargo.lock linguist-generated=false
 bin/** linguist-detectable=false
 config/** linguist-detectable=false
-test/** linguist-detectable=false
 tools/** linguist-detectable=false
-Cargo.lock linguist-generated=false
 Makefile linguist-detectable=false

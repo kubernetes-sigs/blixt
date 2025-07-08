@@ -1,3 +1,0 @@
-[submodule "dataplane/libbpf"]
-	path = dataplane/libbpf
-	url = https://github.com/libbpf/libbpf
