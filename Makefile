@@ -1,98 +1,6 @@
 # ------------------------------------------------------------------------------
-# Build Variables
+# Build Dependencies
 # ------------------------------------------------------------------------------
-
-# IMAGES used when running tests.
-REGISTRY ?= ghcr.io/kubernetes-sigs
-BLIXT_CONTROLPLANE_IMAGE ?= $(REGISTRY)/blixt-controlplane
-BLIXT_DATAPLANE_IMAGE ?= $(REGISTRY)/blixt-dataplane
-BLIXT_UDP_SERVER_IMAGE ?= $(REGISTRY)/blixt-udp-test-server
-
-# Dockerfile paths for each service
-CONTROLPLANE_DOCKERFILE ?= build/Containerfile.controlplane
-DATAPLANE_DOCKERFILE ?= build/Containerfile.dataplane
-UDP_SERVER_DOCKERFILE ?= build/Containerfile.udp_server
-
-# Other testing variables
-EXISTING_CLUSTER ?=
-TEST_CERTS_PATH ?= config/tests/auth/certs
-
-# Image URL to use all building/pushing image targets
-TAG ?= integration-tests
-ifeq ($(shell uname -m),$(filter $(shell uname -m),arm64 aarch64))
-BUILD_PLATFORMS ?= linux/arm64
-else
-BUILD_PLATFORMS ?= linux/amd64
-endif
-BUILD_ARGS ?= --load
-
-# VERSION defines the project version for the bundle.
-# Update this value when you upgrade the version of your project.
-# To re-generate a bundle for another specific version without changing the standard setup, you can:
-# - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
-# - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.0.1
-
-# CHANNELS define the bundle channels used in the bundle.
-# Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
-# To re-generate a bundle for other specific channels without changing the standard setup, you can:
-# - use the CHANNELS as arg of the bundle target (e.g make bundle CHANNELS=candidate,fast,stable)
-# - use environment variables to overwrite this value (e.g export CHANNELS="candidate,fast,stable")
-ifneq ($(origin CHANNELS), undefined)
-BUNDLE_CHANNELS := --channels=$(CHANNELS)
-endif
-
-# DEFAULT_CHANNEL defines the default channel used in the bundle.
-# Add a new line here if you would like to change its default config. (E.g DEFAULT_CHANNEL = "stable")
-# To re-generate a bundle for any other default channel without changing the default setup, you can:
-# - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
-# - use environment variables to overwrite this value (e.g export DEFAULT_CHANNEL="stable")
-ifneq ($(origin DEFAULT_CHANNEL), undefined)
-BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
-endif
-BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
-
-# IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
-# This variable is used to construct full image tags for bundle and catalog images.
-#
-# For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# blixt.gateway.networking.k8s.io/blixt-bundle:$VERSION and blixt.gateway.networking.k8s.io/blixt-catalog:$VERSION.
-IMAGE_TAG_BASE ?= blixt.gateway.networking.k8s.io/blixt
-
-# BUNDLE_IMG defines the image:tag used for the bundle.
-# You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
-
-# BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
-BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
-
-# USE_IMAGE_DIGESTS defines if images are resolved via tags or digests
-# You can enable this value if you would like to use SHA Based Digests
-# To enable set flag to true
-USE_IMAGE_DIGESTS ?= false
-ifeq ($(USE_IMAGE_DIGESTS), true)
-	BUNDLE_GEN_FLAGS += --use-image-digests
-endif
-
-# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.24.2
-
-# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
-ifeq (,$(shell go env GOBIN))
-GOBIN=$(shell go env GOPATH)/bin
-else
-GOBIN=$(shell go env GOBIN)
-endif
-
-# Setting SHELL to bash allows bash commands to be executed by recipes.
-# Options are set to exit when a recipe line exits non-zero or a piped command fails.
-SHELL = /usr/bin/env bash -o pipefail
-.SHELLFLAGS = -ec
-
-# Ensure missing resources are not skipped when applying changes (by default)
-ifndef ignore-not-found
-  ignore-not-found = false
-endif
 
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/build/bin
@@ -102,7 +10,6 @@ $(LOCALBIN):
 ## Tool Binaries
 CFSSL ?= $(LOCALBIN)/cfssl
 CFSSLJSON ?= $(LOCALBIN)/cfssljson
-KUSTOMIZE ?= $(LOCALBIN)/kustomize
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 KIND ?= $(LOCALBIN)/kind
 CLOUD_PROVIDER_KIND ?= $(LOCALBIN)/cloud-provider-kind
@@ -110,15 +17,11 @@ CLOUD_PROVIDER_KIND ?= $(LOCALBIN)/cloud-provider-kind
 ## Tool Versions
 CFSSL_VERSION ?= v1.6.5
 KUSTOMIZE_VERSION ?= v5.3.0
-CONTROLLER_TOOLS_VERSION ?= v0.14.0
 KIND_VERSION ?= v0.29.0
 CLOUD_PROVIDER_KIND_VERSION ?= v0.6.0
 
-KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
-
-# ------------------------------------------------------------------------------
-# Build Dependencies
-# ------------------------------------------------------------------------------
+# CFSSL config
+TEST_CERTS_PATH ?= config/tests/auth/certs
 
 .PHONY: cfssl
 cfssl: $(CFSSL) ## Download cfssl locally if necessary
@@ -130,11 +33,6 @@ cfssljson: $(CFSSLJSON)
 $(CFSSLJSON): $(LOCALBIN)
 	test -s $(LOCALBIN)/cfssljson || GOBIN=$(LOCALBIN) go install github.com/cloudflare/cfssl/cmd/cfssljson@$(CFSSL_VERSION)
 
-.PHONY: kustomize
-kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
-$(KUSTOMIZE): $(LOCALBIN)
-	test -s $(LOCALBIN)/kustomize || { curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); }
-
 .PHONY: cloud-provider-kind
 cloud-provider-kind: $(CLOUD_PROVIDER_KIND)
 $(CLOUD_PROVIDER_KIND): $(LOCALBIN)
@@ -144,21 +42,6 @@ $(CLOUD_PROVIDER_KIND): $(LOCALBIN)
 kind: $(CLOUD_PROVIDER_KIND) $(KIND)
 $(KIND): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/kind@$(KIND_VERSION)
-
-.PHONY: bundle
-bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
-	operator-sdk generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
-	operator-sdk bundle validate ./bundle
-
-.PHONY: bundle-build
-bundle-build: ## Build the bundle image.
-	DOCKER_BUILDKIT=1 docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
-
-.PHONY: bundle-push
-bundle-push: ## Push the bundle image.
-	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
 
 # ------------------------------------------------------------------------------
 # Build
@@ -190,23 +73,38 @@ build.release: ## Build dataplane release
 # Build Images
 # ------------------------------------------------------------------------------
 
+# Container Runtimes
+CONTAINER_RUNTIME ?= podman
+
+# Container Images
+REGISTRY ?= ghcr.io/kubernetes-sigs
+BLIXT_CONTROLPLANE_IMAGE ?= $(REGISTRY)/blixt-controlplane
+BLIXT_DATAPLANE_IMAGE ?= $(REGISTRY)/blixt-dataplane
+BLIXT_UDP_SERVER_IMAGE ?= $(REGISTRY)/blixt-udp-test-server
+TAG ?= integration-tests
+
+# Containerfile paths for each service
+CONTROLPLANE_CONTAINERFILE ?= build/Containerfile.controlplane
+DATAPLANE_CONTAINERFILE ?= build/Containerfile.dataplane
+UDP_SERVER_CONTAINERFILE ?= build/Containerfile.udp_test_server
+
 .PHONY: build.image.controlplane
 build.image.controlplane:
-	DOCKER_BUILDKIT=1 docker buildx build --platform=$(BUILD_PLATFORMS) --file=$(CONTROLPLANE_DOCKERFILE) $(BUILD_ARGS) -t $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) .
+	$(CONTAINER_RUNTIME) build $(BUILD_ARGS) --file=$(CONTROLPLANE_CONTAINERFILE) -t $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) ./
 
-.PHONY: build.image.udp_server
-build.image.udp_server:
-	DOCKER_BUILDKIT=1 docker buildx build --platform=$(BUILD_PLATFORMS) --file=$(UDP_SERVER_DOCKERFILE) -t $(BLIXT_UDP_SERVER_IMAGE):$(TAG) .
+.PHONY: build.image.udp_test_server
+build.image.udp_test_server:
+	$(CONTAINER_RUNTIME) build $(BUILD_ARGS) --file=$(UDP_SERVER_CONTAINERFILE) -t $(BLIXT_UDP_SERVER_IMAGE):$(TAG) ./
 
 .PHONY: build.image.dataplane
 build.image.dataplane:
-	DOCKER_BUILDKIT=1 docker buildx build --platform $(BUILD_PLATFORMS) $(BUILD_ARGS) --file=$(DATAPLANE_DOCKERFILE) -t $(BLIXT_DATAPLANE_IMAGE):$(TAG) ./
+	$(CONTAINER_RUNTIME) build $(BUILD_ARGS) --file=$(DATAPLANE_CONTAINERFILE) -t $(BLIXT_DATAPLANE_IMAGE):$(TAG) ./
 
 .PHONY: build.all.images
 build.all.images: 
 	$(MAKE) build.image.controlplane
 	$(MAKE) build.image.dataplane
-	$(MAKE) build.image.udp_server
+	$(MAKE) build.image.udp_test_server
 
 # ------------------------------------------------------------------------------
 # Development
@@ -229,7 +127,7 @@ lint: ## Lint Rust code
 # ------------------------------------------------------------------------------
 
 .PHONY: test
-test: ## Run tests
+test:
 	cargo test -vv
 
 .PHONY: test.gencert
@@ -253,34 +151,6 @@ test.gencert: cfssl cfssljson
 test.rmcert:
 	rm $(TEST_CERTS_PATH)/{*.pem,*.csr}
 
-.PHONY: test.dataplane.integration
-test.dataplane.integration:
-	go clean -testcache
-	TEST_CERTS_PATH=./$(TEST_CERTS_PATH) \
-	BLIXT_DATAPLANE_IMAGE=$(BLIXT_DATAPLANE_IMAGE):$(TAG) \
-	GOFLAGS="-tags=dataplane_tests" go test -race -v ./test/integration/...
-	$(MAKE) test.rmcert
-	
-.PHONY: test.integration.deprecated
-test.integration.deprecated: ## Run the deprecated Golang integration tests
-	go clean -testcache
-	BLIXT_CONTROLPLANE_IMAGE=$(BLIXT_CONTROLPLANE_IMAGE):$(TAG) \
-	BLIXT_DATAPLANE_IMAGE=$(BLIXT_DATAPLANE_IMAGE):$(TAG) \
-	BLIXT_UDP_SERVER_IMAGE=$(BLIXT_UDP_SERVER_IMAGE):$(TAG) \
-	GOFLAGS="-tags=integration_tests" go test -race -v ./test/integration/...
-
-.PHONY: test.icmp.integration.deprecated
-test.icmp.integration.deprecated: ## Run the deprecated Golang integration tests for ICMP support
-	go clean -testcache
-	# This needs to run as sudo as the test involves listening for raw ICMP packets, which
-	# requires you to be root.
-	sudo env PATH=$(PATH) \
-	BLIXT_CONTROLPLANE_IMAGE=$(BLIXT_CONTROLPLANE_IMAGE):$(TAG) \
-	BLIXT_DATAPLANE_IMAGE=$(BLIXT_DATAPLANE_IMAGE):$(TAG) \
-	BLIXT_UDP_SERVER_IMAGE=$(BLIXT_UDP_SERVER_IMAGE):$(TAG) \
-	RUN_ICMP_TEST=true \
-	go test --tags=integration_tests -run "TestUDPRouteNoReach" -race -v ./test/integration/...
-
 # ------------------------------------------------------------------------------
 # Deployment
 # ------------------------------------------------------------------------------
@@ -288,24 +158,23 @@ test.icmp.integration.deprecated: ## Run the deprecated Golang integration tests
 KIND_CLUSTER ?= blixt-dev
 
 .PHONY: install
-install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+install: manifests
+	kubectl kustomize config/crd | kubectl apply -f -
 
 .PHONY: uninstall
-uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+uninstall: manifests
+	kubectl kustomize config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
+deploy: manifests
+	kubectl kustomize config/default | kubectl apply -f -
 
 .PHONY: undeploy
-undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+undeploy:
+	kubectl kustomize config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: build.cluster
-build.cluster: $(KIND) # builds a KIND cluster which can be used for testing and development
+build.cluster: $(KIND)
 	$(KIND) create cluster --name $(KIND_CLUSTER)
 	echo "use $(CLOUD_PROVIDER_KIND) to enable LoadBalancer type Services"
 

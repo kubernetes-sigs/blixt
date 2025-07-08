@@ -1,79 +1,83 @@
-FROM rust:1.79-slim-bookworm AS builder
+# ------------------------------------------------------------------------------
+# Builder
+# ------------------------------------------------------------------------------
 
-ARG TARGETARCH
-ARG LLVM_VERSION=19
+FROM rust:slim-bookworm AS builder
 
 RUN apt-get update
+
 RUN apt-get install --yes \
     build-essential \
+    llvm-19 \
     protobuf-compiler \
     pkg-config \
     musl-tools \
     clang \
-    wget
-
-RUN apt install --yes lsb-release software-properties-common gnupg
-RUN wget -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
-RUN chmod +x /tmp/llvm.sh
-RUN /bin/sh -c "/tmp/llvm.sh ${LLVM_VERSION} all"
+    wget \
+    lsb-release \
+    software-properties-common \
+    gnupg
 
 RUN rustup default stable
+
 RUN rustup install nightly
+
 RUN rustup component add rust-src --toolchain nightly
-RUN --mount=type=cache,target=/root/.cargo/registry \
-    cargo install bpf-linker
+
+RUN cargo install bpf-linker
 
 WORKDIR /workspace
-# Docker uses the amd64/arm64 convention while Rust uses the x86_64/aarch64 convention.
-# Since Dockerfile doesn't support conditional variables (sigh), write the arch in Rust's
-# convention to a file for later usage.
-RUN if [ "$TARGETARCH" = "amd64" ]; \
-    then echo "x86_64" >> arch; \
-    else echo "aarch64" >> arch; \
-    fi
-RUN rustup target add $(eval cat arch)-unknown-linux-musl
 
-COPY dataplane dataplane 
-COPY controlplane controlplane
-COPY tools/udp-test-server tools/udp-test-server
-COPY xtask xtask
-COPY Cargo.toml Cargo.toml
-COPY Cargo.lock Cargo.lock
-COPY .cargo .cargo
+RUN rustup target add x86_64-unknown-linux-musl
+
+ARG PROJECT_DIR=/workspace
+
+ARG BUILD_DIR=$PROJECT_DIR/build
+
+COPY Cargo.toml Cargo.lock ./
+
+COPY controlplane/ controlplane/
+
+COPY dataplane/ dataplane/
+
+COPY tools/ tools/
+
+COPY xtask/ xtask/
+
+COPY .cargo/config.toml .cargo/config.toml
 
 # We need to tell bpf-linker where it can find LLVM's shared library file.
 # Ref: https://github.com/aya-rs/rustc-llvm-proxy/blob/cbcb3c6/src/lib.rs#L48
-ENV LD_LIBRARY_PATH="/usr/lib/llvm-$LLVM_VERSION/lib"
-ENV CC_aarch64_unknown_linux_musl="/usr/lib/llvm-$LLVM_VERSION/bin/clang"
-ENV AR_aarch64_unknown_linux_musl="/usr/lib/llvm-$LLVM_VERSION/bin/llvm-ar"
-ENV CC_x86_64_unknown_linux_musl="/usr/lib/llvm-$LLVM_VERSION/bin/clang"
-ENV AR_x86_64_unknown_linux_musl="/usr/lib/llvm-$LLVM_VERSION/bin/llvm-ar"
-ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-Clink-self-contained=yes -Clinker=rust-lld"
+ENV LD_LIBRARY_PATH="/usr/lib/llvm-19/lib"
 
-RUN --mount=type=cache,target=/workspace/target/ \
-    --mount=type=cache,target=/root/.cargo/registry \
-    cargo xtask build-ebpf --release
-RUN --mount=type=cache,target=/workspace/target/ \
-    --mount=type=cache,target=/root/.cargo/registry \
-    RUSTFLAGS=-Ctarget-feature=+crt-static cargo build \
+ENV CC_x86_64_unknown_linux_musl="/usr/bin/clang"
+
+ENV AR_x86_64_unknown_linux_musl="/usr/lib/llvm-19/bin/llvm-ar"
+
+RUN cargo xtask build-ebpf
+
+RUN RUSTFLAGS=-Ctarget-feature=+crt-static cargo build \
     --workspace \
     --exclude ebpf \ 
     --package loader \
-    --release \
-    --target=$(eval cat arch)-unknown-linux-musl
-RUN --mount=type=cache,target=/workspace/target/ \
-    cp /workspace/target/$(eval cat arch)-unknown-linux-musl/release/loader /workspace/dataplane-release
+    --target=x86_64-unknown-linux-musl
+
+# ------------------------------------------------------------------------------
+# Image
+# ------------------------------------------------------------------------------
 
 FROM alpine
 
 LABEL org.opencontainers.image.source=https://github.com/kubernetes-sigs/blixt
+
 LABEL org.opencontainers.image.licenses=GPL-2.0-only,BSD-2-Clause
 
-WORKDIR /opt/blixt/
+WORKDIR /
 
-COPY --from=builder /workspace/dataplane-release /opt/blixt/dataplane
+COPY --from=builder /workspace/target/x86_64-unknown-linux-musl/debug/loader /dataplane
 
-COPY dataplane/LICENSE.GPL-2.0 /opt/blixt/LICENSE.GPL-2.0
-COPY dataplane/LICENSE.BSD-2-Clause /opt/blixt/LICENSE.BSD-2-Clause
+COPY dataplane/LICENSE.GPL-2.0 /LICENSE.GPL-2.0
 
-ENTRYPOINT ["/opt/blixt/dataplane"]
+COPY dataplane/LICENSE.BSD-2-Clause /LICENSE.BSD-2-Clause
+
+ENTRYPOINT ["/dataplane"]

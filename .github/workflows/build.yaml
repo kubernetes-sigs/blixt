@@ -3,54 +3,45 @@ name: build
 on:
   pull_request:
     branches:
-      - '*'
+      - "*"
   push:
     branches:
-      - 'main'
+      - "main"
     tags:
-      - '*'
+      - "*"
   workflow_dispatch: {}
 
 jobs:
   rust-build:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          components: rust-src, clippy, rustfmt
+          override: false
+      - name: Install bpf-linker
+        run: |
+          cargo install bpf-linker
+      - name: Build all rust crates (dataplane, test server)
+        run: |
+          make build
+      - name: Check formatting
+        run: |
+          make check.format
+      - name: Check clippy
+        run: |
+          make lint
+      - name: Run Tests
+        run: |
+          make test
 
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: nightly
-        components: rust-src, clippy, rustfmt
-        override: false
-
-    - name: Install bpf-linker
-      run: |
-        cargo install bpf-linker
-
-    - name: Build all rust crates (dataplane, test server) 
-      run: |
-        make build
-
-    - name: Check formatting
-      run: |
-        make check.format
-
-    - name: Check clippy
-      run: |
-        make lint
-
-    - name: Run Tests
-      run: |
-        make test
-
-  docker-build-amd64:
-    name: docker-build-amd64
+  image-build:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -63,26 +54,11 @@ jobs:
               - 'dataplane/**'
             containerfile:
               - 'build/Containerfile.dataplane'
-      - name: Build container image for amd64
+      - name: build container image
         if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           push: false
           context: .
           file: build/Containerfile.dataplane
-          tags: localhost/blixt-dataplane:pr-${{ github.event.pull_request.number }}-amd64-${{ github.sha }}
-
-  docker-build-arm64:
-    name: docker-build-arm64
-    runs-on: ubuntu-22.04-arm
-    steps:
-      - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - name: Build container image for arm64
-        if: steps.filter.outputs.dataplane || steps.filter.outputs.containerfile
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
-        with:
-          push: false
-          context: .
-          file: build/Containerfile.dataplane
-          tags: localhost/blixt-dataplane:pr-${{ github.event.pull_request.number }}-arm64-${{ github.sha }}
+          tags: localhost/blixt-dataplane:pr-${{ github.event.pull_request.number }}-${{ github.sha }}

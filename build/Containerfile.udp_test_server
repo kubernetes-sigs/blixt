@@ -4,7 +4,9 @@
 
 FROM rust:alpine AS builder
 
-RUN apk add --no-cache clang lld
+RUN apk add --no-cache musl-dev clang lld
+
+WORKDIR /workspace
 
 WORKDIR /workspace
 
@@ -22,13 +24,13 @@ COPY tools/ tools/
 
 COPY xtask/ xtask/
 
-RUN cargo build -p controlplane --target x86_64-unknown-linux-musl
+RUN cargo build -p udp-test-server --target x86_64-unknown-linux-musl
 
 # ------------------------------------------------------------------------------
 # Image
 # ------------------------------------------------------------------------------
 
-FROM alpine:latest
+FROM alpine
 
 LABEL org.opencontainers.image.source=https://github.com/kubernetes-sigs/blixt
 
@@ -36,6 +38,12 @@ WORKDIR /
 
 USER 1000:1000
 
-COPY --from=builder /workspace/target/x86_64-unknown-linux-musl/debug/controller /controller
+COPY --from=builder /workspace/target/x86_64-unknown-linux-musl/debug/udp-test-server /udp-test-server
 
-ENTRYPOINT [ "/controller" ]
+EXPOSE 9875
+
+EXPOSE 9876
+
+EXPOSE 9877
+
+ENTRYPOINT ["/udp-test-server"]
