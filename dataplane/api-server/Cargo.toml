@@ -7,7 +7,7 @@ version.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
-aya = { version = "0.13.1", features = ["async_tokio"] }
+aya = { workspace = true, features = ["async_tokio"] }
 clap = { workspace = true, features = ["derive"] }
 common = { path = "../common", features = ["user"] }
 libc = { workspace = true }
