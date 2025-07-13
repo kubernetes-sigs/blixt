@@ -72,7 +72,7 @@ async fn setup_health_checks(addr: IpAddr, port: u16) -> Result<JoinHandle<()>> 
             IpAddr::V6(v6) => SocketAddr::V6(SocketAddrV6::new(v6, port, 0, 0)),
         };
 
-        let server = server_builder.serve(addr.into(), health_service);
+        let server = server_builder.serve(addr, health_service);
 
         log::debug!("gRPC Health Checking service listens on {addr}");
         server
