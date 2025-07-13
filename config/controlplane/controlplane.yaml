@@ -11,18 +11,21 @@ metadata:
   name: controlplane
   namespace: system
   labels:
-    control-plane: controlplane
+    app: blixt
+    component: controlplane
 spec:
   selector:
     matchLabels:
-      control-plane: controlplane
+      app: blixt
+      component: controlplane
   replicas: 1
   template:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: manager
       labels:
-        control-plane: controlplane
+        app: blixt
+        component: controlplane
     spec:
       securityContext:
         runAsNonRoot: true
@@ -34,27 +37,28 @@ spec:
         # seccompProfile:
         #   type: RuntimeDefault
       containers:
-      - command:
-        - /workspace/manager
-        args:
-        - --leader-elect
+      - name: controller
+        command:
+        - /controller
         image: ghcr.io/kubernetes-sigs/blixt-controlplane:latest
         imagePullPolicy: IfNotPresent
-        name: manager
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
             drop:
               - "ALL"
+        env:
+        - name: RUST_LOG
+          value: "trace,tonic=info,h2=info,tracing=info"
+        - name: RUST_BACKTRACE
+          value: "1"
         livenessProbe:
-          httpGet:
-            path: /healthz
+          grpc:
             port: 8081
           initialDelaySeconds: 15
           periodSeconds: 20
         readinessProbe:
-          httpGet:
-            path: /readyz
+          grpc:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10

@@ -15,9 +15,12 @@ limitations under the License.
 */
 
 use controlplane::*;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
 use kube::Client;
+use tokio::task::JoinHandle;
 use tokio::try_join;
+use tonic::transport::Server;
 use tracing::*;
 
 #[tokio::main]
@@ -27,8 +30,8 @@ async fn main() -> anyhow::Result<()> {
 }
 
 pub async fn run() {
-    let subscriber = tracing_subscriber::FmtSubscriber::new();
-    tracing::subscriber::set_global_default(subscriber).unwrap();
+    let fmt_subscriber = tracing_subscriber::FmtSubscriber::new();
+    subscriber::set_global_default(fmt_subscriber).unwrap();
 
     let client = Client::try_default()
         .await
@@ -46,8 +49,35 @@ pub async fn run() {
     if let Err(error) = try_join!(
         gateway_controller(ctx.clone()),
         gatewayclass_controller(ctx),
+        setup_health_checks(IpAddr::from(Ipv4Addr::new(0, 0, 0, 0)), 8080)
     ) {
         error!("failed to start controllers: {error:?}");
         std::process::exit(1);
     }
+}
+
+// TODO: integrate with DataplaneClientManager connection status
+// only get healthy once the dataplane pod connections are established
+async fn setup_health_checks(addr: IpAddr, port: u16) -> Result<JoinHandle<()>> {
+    let healthchecks = tokio::spawn(async move {
+        let (_, health_service) = tonic_health::server::health_reporter();
+        let server_builder = Server::builder();
+
+        // by convention we add 1 to the API listen port and use that
+        // for the health check port.
+        let port = port + 1;
+
+        let addr = match addr {
+            IpAddr::V4(v4) => SocketAddr::V4(SocketAddrV4::new(v4, port)),
+            IpAddr::V6(v6) => SocketAddr::V6(SocketAddrV6::new(v6, port, 0, 0)),
+        };
+
+        let server = server_builder.serve(addr.into(), health_service);
+
+        log::debug!("gRPC Health Checking service listens on {addr}");
+        server
+            .await
+            .expect("Failed to serve gRPC Health Checking service");
+    });
+    Ok(healthchecks)
 }
