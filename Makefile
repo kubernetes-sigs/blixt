@@ -101,7 +101,7 @@ build.image.dataplane:
 	$(CONTAINER_RUNTIME) build $(BUILD_ARGS) --file=$(DATAPLANE_CONTAINERFILE) -t $(BLIXT_DATAPLANE_IMAGE):$(TAG) ./
 
 .PHONY: build.all.images
-build.all.images: 
+build.all.images:
 	$(MAKE) build.image.controlplane
 	$(MAKE) build.image.dataplane
 	$(MAKE) build.image.udp_test_server
@@ -189,7 +189,7 @@ load.image.controlplane: build.image.controlplane
 load.image.dataplane: build.image.dataplane
 	kubectl create namespace blixt-system || true && \
 	kind load docker-image $(BLIXT_DATAPLANE_IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
-		kubectl -n blixt-system rollout restart daemonset dataplane || true
+		kubectl -n blixt-system rollout restart daemonset blixt-dataplane || true
 
 .PHONY: load.all.images
 load.all.images: build.all.images
@@ -198,3 +198,10 @@ load.all.images: build.all.images
 	kind load docker-image $(BLIXT_UDP_SERVER_IMAGE):$(TAG) --name $(KIND_CLUSTER) && \
 		kubectl -n blixt-system get deployment blixt-controlplane >/dev/null 2>&1 && \
 		kubectl -n blixt-system rollout restart deployment blixt-controlplane || true
+
+.PHONY: setup.cluster
+setup.cluster:
+	kubectl apply -k https://github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v1.2.1
+	kubectl apply -k https://github.com/metallb/metallb/config/native?ref=v0.13.11
+	kubectl apply -k config/metallb/
+	kubectl apply -k config/default/
