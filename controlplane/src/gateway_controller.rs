@@ -28,6 +28,7 @@ use gateway_utils::*;
 use route_utils::set_condition;
 
 use chrono::Utc;
+use controllers::NamespaceName;
 use futures::StreamExt;
 use gateway_api::apis::standard::gateways::{Gateway, GatewayStatus};
 use gateway_api::apis::standard::{
@@ -115,7 +116,7 @@ pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Actio
     }
 
     // Try to fetch any existing Loadbalancer service(s) for this Gateway.
-    let service_api: Api<Service> = Api::namespaced(client, &ns);
+    let service_api: Api<Service> = Api::namespaced(ctx.client.clone(), &ns);
     let services = service_api
         .list(&ListParams::default().labels(&format!("{GATEWAY_SERVICE_LABEL}={name}")))
         .await
@@ -220,7 +221,7 @@ pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Actio
     Ok(Action::requeue(Duration::from_secs(60)))
 }
 
-pub async fn controller(ctx: Context) -> Result<()> {
+pub async fn controller(ctx: Arc<Context>) -> Result<()> {
     let gateway = Api::<Gateway>::all(ctx.client.clone());
     gateway
         .list(&ListParams::default().limit(1))
@@ -229,7 +230,7 @@ pub async fn controller(ctx: Context) -> Result<()> {
 
     Controller::new(gateway, Config::default().any_semantic())
         .shutdown_on_signal()
-        .run(reconcile, error_policy, Arc::new(ctx))
+        .run(reconcile, error_policy, ctx)
         .filter_map(|x| async move { std::result::Result::ok(x) })
         .for_each(|_| futures::future::ready(()))
         .await;

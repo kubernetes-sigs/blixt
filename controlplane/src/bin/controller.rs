@@ -14,8 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-use controlplane::*;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::sync::Arc;
+
+use controlplane::client_manager::DataplaneClientManager;
+use controlplane::{Context, Result, gateway_controller, gatewayclass_controller};
 
 use kube::Client;
 use tokio::task::JoinHandle;
@@ -25,35 +28,36 @@ use tracing::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    run().await;
+    run().await?;
     Ok(())
 }
 
-pub async fn run() {
-    let fmt_subscriber = tracing_subscriber::FmtSubscriber::new();
-    subscriber::set_global_default(fmt_subscriber).unwrap();
+pub async fn run() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_file(true)
+        .with_line_number(true)
+        .init();
 
     let client = Client::try_default()
         .await
         .expect("failed to create kube Client");
-    let ctx = Context {
+    let ctx = Arc::new(Context {
         client: client.clone(),
-    };
+    });
 
-    // TODO: when TCPRoute and UDPRoute support is implemented
-    //
-    // use std::sync::Arc;
-    // use controlplane::client_manager::DataplaneClientManager;
-    // let dataplane_manager = Arc::new(DataplaneClientManager::new());
+    let dataplane_client = Arc::new(DataplaneClientManager::default());
+    dataplane_client.update_clients(ctx.client.clone()).await?;
 
     if let Err(error) = try_join!(
         gateway_controller(ctx.clone()),
         gatewayclass_controller(ctx),
-        setup_health_checks(IpAddr::from(Ipv4Addr::new(0, 0, 0, 0)), 8080)
+        setup_health_checks(IpAddr::from(Ipv4Addr::new(0, 0, 0, 0)), 8080),
     ) {
         error!("failed to start controllers: {error:?}");
         std::process::exit(1);
     }
+
+    Ok(())
 }
 
 // TODO: integrate with DataplaneClientManager connection status

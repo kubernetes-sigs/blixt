@@ -65,7 +65,7 @@ pub async fn reconcile(gateway_class: Arc<GatewayClass>, ctx: Arc<Context>) -> R
     Ok(Action::await_change())
 }
 
-pub async fn controller(ctx: Context) -> Result<()> {
+pub async fn controller(ctx: Arc<Context>) -> Result<()> {
     let gwc_api = Api::<GatewayClass>::all(ctx.client.clone());
     gwc_api
         .list(&ListParams::default().limit(1))
@@ -74,7 +74,7 @@ pub async fn controller(ctx: Context) -> Result<()> {
 
     Controller::new(gwc_api, Config::default().any_semantic())
         .shutdown_on_signal()
-        .run(reconcile, error_policy, Arc::new(ctx))
+        .run(reconcile, error_policy, ctx)
         .filter_map(|x| async move { std::result::Result::ok(x) })
         .for_each(|_| futures::future::ready(()))
         .await;

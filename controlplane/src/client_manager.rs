@@ -68,7 +68,8 @@ impl DataplaneClientManager {
 
         for pod in dataplane_pods {
             if let Some(pod_ip) = &pod.status.as_ref().and_then(|s| s.pod_ip.as_ref()) {
-                let endpoint = format!("http://{pod_ip}:9090");
+                // FIXME: allow to configure port via CLI arg
+                let endpoint = format!("http://{pod_ip}:9874");
                 match BackendsClient::connect(endpoint.clone()).await {
                     Ok(grpc_client) => {
                         info!("Connected to dataplane pod: {}", pod_ip);
@@ -99,8 +100,9 @@ impl DataplaneClientManager {
 
         for (pod_ip, mut client) in clients.clone() {
             match client.update(Request::new(targets.clone())).await {
-                Ok(_) => {
+                Ok(resp) => {
                     info!("Successfully updated targets on dataplane pod: {}", pod_ip);
+                    info!("Received {:?}", resp.get_ref());
                 }
                 Err(err) => {
                     return Err(crate::Error::DataplaneError(format!(
