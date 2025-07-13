@@ -1,6 +1,8 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+namespace: blixt-samples-tcproute
 resources:
+- namespace.yaml
 - gateway.yaml
 - server.yaml
 - tcproute.yaml
