@@ -18,6 +18,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::Arc;
 
 use controlplane::client_manager::DataplaneClientManager;
+use controlplane::controllers::tcproute::TCPRouteController;
 use controlplane::{Context, Result, gateway_controller, gatewayclass_controller};
 
 use kube::Client;
@@ -48,9 +49,12 @@ pub async fn run() -> anyhow::Result<()> {
     let dataplane_client = Arc::new(DataplaneClientManager::default());
     dataplane_client.update_clients(ctx.client.clone()).await?;
 
+    let tcproute_controller = TCPRouteController::new(ctx.clone(), dataplane_client.clone());
+
     if let Err(error) = try_join!(
         gateway_controller(ctx.clone()),
         gatewayclass_controller(ctx),
+        tcproute_controller.start(),
         setup_health_checks(IpAddr::from(Ipv4Addr::new(0, 0, 0, 0)), 8080),
     ) {
         error!("failed to start controllers: {error:?}");

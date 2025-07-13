@@ -49,6 +49,7 @@ use k8s_openapi::api::core::v1::{
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
 
 use chrono::Utc;
+use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use serde_json::json;
 use tracing::*;
 
@@ -214,6 +215,7 @@ pub fn update_service_for_gateway(gateway: &Gateway, svc: &mut Service) -> Resul
         let mut port = ServicePort::default();
         port.name = Some(listener.name.clone());
         port.port = listener.port;
+        port.target_port = Some(IntOrString::Int(listener.port));
         match listener.protocol.as_str() {
             "TCP" | "HTTP" | "HTTPS" => {
                 port.protocol = Some("TCP".to_string());
@@ -246,6 +248,9 @@ pub fn update_service_for_gateway(gateway: &Gateway, svc: &mut Service) -> Resul
     let svc_spec = svc.spec.as_mut().ok_or(Error::LoadBalancerError(
         "Loadbalancer service does not have a spec".to_string(),
     ))?;
+    // TODO: check if this is required, using MetalLB this is likely not needed
+    // using cloud-provider-kind the port was mapped by default
+    svc_spec.allocate_load_balancer_node_ports = Some(false);
 
     let lb_ip: Option<String> = svc_spec.load_balancer_ip.clone();
     if let Some((addr, ip)) = address.clone().zip(lb_ip.clone()) {
@@ -392,6 +397,7 @@ pub fn set_listener_status(gateway: &mut Gateway) -> Result<()> {
         .ok_or(Error::InvalidConfigError(
             "Gateway generation not found".to_string(),
         ))?;
+
     for listener in &gateway_spec.listeners {
         let mut final_conditions = vec![];
         let (supported_kinds, conditions) = get_listener_status(listener, generation);

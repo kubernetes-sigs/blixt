@@ -30,6 +30,8 @@ pub use gatewayclass_controller::controller as gatewayclass_controller;
 use kube::Client;
 use thiserror::Error;
 
+use crate::controllers::tcproute::TCPRouteError;
+
 // Context for our reconciler
 #[derive(Clone)]
 pub struct Context {
@@ -49,6 +51,8 @@ pub enum Error {
     CRDNotFoundError(#[source] kube::Error),
     #[error("dataplane error: {0}")]
     DataplaneError(String),
+    #[error("error reconciling TCPRoute: {0}")]
+    TCPRouteError(#[from] TCPRouteError),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
