@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 pub mod client_manager;
-mod consts;
+pub mod consts;
+pub mod controllers;
 mod gateway_controller;
 mod gateway_utils;
 mod gatewayclass_controller;

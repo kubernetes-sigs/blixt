@@ -41,6 +41,7 @@ use kube::{
     core::ObjectMeta,
 };
 
+use controllers::NamespaceName;
 use k8s_openapi::api::core::v1::{
     EndpointAddress, EndpointPort, EndpointSubset, Endpoints, Service, ServicePort, ServiceSpec,
     ServiceStatus,
@@ -171,13 +172,15 @@ pub fn get_ingress_ip_len(svc_status: &ServiceStatus) -> usize {
 
 // Creates a LoadBalancer Service for the provided Gateway.
 pub async fn create_svc_for_gateway(ctx: Arc<Context>, gateway: &Gateway) -> Result<Service> {
-    let mut svc_meta = ObjectMeta::default();
-    let ns = gateway.namespace().unwrap_or("default".to_string());
-    svc_meta.namespace = Some(ns.clone());
-    svc_meta.generate_name = Some(format!("service-for-gateway-{}-", gateway.name_any()));
+    let namespace = gateway.metadata.namespace()?;
+    let gw_name = gateway.metadata.name()?;
 
+    let mut svc_meta = ObjectMeta::default();
+    let svc_name = format!("gateway-{}", &gw_name);
+    svc_meta.namespace = Some(namespace.clone());
+    svc_meta.name = Some(svc_name.clone());
     let mut labels = BTreeMap::new();
-    labels.insert(GATEWAY_SERVICE_LABEL.to_string(), gateway.name_any());
+    labels.insert(GATEWAY_SERVICE_LABEL.to_string(), gw_name.to_string());
     svc_meta.labels = Some(labels);
 
     let mut svc = Service {
@@ -185,9 +188,15 @@ pub async fn create_svc_for_gateway(ctx: Arc<Context>, gateway: &Gateway) -> Res
         spec: Some(ServiceSpec::default()),
         status: Some(ServiceStatus::default()),
     };
-    update_service_for_gateway(gateway, &mut svc)?;
 
-    let svc_api: Api<Service> = Api::namespaced(ctx.client.clone(), ns.as_str());
+    let _ = update_service_for_gateway(gateway, &mut svc)?;
+
+    info!(
+        "creating loadbalancer service {} for gateway {}",
+        &svc_name, &gw_name
+    );
+    debug!("{svc:?}");
+    let svc_api: Api<Service> = Api::namespaced(ctx.client.clone(), namespace.as_str());
     let service = svc_api
         .create(&PostParams::default(), &svc)
         .await

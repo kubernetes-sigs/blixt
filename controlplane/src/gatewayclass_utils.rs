@@ -27,16 +27,16 @@ use kube::api::{Api, Patch, PatchParams};
 use serde_json::json;
 
 pub fn is_accepted(gateway_class: &GatewayClass) -> bool {
-    let mut accepted = false;
-    if let Some(status) = &gateway_class.status {
-        if let Some(conditions) = &status.conditions {
-            for condition in conditions {
-                accepted = condition.type_ == GatewayConditionType::Accepted.to_string()
-                    && condition.status == "True"
-            }
-        }
-    }
-    accepted
+    let Some(status) = &gateway_class.status else {
+        return false;
+    };
+    let Some(conditions) = &status.conditions else {
+        return false;
+    };
+
+    conditions
+        .iter()
+        .any(|c| c.type_ == GatewayConditionType::Accepted.to_string() && c.status == "True")
 }
 
 pub fn accept(gateway_class: &mut GatewayClass) {

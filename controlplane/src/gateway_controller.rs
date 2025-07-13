@@ -20,15 +20,18 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{
-    consts::{GATEWAY_CLASS_CONTROLLER_NAME, GATEWAY_SERVICE_LABEL},
-    *,
+use crate::consts::{GATEWAY_CLASS_CONTROLLER_NAME, GATEWAY_SERVICE_LABEL};
+use crate::controllers::NamespaceName;
+
+use crate::gateway_utils::{
+    create_endpoint_if_not_exists, create_svc_for_gateway, get_accepted_condition,
+    get_ingress_ip_len, get_service_key, patch_status, set_gateway_status_addresses,
+    set_listener_status, update_service_for_gateway,
 };
-use gateway_utils::*;
-use route_utils::set_condition;
+use crate::route_utils::set_condition;
+use crate::{Context, Error, Result, gatewayclass_utils};
 
 use chrono::Utc;
-use controllers::NamespaceName;
 use futures::StreamExt;
 use gateway_api::apis::standard::gateways::{Gateway, GatewayStatus};
 use gateway_api::apis::standard::{
@@ -42,32 +45,17 @@ use kube::{
     api::{Api, ListParams, Patch, PatchParams},
     runtime::{Controller, controller::Action, watcher::Config},
 };
-use log::debug;
-use tracing::*;
+use tracing::{debug, error, info, warn};
 
 pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Action> {
     let start = Instant::now();
-    let client = ctx.client.clone();
-    let name = gateway
-        .metadata
-        .name
-        .clone()
-        .ok_or(Error::InvalidConfigError("invalid name".to_string()))?;
+    let name = gateway.metadata.name()?;
+    let ns = gateway.metadata.namespace()?;
 
-    let ns = gateway
-        .metadata
-        .namespace
-        .clone()
-        .ok_or(Error::InvalidConfigError("invalid namespace".to_string()))?;
+    let gateway_api: Api<Gateway> = Api::namespaced(ctx.client.clone(), &ns);
+    let mut gw = gateway.as_ref().clone();
 
-    let gateway_api: Api<Gateway> = Api::namespaced(client.clone(), &ns);
-    let mut gw = Gateway {
-        metadata: gateway.metadata.clone(),
-        spec: gateway.spec.clone(),
-        status: gateway.status.clone(),
-    };
-
-    let gateway_class_api = Api::<GatewayClass>::all(client.clone());
+    let gateway_class_api = Api::<GatewayClass>::all(ctx.client.clone());
     let gateway_class = gateway_class_api
         .get(gateway.spec.gateway_class_name.as_str())
         .await
