@@ -51,6 +51,15 @@ After these goals are achieved, further goals may be decided.
 > (KIND)][kind] clusters. You can generate a new development cluster for testing
 > with `make build.cluster`.
 
+Due to kernel permission requirements for eBPF programs the cluster requires the possibility to run the containers with
+root permissions. Error messages during the startup of the `dataplane` indicating permissions issues or an error
+showing `Argument list too long` are signs for limited container permission.
+
+Running `podman` as system service works to deploy the dataplane within a `kind` cluster.
+
+Setting kernel options like `kernel.perf_event_paranoid` or `kernel.unprivileged_bpf_disabled` is not sufficient for
+running the `dataplane` (on kernel version `6.15`).
+
 Deploy the [Gateway API] [CRDs]:
 
 ```console
