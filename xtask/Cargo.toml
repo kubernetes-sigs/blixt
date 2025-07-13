@@ -13,6 +13,10 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tonic = { workspace = true }
 tonic-build = { workspace = true, features = ["prost"] }
 controlplane = { path = "../controlplane" }
+tracing-subscriber = { workspace = true }
+tracing = { workspace = true }
+xshell = "0.2.7"
+thiserror = "1.0.69"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 api-server = { path = "../dataplane/api-server" }

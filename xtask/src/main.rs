@@ -9,6 +9,7 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 #[cfg(target_os = "linux")]
 mod build_ebpf;
 mod build_proto;
+mod container_images;
 mod grpc;
 mod run;
 
@@ -32,10 +33,14 @@ enum Command {
     RunControlplane(run::Options),
     BuildProto(build_proto::Options),
     GrpcClient(grpc::Options),
+    ContainerImages(container_images::Options),
 }
 
 #[tokio::main]
 async fn main() {
+    let fmt_subscriber = tracing_subscriber::FmtSubscriber::new();
+    tracing::subscriber::set_global_default(fmt_subscriber).unwrap();
+
     let opts = Options::parse();
 
     use Command::*;
@@ -46,6 +51,7 @@ async fn main() {
         RunDataplane(opts) => run::run_dataplane(opts),
         RunControlplane(opts) => run::run_controlplane(opts),
         GrpcClient(opts) => grpc::update(opts).await,
+        ContainerImages(opts) => container_images::run(opts).await,
     };
 
     #[cfg(not(target_os = "linux"))]

@@ -1,0 +1,18 @@
+# ------------------------------------------------------------------------------
+# Image
+# ------------------------------------------------------------------------------
+
+FROM debian:trixie-slim
+
+LABEL org.opencontainers.image.source=https://github.com/kubernetes-sigs/blixt
+
+LABEL org.opencontainers.image.licenses=GPL-2.0-only,BSD-2-Clause
+
+WORKDIR /
+
+RUN cp /workspace/target/debug/loader /dataplane \
+    && cp /workspace/dataplane/LICENSE.GPL-2.0 / \
+    && cp /workspace/dataplane/LICENSE.BSD-2-Clause / \
+    && /usr/bin/ldd /dataplane
+
+ENTRYPOINT ["/dataplane"]
