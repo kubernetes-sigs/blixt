@@ -17,7 +17,7 @@ limitations under the License.
 #![allow(clippy::field_reassign_with_default)]
 
 use std::collections::{BTreeMap, HashMap};
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
 use std::str::FromStr;
 
 use chrono::Utc;
@@ -695,14 +695,4 @@ pub(crate) fn get_gateway_ips(gateway: &Gateway) -> Result<Vec<IpAddr>> {
     }
 
     Ok(ip_addresses)
-}
-
-pub(crate) fn get_gateway_ipv4(gateway: &Gateway) -> Result<Ipv4Addr> {
-    let ips = get_gateway_ips(gateway)?;
-    // FIXME: remove that part
-    // SAFETY: currently get_gateway_ips() errors if not exactly one ipv4 is present
-    match ips[0] {
-        IpAddr::V4(v4) => Ok(v4),
-        IpAddr::V6(_) => unreachable!(),
-    }
 }

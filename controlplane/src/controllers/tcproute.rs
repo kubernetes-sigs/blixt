@@ -12,9 +12,8 @@ use gateway_api::apis::experimental::tcproutes::{
 };
 use gateway_api::apis::standard::gateways::Gateway;
 use gateway_api::gatewayclasses::GatewayClass;
-use k8s_openapi::api::core::v1::{Endpoints, Service};
+use k8s_openapi::api::core::v1::Endpoints;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use kube::api::{ListParams, Patch, PatchParams};
 use kube::runtime::Controller;
 use kube::runtime::controller::Action;
@@ -40,46 +39,18 @@ pub struct TCPRouteController {
 pub enum TCPRouteError {
     #[error(transparent)]
     K8s(#[from] K8sError),
-    #[error("Gateway {0}/{1} has no addresses.")]
-    GatewayNoStatus(String, String),
-    #[error("Gateway {0}/{1} has no addresses.")]
-    GatewayNoIpAddress(String, String),
-    #[error("Gateway {0}/{1} has no IPv4 address.")]
-    GatewayNoIPv4Address(String, String),
-    #[error("Gateway {0}/{1} fetching failed with error {2}.")]
-    GatewayFetchFailed(String, String, kube::Error),
     #[error("{0:?} has no parentRefs.")]
     NoParentRefs(NamespacedName),
     #[error("{0:?} has no rules.")]
-    TCPRouteNoRules(NamespacedName),
-    #[error("TCPRoute {0}/{1} rule has no backendRefs.")]
-    RulesMissingBackendRef(String, String),
-    #[error("TCPRoute {0}/{1} backendRefs do not have a Service associated.")]
-    TCPRouteBackendRefsNoService(String, String),
-    #[error("backendRef {0}/{1} does not have a port associated.")]
-    BackendRefPortMissing(String, String),
-    #[error("backendRef {0}/{1} could not locate a matching Service port.")]
-    BackendRefTargetPortMissing(String, String),
+    NoRules(NamespacedName),
+    #[error("TCPRoute {0:?} rule has no backendRefs.")]
+    RulesMissingBackendRef(NamespacedName),
     #[error("{0:?} found too many Gateways {1}. Currently only a single Gateway is supported.")]
     TooManyGatewaysFound(NamespacedName, usize),
-    #[error("TCPRoute {0}/{1} endpoint {2} address not ready.")]
-    EndpointAddressNotReady(String, String, String),
-    #[error("TCPRoute {0}/{1} endpoint {2} port not ready.")]
-    EndpointPortNotReady(String, String, String),
-    #[error("TCPRoute {0}/{1} endpoint {2} has no addresses.")]
-    EndpointNoAddresses(String, String, String),
-    #[error("TCPRoute {0}/{1} endpoint {2} address is empty.")]
-    EndpointAddressEmpty(String, String, String),
-    #[error("TCPRoute {0}/{1} does not have healthy backends.")]
-    TCPRouteNoHealthyBackends(String, String),
-    #[error("Service {0}/{1} does not have a spec.")]
-    ServiceSpecMissing(String, String),
-    #[error("Service {0}/{1} does not have a ports associated.")]
-    ServicePortsMissing(String, String),
+    #[error("TCPRoute {0:?} does not have healthy backends.")]
+    NoHealthyBackends(NamespacedName),
     #[error("Gateway {0:?} IPv6 not supported.")]
     GatewayIPv6NotSupported(NamespacedName),
-    #[error("Service {0}/{1} failed to parse target port {2} {3}")]
-    ServiceTargetPortParseError(String, String, String, String),
     #[error("{0:?} no matching port found")]
     NoMatchingGatewayPort(NamespacedName),
 }
@@ -109,33 +80,39 @@ impl TCPRouteController {
         Ok(())
     }
 
-    pub async fn reconcile(tcp_route: Arc<TCPRoute>, ctx: Arc<Self>) -> Result<Action> {
+    async fn reconcile(tcp_route: Arc<TCPRoute>, ctx: Arc<Self>) -> Result<Action> {
         error!("TCPRoute: {tcp_route:?}");
         let start = Instant::now();
-        // TODO: check if object still exists
 
-        let route_name = tcp_route.metadata.name()?;
-        let namespace = tcp_route.metadata.namespace()?;
-        let tcp_route_identifier = NamespacedName {
-            name: route_name.clone(),
-            namespace: namespace.clone(),
+        let tcp_route_id = NamespacedName {
+            name: tcp_route.metadata.name()?,
+            namespace: tcp_route.metadata.namespace()?,
         };
 
         let Some(parent_refs) = &tcp_route.spec.parent_refs else {
-            return Err(TCPRouteError::NoParentRefs(tcp_route_identifier).into());
+            return Err(TCPRouteError::NoParentRefs(tcp_route_id).into());
         };
         if parent_refs.is_empty() {
-            return Err(TCPRouteError::NoParentRefs(tcp_route_identifier).into());
+            return Err(TCPRouteError::NoParentRefs(tcp_route_id).into());
         }
         if tcp_route.spec.rules.is_empty() {
-            return Err(TCPRouteError::TCPRouteNoRules(tcp_route_identifier).into());
+            return Err(TCPRouteError::NoRules(tcp_route_id).into());
+        };
+        let backend_refs = &tcp_route
+            .spec
+            .rules
+            .iter()
+            .filter_map(|r| r.backend_refs.clone())
+            .flatten()
+            .collect::<Vec<_>>();
+
+        if backend_refs.is_empty() {
+            return Err(TCPRouteError::RulesMissingBackendRef(tcp_route_id).into());
         };
 
         // TODO: support multiple gateways, the TCPRoute spec allows for multiple parents
         // as of now the function returns an error when multiple gateways are found
-        let managed_gateways = ctx
-            .managed_route(&tcp_route_identifier, parent_refs)
-            .await?;
+        let managed_gateways = ctx.managed_route(&tcp_route_id, parent_refs).await?;
         if managed_gateways.is_empty() {
             // TODO: enable orphan checking
             return Ok(Action::await_change());
@@ -170,10 +147,10 @@ impl TCPRouteController {
         // in all other cases ensure the TCPRoute is configured in the dataplane
         for gateway in managed_gateways.iter() {
             ctx.ensure_tcp_route_configure_in_dataplane(
-                &tcp_route_identifier,
-                &tcp_route,
-                gateway,
+                &tcp_route_id,
                 parent_refs,
+                gateway,
+                backend_refs,
             )
             .await?;
         }
@@ -185,13 +162,18 @@ impl TCPRouteController {
 
     async fn ensure_tcp_route_configure_in_dataplane(
         &self,
-        tcp_route_key: &NamespacedName,
-        tcp_route: &TCPRoute,
-        gateway: &Gateway,
+        tcp_route_id: &NamespacedName,
         parent_refs: &[TCPRouteParentRefs],
+        gateway: &Gateway,
+        backend_refs: &[TCPRouteRulesBackendRefs],
     ) -> Result<()> {
         let targets = self
-            .compile_tcproute_to_data_plane_targets(tcp_route_key, tcp_route, gateway, parent_refs)
+            .compile_tcp_route_to_data_plane_targets(
+                tcp_route_id,
+                parent_refs,
+                backend_refs,
+                gateway,
+            )
             .await?;
 
         info!("Updating targets: {targets:?}");
@@ -334,94 +316,46 @@ impl TCPRouteController {
         Ok(managed_gateways)
     }
 
-    async fn compile_tcproute_to_data_plane_targets(
+    async fn compile_tcp_route_to_data_plane_targets(
         &self,
-        tcp_route_key: &NamespacedName,
-        tcp_route: &TCPRoute,
-        gateway: &Gateway,
+        tcp_route_id: &NamespacedName,
         parent_refs: &[TCPRouteParentRefs],
+        backend_refs: &[TCPRouteRulesBackendRefs],
+        gateway: &Gateway,
     ) -> Result<Targets> {
-        let namespace = tcp_route.metadata.namespace()?;
-        let route_name = tcp_route.metadata.name()?;
-
-        let gw_port = Self::get_gateway_port_for_parent_refs(tcp_route_key, parent_refs, gateway)?;
-        let gw_ips = get_gateway_ips(gateway)?;
-        let gw_ip: Ipv4Addr = match gw_ips[0] {
+        let gateway_port =
+            Self::get_gateway_port_for_parent_refs(tcp_route_id, parent_refs, gateway)?;
+        let gateway_ips = get_gateway_ips(gateway)?;
+        // TODO: multiple gateways and IPv6 support
+        let gw_ip: Ipv4Addr = match gateway_ips[0] {
             IpAddr::V4(v4) => v4,
             IpAddr::V6(_) => {
-                return Err(TCPRouteError::GatewayIPv6NotSupported(tcp_route_key.clone()).into());
+                return Err(TCPRouteError::GatewayIPv6NotSupported(tcp_route_id.clone()).into());
             }
         };
 
         let mut backend_targets: Vec<(Ipv4Addr, u16)> = vec![];
-        for rule in tcp_route.spec.rules.iter() {
-            let Some(backend_refs) = &rule.backend_refs else {
-                return Err(TCPRouteError::RulesMissingBackendRef(namespace, route_name).into());
-            };
+        for backend_ref in backend_refs {
+            let backend_namespace = backend_ref
+                .namespace
+                .as_deref()
+                .unwrap_or(tcp_route_id.namespace.as_str());
+            let backend_name = backend_ref.name.clone();
+            let backend_port = backend_ref.port.unwrap_or(80);
 
-            for backend_ref in backend_refs {
-                let backend_ref_name = backend_ref.name.clone();
-                let endpoints = self
-                    .endpoints_from_backend_ref(tcp_route, backend_ref)
-                    .await?;
-                let Some(subsets) = endpoints.subsets else {
-                    return Err(TCPRouteError::EndpointAddressNotReady(
-                        namespace,
-                        route_name,
-                        backend_ref_name,
-                    )
-                    .into());
-                };
-                for subset in subsets.iter() {
-                    let Some(ports) = &subset.ports else {
-                        return Err(TCPRouteError::EndpointPortNotReady(
-                            namespace,
-                            route_name,
-                            backend_ref_name,
-                        )
-                        .into());
-                    };
-                    if ports.is_empty() {
-                        return Err(TCPRouteError::EndpointPortNotReady(
-                            namespace,
-                            route_name,
-                            backend_ref_name,
-                        )
-                        .into());
-                    }
+            let endpoint_api =
+                Api::<Endpoints>::namespaced(self.k8s_client.clone(), backend_namespace);
+            let endpoints = endpoint_api
+                .get(backend_name.as_str())
+                .await
+                .map_err(K8sError::Client)?;
 
-                    let Some(addresses) = &subset.addresses else {
-                        return Err(TCPRouteError::EndpointNoAddresses(
-                            namespace,
-                            route_name,
-                            backend_ref_name,
-                        )
-                        .into());
-                    };
-                    for addr in addresses {
-                        if addr.ip.is_empty() {
-                            return Err(TCPRouteError::EndpointAddressEmpty(
-                                namespace,
-                                route_name,
-                                backend_ref_name,
-                            )
-                            .into());
-                        }
-                        let pod_ip = match IpAddr::from_str(&addr.ip) {
-                            Ok(addr) => addr,
-                            Err(e) => {
-                                warn!(
-                                    "TCPRoute {namespace}/{route_name} backendRef {backend_ref_name} failed to parse address: {}. Error: {e}",
-                                    &addr.ip
-                                );
-                                continue;
-                            }
-                        };
-                        let pod_port = self.get_backend_port(tcp_route, backend_ref).await?;
-
+            for subset in endpoints.subsets.unwrap_or_default() {
+                for address in subset.addresses.unwrap_or_default() {
+                    if let Ok(pod_ip) = IpAddr::from_str(&address.ip) {
                         match pod_ip {
                             IpAddr::V4(ip) => {
-                                backend_targets.push((ip, pod_port));
+                                backend_targets.push((ip, backend_port as u16));
                             }
                             IpAddr::V6(_) => { /* TODO: support IPv6 */ }
                         }
@@ -431,17 +365,17 @@ impl TCPRouteController {
         }
 
         if backend_targets.is_empty() {
-            return Err(TCPRouteError::TCPRouteNoHealthyBackends(namespace, route_name).into());
+            return Err(TCPRouteError::NoHealthyBackends(tcp_route_id.clone()).into());
         }
 
         info!(
             "Targets {{ vip: {{ ip {:?}, port: {} }}, targets: {:?}}}",
-            gw_ip, gw_port, backend_targets
+            gw_ip, gateway_port, backend_targets
         );
         Ok(Targets {
             vip: Some(Vip {
                 ip: gw_ip.to_bits(),
-                port: gw_port as u32,
+                port: gateway_port as u32,
             }),
             targets: backend_targets
                 .into_iter()
@@ -454,8 +388,8 @@ impl TCPRouteController {
         })
     }
 
-    pub(crate) fn get_gateway_port_for_parent_refs(
-        tcp_route_key: &NamespacedName,
+    fn get_gateway_port_for_parent_refs(
+        tcp_route_id: &NamespacedName,
         parent_refs: &[TCPRouteParentRefs],
         gateway: &Gateway,
     ) -> Result<i32> {
@@ -469,100 +403,6 @@ impl TCPRouteController {
             }
         }
 
-        Err(TCPRouteError::NoMatchingGatewayPort(tcp_route_key.clone()).into())
-    }
-
-    async fn endpoints_from_backend_ref(
-        &self,
-        tcp_route: &TCPRoute,
-        backend_ref: &TCPRouteRulesBackendRefs,
-    ) -> Result<Endpoints> {
-        let namespace = &backend_ref
-            .namespace
-            .clone()
-            .unwrap_or(tcp_route.metadata.namespace()?);
-
-        let endpoint_api = Api::<Endpoints>::namespaced(self.k8s_client.clone(), namespace);
-        endpoint_api
-            .get(&backend_ref.name)
-            .await
-            .map_err(|e| K8sError::Client(e).into())
-    }
-
-    async fn get_backend_port(
-        &self,
-        tcp_route: &TCPRoute,
-        backend_ref: &TCPRouteRulesBackendRefs,
-    ) -> Result<u16> {
-        let namespace = &backend_ref
-            .namespace
-            .clone()
-            .unwrap_or(tcp_route.metadata.namespace()?);
-
-        let Some(backend_ref_port) = &backend_ref.port else {
-            return Err(TCPRouteError::BackendRefPortMissing(
-                namespace.clone(),
-                backend_ref.name.clone(),
-            )
-            .into());
-        };
-
-        let service_api = Api::<Service>::namespaced(self.k8s_client.clone(), namespace);
-        let service = service_api
-            .get(&backend_ref.name)
-            .await
-            .map_err(K8sError::Client)?;
-
-        let Some(service_spec) = service.spec else {
-            return Err(TCPRouteError::ServiceSpecMissing(
-                namespace.clone(),
-                backend_ref.name.clone(),
-            )
-            .into());
-        };
-
-        let Some(ports) = service_spec.ports else {
-            return Err(TCPRouteError::ServicePortsMissing(
-                namespace.clone(),
-                backend_ref.name.clone(),
-            )
-            .into());
-        };
-
-        info!("service: {} ports: {ports:?}", &backend_ref.name);
-        for port in ports {
-            if port.port == *backend_ref_port {
-                // Use NodePort as the highest priority (e.g. Service.spec.allocateLoadBalancerNodePorts=true)
-                if let Some(node_port) = port.node_port {
-                    return Ok(node_port as u16);
-                };
-                // Use TargetPort in case defined
-                if let Some(target_port) = port.target_port {
-                    let target_port = match &target_port {
-                        IntOrString::Int(port) => *port,
-                        IntOrString::String(sport) => match i32::from_str(sport.as_str()) {
-                            Ok(port) => port,
-                            Err(e) => {
-                                return Err(TCPRouteError::ServiceTargetPortParseError(
-                                    namespace.to_string(),
-                                    backend_ref.name.to_string(),
-                                    format!("{target_port:?}"),
-                                    format!("{e:?}"),
-                                )
-                                .into());
-                            }
-                        },
-                    };
-                    return Ok(target_port as u16);
-                }
-                // Default to the port
-                return Ok(port.port as u16);
-            }
-        }
-
-        Err(
-            TCPRouteError::BackendRefTargetPortMissing(namespace.clone(), backend_ref.name.clone())
-                .into(),
-        )
+        Err(TCPRouteError::NoMatchingGatewayPort(tcp_route_id.clone()).into())
     }
 }

@@ -85,8 +85,6 @@ pub enum GatewayError {
     ServiceMissingLoadBalancerStatus(String, String),
     #[error("{0}/{1} Service does not have a status.loadBalancer.ingress")]
     ServiceMissingLoadBalancerIngress(String, String),
-    #[error("{0}/{1} Service does not have loadbalancer endpoints in ready state")]
-    ServiceMissingLoadBalancerEndpointsReady(String, String),
 }
 
 impl GatewayController {
