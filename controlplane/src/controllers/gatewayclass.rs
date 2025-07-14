@@ -14,23 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-use futures::StreamExt;
 use std::{
     ops::Sub,
     sync::Arc,
     time::{Duration, Instant},
 };
 
+use chrono::Utc;
+use futures::StreamExt;
+use gateway_api::apis::standard::gatewayclasses::GatewayClass;
+use gateway_api::constants::{GatewayConditionReason, GatewayConditionType};
+use gateway_api::gatewayclasses::GatewayClassStatus;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
+use kube::api::{Patch, PatchParams};
 use kube::{
     api::{Api, ListParams},
     runtime::{Controller, controller::Action, watcher::Config},
 };
-
-use crate::controllers::NamespaceName;
-use crate::{consts::GATEWAY_CLASS_CONTROLLER_NAME, *};
-use gateway_api::apis::standard::gatewayclasses::GatewayClass;
-use gatewayclass_utils::*;
+use serde_json::json;
 use tracing::{info, warn};
+
+use crate::consts::BLIXT_FIELD_MANAGER;
+use crate::controllers::NamespaceName;
+use crate::route_utils::set_condition;
+use crate::{consts::GATEWAY_CLASS_CONTROLLER_NAME, *};
 
 #[derive(Clone)]
 pub struct GatewayClassController {
@@ -59,7 +66,7 @@ impl GatewayClassController {
         Ok(())
     }
 
-    pub async fn reconcile(gateway_class: Arc<GatewayClass>, ctx: Arc<Self>) -> Result<Action> {
+    async fn reconcile(gateway_class: Arc<GatewayClass>, ctx: Arc<Self>) -> Result<Action> {
         let start = Instant::now();
         let name = gateway_class.metadata.name()?;
 
@@ -69,11 +76,11 @@ impl GatewayClassController {
             return Ok(Action::await_change());
         }
 
-        if !is_accepted(&gateway_class) {
+        if !check_accepted(&gateway_class) {
             info!("marking gateway class {:?} as accepted", name);
-            accept(&mut gwc);
-            let gatewayclass_api = Api::<GatewayClass>::all(ctx.k8s_client.clone());
-            patch_status(&gatewayclass_api, name, &gwc.status.unwrap_or_default()).await?;
+            mark_accepted(&mut gwc);
+            ctx.patch_status(name, &gwc.status.unwrap_or_default())
+                .await?;
         }
 
         let duration = Instant::now().sub(start);
@@ -85,4 +92,52 @@ impl GatewayClassController {
         warn!("reconcile failed: {:?}", error);
         Action::requeue(Duration::from_secs(5))
     }
+
+    // TODO: unify with GatewayController in case possible
+    async fn patch_status(&self, name: String, status: &GatewayClassStatus) -> Result<()> {
+        let gatewayclass_api = Api::<GatewayClass>::all(self.k8s_client.clone());
+        let mut conditions = &vec![];
+        if let Some(c) = status.conditions.as_ref() {
+            conditions = c;
+        }
+        let patch = Patch::Apply(json!({
+            "apiVersion": "gateway.networking.k8s.io/v1",
+            "kind": "GatewayClass",
+            "status": {
+                "conditions": conditions
+            }
+        }));
+        let params = PatchParams::apply(BLIXT_FIELD_MANAGER).force();
+        gatewayclass_api
+            .patch_status(name.as_str(), &params, &patch)
+            .await
+            .map_err(K8sError::Client)?;
+        Ok(())
+    }
+}
+
+pub(super) fn check_accepted(gateway_class: &GatewayClass) -> bool {
+    let Some(status) = &gateway_class.status else {
+        return false;
+    };
+    let Some(conditions) = &status.conditions else {
+        return false;
+    };
+
+    conditions
+        .iter()
+        .any(|c| c.type_ == GatewayConditionType::Accepted.to_string() && c.status == "True")
+}
+
+pub(super) fn mark_accepted(gateway_class: &mut GatewayClass) {
+    let now = metav1::Time(Utc::now());
+    let accepted = metav1::Condition {
+        type_: GatewayConditionType::Accepted.to_string(),
+        status: String::from("True"),
+        reason: GatewayConditionReason::Accepted.to_string(),
+        observed_generation: gateway_class.metadata.generation,
+        last_transition_time: now,
+        message: String::from("Blixt accepts responsibility for this GatewayClass"),
+    };
+    set_condition(gateway_class, accepted);
 }

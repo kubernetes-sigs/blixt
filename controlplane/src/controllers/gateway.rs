@@ -34,18 +34,18 @@ use kube::{
     api::{Api, ListParams, Patch, PatchParams},
     runtime::{Controller, controller::Action, watcher::Config},
 };
+use thiserror::Error as ThisError;
 use tracing::{debug, error, info, warn};
 
 use crate::consts::{GATEWAY_CLASS_CONTROLLER_NAME, GATEWAY_SERVICE_LABEL};
-use crate::controllers::NamespaceName;
+use crate::controllers::{NamespaceName, gatewayclass};
 use crate::gateway_utils::{
     create_endpoint_if_not_exists, create_svc_for_gateway, get_accepted_condition,
     get_ingress_ip_len, get_service_key, patch_status, set_gateway_status_addresses,
     set_listener_status, update_service_for_gateway,
 };
 use crate::route_utils::set_condition;
-use crate::{Error, K8sError, Result, gatewayclass_utils};
-use thiserror::Error as ThisError;
+use crate::{Error, K8sError, Result};
 
 #[derive(Clone)]
 pub struct GatewayController {
@@ -132,7 +132,7 @@ impl GatewayController {
         );
 
         // Only reconcile the Gateway object if our GatewayClass has already been accepted
-        if !gatewayclass_utils::is_accepted(&gateway_class) {
+        if !gatewayclass::check_accepted(&gateway_class) {
             debug!(
                 "GatewayClass {:?} not yet accepted",
                 gateway_class.name_any()
