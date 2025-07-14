@@ -396,7 +396,6 @@ dependencies = [
 name = "controlplane"
 version = "0.3.0"
 dependencies = [
- "anyhow",
  "api-server",
  "chrono",
  "futures",

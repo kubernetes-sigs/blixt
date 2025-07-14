@@ -27,12 +27,17 @@ use controlplane::controllers::{GatewayClassController, GatewayController, TCPRo
 use controlplane::dataplane::DataplaneClientManager;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    run().await?;
-    Ok(())
+async fn main() {
+    match run().await {
+        Ok(()) => info!("Success."),
+        Err(e) => {
+            error!("{e:?}");
+            std::process::exit(1)
+        }
+    }
 }
 
-pub async fn run() -> anyhow::Result<()> {
+pub async fn run() -> Result<()> {
     tracing_subscriber::fmt()
         .with_file(true)
         .with_line_number(true)

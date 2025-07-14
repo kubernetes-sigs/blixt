@@ -19,7 +19,6 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
 thiserror = { workspace = true }
-anyhow = { workspace = true }
 gateway-api = { workspace = true }
 tonic = { workspace = true, features = ["tls-ring"] }
 tonic-health = { workspace = true }
