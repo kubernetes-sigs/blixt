@@ -41,9 +41,9 @@ pub enum DataplaneError {
     #[error("no dataplane clients available")]
     MissingClients,
     #[error("failed to connect to dataplane pod {0} error {1}")]
-    PodConnectionFailed(String, tonic::transport::Error),
+    PodConnectionFailed(String, Box<tonic::transport::Error>),
     #[error("Failed to update targets on dataplane pod {0} status {1}")]
-    UpdateFailed(String, tonic::Status),
+    UpdateFailed(String, Box<tonic::Status>),
 }
 
 impl Default for DataplaneClientManager {
@@ -92,7 +92,7 @@ impl DataplaneClientManager {
                     Err(err) => {
                         return Err(DataplaneError::PodConnectionFailed(
                             pod_ip.as_str().to_string(),
-                            err,
+                            err.into(),
                         )
                         .into());
                     }
@@ -119,7 +119,7 @@ impl DataplaneClientManager {
                     info!("Received {:?}", resp.get_ref());
                 }
                 Err(err) => {
-                    return Err(DataplaneError::UpdateFailed(pod_ip, err).into());
+                    return Err(DataplaneError::UpdateFailed(pod_ip, err.into()).into());
                 }
             }
         }

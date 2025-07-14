@@ -60,7 +60,6 @@ pub enum GatewayError {
     MissingAddresses(String, String),
     #[error("{0}/{1} found {2} IP addresses, currently only a single address is supported")]
     NotExactlyOneIpAddress(String, String, usize),
-
     #[error("{0}/{1} has an invalid configuration: {2}")]
     InvalidConfiguration(String, String, String),
     #[error("{0}/{1} not ready")]
@@ -232,17 +231,22 @@ impl GatewayController {
             }
         };
 
-        let svc_status: &ServiceStatus = match service.status.as_ref().ok_or(
-            GatewayError::MissingService(namespace.clone(), gw_name.clone()),
-        ) {
-            Ok(status) => status,
-            Err(error) => {
-                invalid_lb_condition.message = error.to_string();
-                set_condition(&mut gw, invalid_lb_condition);
-                patch_status(&gateway_api, gw_name, &gw.status.unwrap_or_default()).await?;
-                return Err(error.into());
-            }
-        };
+        let svc_status: &ServiceStatus =
+            match service
+                .status
+                .as_ref()
+                .ok_or(GatewayError::MissingServiceStatus(
+                    namespace.clone(),
+                    gw_name.clone(),
+                )) {
+                Ok(status) => status,
+                Err(error) => {
+                    invalid_lb_condition.message = error.to_string();
+                    set_condition(&mut gw, invalid_lb_condition);
+                    patch_status(&gateway_api, gw_name, &gw.status.unwrap_or_default()).await?;
+                    return Err(error.into());
+                }
+            };
 
         let svc_key = get_service_key(&service)?;
         if get_ingress_ip_len(svc_status) == 0 || svc_spec.cluster_ip.is_none() {
