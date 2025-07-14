@@ -18,7 +18,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use api_server::backends::{Targets, Vip, backends_client::BackendsClient};
-use gateway_api::apis::standard::gateways::Gateway;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{Api, Client};
 use thiserror::Error as ThisError;
@@ -28,7 +27,6 @@ use tonic::transport::Channel;
 use tracing::{info, warn};
 
 use crate::consts::{BLIXT_APP_LABEL, BLIXT_DATAPLANE_COMPONENT_LABEL, BLIXT_NAMESPACE};
-use crate::controllers::{GatewayError, NamespaceName};
 use crate::{Error, K8sError};
 
 #[derive(Clone)]
@@ -146,16 +144,4 @@ impl DataplaneClientManager {
 
         Ok(())
     }
-}
-
-pub fn get_gateway_ip(gateway: &Gateway) -> Result<std::net::Ipv4Addr, Error> {
-    let gw_name = gateway.metadata.name()?;
-    let namespace = gateway.metadata.namespace()?;
-    gateway
-        .status
-        .as_ref()
-        .and_then(|status| status.addresses.as_ref())
-        .and_then(|addresses| addresses.first())
-        .and_then(|addr| addr.value.parse().ok())
-        .ok_or_else(|| GatewayError::IpNotFound(namespace, gw_name).into())
 }

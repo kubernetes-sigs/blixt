@@ -23,8 +23,8 @@ use tonic::transport::Server;
 use tracing::*;
 
 use controlplane::Result;
-use controlplane::client_manager::DataplaneClientManager;
 use controlplane::controllers::{GatewayClassController, GatewayController, TCPRouteController};
+use controlplane::dataplane::DataplaneClientManager;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

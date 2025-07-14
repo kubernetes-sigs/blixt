@@ -23,7 +23,7 @@ use thiserror::Error as ThisError;
 use tracing::log::error;
 use tracing::{info, warn};
 
-use crate::client_manager::DataplaneClientManager;
+use crate::dataplane::DataplaneClientManager;
 use crate::consts::{DATAPLANE_FINALIZER, GATEWAY_CLASS_CONTROLLER_NAME};
 use crate::controllers::NamespaceName;
 use crate::gateway_utils::get_gateway_ips;

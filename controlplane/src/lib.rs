@@ -14,19 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-pub mod client_manager;
 pub mod consts;
 pub mod controllers;
+pub mod dataplane;
 mod gateway_utils;
-mod gatewayclass_utils;
 mod route_utils;
 mod traits;
 
 use kube::Client;
 use thiserror::Error;
 
-use crate::client_manager::DataplaneError;
 use crate::controllers::{GatewayError, TCPRouteError};
+use crate::dataplane::DataplaneError;
 
 #[derive(Error, Debug)]
 pub enum Error {
