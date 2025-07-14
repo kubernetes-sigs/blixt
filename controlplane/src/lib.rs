@@ -17,7 +17,6 @@ limitations under the License.
 pub mod consts;
 pub mod controllers;
 pub mod dataplane;
-mod gateway_utils;
 mod utils;
 
 use kube::Client;
