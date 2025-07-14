@@ -5,16 +5,10 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::client_manager::DataplaneClientManager;
-use crate::consts::{DATAPLANE_FINALIZER, GATEWAY_CLASS_CONTROLLER_NAME};
-use crate::controllers::NamespaceName;
-use crate::gateway_utils::get_gateway_ips;
-use crate::{K8sError, Result};
-
 use api_server::backends::{Target, Targets, Vip};
 use futures::StreamExt;
 use gateway_api::apis::experimental::tcproutes::{
-    TCPRoute, TCPRouteParentRefs, TCPRouteRulesBackendRefs, TCPRouteSpec,
+    TCPRoute, TCPRouteParentRefs, TCPRouteRulesBackendRefs,
 };
 use gateway_api::apis::standard::gateways::Gateway;
 use gateway_api::gatewayclasses::GatewayClass;
@@ -29,6 +23,12 @@ use kube::{Api, Resource, ResourceExt};
 use thiserror::Error as ThisError;
 use tracing::log::error;
 use tracing::{info, warn};
+
+use crate::client_manager::DataplaneClientManager;
+use crate::consts::{DATAPLANE_FINALIZER, GATEWAY_CLASS_CONTROLLER_NAME};
+use crate::controllers::NamespaceName;
+use crate::gateway_utils::get_gateway_ips;
+use crate::{K8sError, NamespacedName, Result};
 
 #[derive(Clone)]
 pub struct TCPRouteController {
@@ -48,28 +48,20 @@ pub enum TCPRouteError {
     GatewayNoIPv4Address(String, String),
     #[error("Gateway {0}/{1} fetching failed with error {2}.")]
     GatewayFetchFailed(String, String, kube::Error),
-    #[error("TCPRoute {0}/{1} has no parentRefs.")]
-    TCPRouteNoParentRefs(String, String),
-    #[error("TCPRoute {0}/{1} has no rules.")]
-    TCPRouteNoRules(String, String),
+    #[error("{0:?} has no parentRefs.")]
+    NoParentRefs(NamespacedName),
+    #[error("{0:?} has no rules.")]
+    TCPRouteNoRules(NamespacedName),
     #[error("TCPRoute {0}/{1} rule has no backendRefs.")]
     RulesMissingBackendRef(String, String),
     #[error("TCPRoute {0}/{1} backendRefs do not have a Service associated.")]
     TCPRouteBackendRefsNoService(String, String),
-    #[error("TCPRoute {0}/{1} parentRef {2} does not have a port associated.")]
-    TcpRouteParentRefPortMissing(String, String, String),
     #[error("backendRef {0}/{1} does not have a port associated.")]
     BackendRefPortMissing(String, String),
     #[error("backendRef {0}/{1} could not locate a matching Service port.")]
     BackendRefTargetPortMissing(String, String),
-    #[error(
-        "TCPRoute {0}/{1} found too many Gateways {2}. Currently only a single Gateway is supported."
-    )]
-    TooManyGatewaysFound(String, String, usize),
-    #[error(
-        "TCPRoute {0}/{1} found too many parentRefs {2}. Currently only a single parentRef is supported."
-    )]
-    TCPRouteTooManyParentRefs(String, String, usize),
+    #[error("{0:?} found too many Gateways {1}. Currently only a single Gateway is supported.")]
+    TooManyGatewaysFound(NamespacedName, usize),
     #[error("TCPRoute {0}/{1} endpoint {2} address not ready.")]
     EndpointAddressNotReady(String, String, String),
     #[error("TCPRoute {0}/{1} endpoint {2} port not ready.")]
@@ -84,12 +76,12 @@ pub enum TCPRouteError {
     ServiceSpecMissing(String, String),
     #[error("Service {0}/{1} does not have a ports associated.")]
     ServicePortsMissing(String, String),
-    #[error("Gateway {0}/{1} IPv not supported.")]
-    GatewayIPv6NotSupported(String, String),
+    #[error("Gateway {0:?} IPv6 not supported.")]
+    GatewayIPv6NotSupported(NamespacedName),
     #[error("Service {0}/{1} failed to parse target port {2} {3}")]
     ServiceTargetPortParseError(String, String, String, String),
-    #[error("{0}/{1} no matching port found")]
-    NoMatchingGatewayPort(String, String),
+    #[error("{0:?} no matching port found")]
+    NoMatchingGatewayPort(NamespacedName),
 }
 
 impl TCPRouteController {
@@ -122,9 +114,28 @@ impl TCPRouteController {
         let start = Instant::now();
         // TODO: check if object still exists
 
+        let route_name = tcp_route.metadata.name()?;
+        let namespace = tcp_route.metadata.namespace()?;
+        let tcp_route_identifier = NamespacedName {
+            name: route_name.clone(),
+            namespace: namespace.clone(),
+        };
+
+        let Some(parent_refs) = &tcp_route.spec.parent_refs else {
+            return Err(TCPRouteError::NoParentRefs(tcp_route_identifier).into());
+        };
+        if parent_refs.is_empty() {
+            return Err(TCPRouteError::NoParentRefs(tcp_route_identifier).into());
+        }
+        if tcp_route.spec.rules.is_empty() {
+            return Err(TCPRouteError::TCPRouteNoRules(tcp_route_identifier).into());
+        };
+
         // TODO: support multiple gateways, the TCPRoute spec allows for multiple parents
         // as of now the function returns an error when multiple gateways are found
-        let managed_gateways = ctx.managed_route(&tcp_route).await?;
+        let managed_gateways = ctx
+            .managed_route(&tcp_route_identifier, parent_refs)
+            .await?;
         if managed_gateways.is_empty() {
             // TODO: enable orphan checking
             return Ok(Action::await_change());
@@ -158,8 +169,13 @@ impl TCPRouteController {
 
         // in all other cases ensure the TCPRoute is configured in the dataplane
         for gateway in managed_gateways.iter() {
-            ctx.ensure_tcp_route_configure_in_dataplane(&tcp_route, gateway)
-                .await?;
+            ctx.ensure_tcp_route_configure_in_dataplane(
+                &tcp_route_identifier,
+                &tcp_route,
+                gateway,
+                parent_refs,
+            )
+            .await?;
         }
 
         let duration = Instant::now().sub(start);
@@ -169,11 +185,13 @@ impl TCPRouteController {
 
     async fn ensure_tcp_route_configure_in_dataplane(
         &self,
+        tcp_route_key: &NamespacedName,
         tcp_route: &TCPRoute,
         gateway: &Gateway,
+        parent_refs: &[TCPRouteParentRefs],
     ) -> Result<()> {
         let targets = self
-            .compile_tcproute_to_data_plane_targets(tcp_route, gateway)
+            .compile_tcproute_to_data_plane_targets(tcp_route_key, tcp_route, gateway, parent_refs)
             .await?;
 
         info!("Updating targets: {targets:?}");
@@ -243,23 +261,18 @@ impl TCPRouteController {
 
     // TODO: currently errors on > 1 Gateways found
     // add support for multiple Gateways
-    async fn managed_route(&self, tcp_route: &TCPRoute) -> Result<Vec<Gateway>> {
-        let tcp_route_spec: &TCPRouteSpec = &tcp_route.spec;
-        let namespace = tcp_route.metadata.namespace()?;
-        let route_name = tcp_route.metadata.name()?;
-
-        let Some(parent_refs) = &tcp_route_spec.parent_refs else {
-            return Err(TCPRouteError::TCPRouteNoParentRefs(namespace, route_name).into());
-        };
-
-        if tcp_route.spec.rules.is_empty() {
-            return Err(TCPRouteError::TCPRouteNoRules(namespace, route_name).into());
-        };
-
+    async fn managed_route(
+        &self,
+        route_identifier: &NamespacedName,
+        parent_refs: &[TCPRouteParentRefs],
+    ) -> Result<Vec<Gateway>> {
         let mut managed_gateways: Vec<Gateway> = vec![];
         let gateway_class_api: Api<GatewayClass> = Api::all(self.k8s_client.clone());
         for parent_ref in parent_refs {
-            let namespace = parent_ref.namespace.clone().unwrap_or(namespace.clone());
+            let namespace = parent_ref
+                .namespace
+                .clone()
+                .unwrap_or(route_identifier.namespace.clone());
             let gateway_name = parent_ref.name.as_str();
             let gateway_api: Api<Gateway> = Api::namespaced(self.k8s_client.clone(), &namespace);
 
@@ -312,8 +325,7 @@ impl TCPRouteController {
         // TODO: support multiple gateways
         if managed_gateways.len() > 1 {
             return Err(TCPRouteError::TooManyGatewaysFound(
-                namespace,
-                route_name,
+                route_identifier.clone(),
                 managed_gateways.len(),
             )
             .into());
@@ -324,43 +336,20 @@ impl TCPRouteController {
 
     async fn compile_tcproute_to_data_plane_targets(
         &self,
+        tcp_route_key: &NamespacedName,
         tcp_route: &TCPRoute,
         gateway: &Gateway,
+        parent_refs: &[TCPRouteParentRefs],
     ) -> Result<Targets> {
         let namespace = tcp_route.metadata.namespace()?;
         let route_name = tcp_route.metadata.name()?;
 
-        // get gateway port
-        let Some(parent_refs) = &tcp_route.spec.parent_refs else {
-            return Err(TCPRouteError::TCPRouteNoParentRefs(namespace, route_name).into());
-        };
-        if parent_refs.is_empty() {
-            return Err(TCPRouteError::TCPRouteNoParentRefs(namespace, route_name).into());
-        }
-        if parent_refs.len() > 1 {
-            // TODO: support multiple parent refs
-            return Err(TCPRouteError::TCPRouteTooManyParentRefs(
-                namespace,
-                route_name,
-                parent_refs.len(),
-            )
-            .into());
-        }
-
-        let parent_ref: &TCPRouteParentRefs = &parent_refs[0];
-        let Some(gw_port) = parent_ref.port else {
-            return Err(TCPRouteError::TcpRouteParentRefPortMissing(
-                namespace,
-                route_name,
-                parent_ref.name.clone(),
-            )
-            .into());
-        };
+        let gw_port = Self::get_gateway_port_for_parent_refs(tcp_route_key, parent_refs, gateway)?;
         let gw_ips = get_gateway_ips(gateway)?;
         let gw_ip: Ipv4Addr = match gw_ips[0] {
             IpAddr::V4(v4) => v4,
             IpAddr::V6(_) => {
-                return Err(TCPRouteError::GatewayIPv6NotSupported(namespace, route_name).into());
+                return Err(TCPRouteError::GatewayIPv6NotSupported(tcp_route_key.clone()).into());
             }
         };
 
@@ -463,6 +452,24 @@ impl TCPRouteController {
                 })
                 .collect::<Vec<Target>>(),
         })
+    }
+
+    pub(crate) fn get_gateway_port_for_parent_refs(
+        tcp_route_key: &NamespacedName,
+        parent_refs: &[TCPRouteParentRefs],
+        gateway: &Gateway,
+    ) -> Result<i32> {
+        for parent_ref in parent_refs {
+            if let Some(port) = parent_ref.port {
+                for listener in &gateway.spec.listeners {
+                    if listener.port == port {
+                        return Ok(port);
+                    }
+                }
+            }
+        }
+
+        Err(TCPRouteError::NoMatchingGatewayPort(tcp_route_key.clone()).into())
     }
 
     async fn endpoints_from_backend_ref(

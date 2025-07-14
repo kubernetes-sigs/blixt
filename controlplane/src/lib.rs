@@ -54,6 +54,7 @@ pub enum K8sError {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
+#[derive(Clone, Debug)]
 pub struct NamespacedName {
     pub name: String,
     pub namespace: String,

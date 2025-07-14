@@ -26,18 +26,23 @@ use kube::{Api, Client};
 use crate::controllers::{GatewayError, NamespaceName, TCPRouteError};
 use crate::gateway_utils::get_gateway_ipv4;
 use crate::traits::HasConditions;
-use crate::{Error, K8sError};
+use crate::{Error, K8sError, NamespacedName, controllers};
 
 // FIXME: use & integrate within controller
 pub async fn compile_route_to_targets(
     client: Client,
     route_namespace: &str,
+    tcp_route_key: &NamespacedName,
     backend_refs: &[TCPRouteRulesBackendRefs],
     gateway: &Gateway,
     parent_refs: &[TCPRouteParentRefs],
 ) -> Result<Targets, Error> {
     let gateway_ip = get_gateway_ipv4(gateway)?;
-    let gateway_port = get_gateway_port_for_refs(gateway, parent_refs)?;
+    let gateway_port = controllers::tcproute::TCPRouteController::get_gateway_port_for_parent_refs(
+        tcp_route_key,
+        parent_refs,
+        gateway,
+    )?;
 
     let vip = Vip {
         ip: u32::from(gateway_ip),
@@ -83,28 +88,6 @@ pub async fn compile_route_to_targets(
         vip: Some(vip),
         targets,
     })
-}
-
-// FIXME: use & integrate within controller
-pub fn get_gateway_port_for_refs(
-    gateway: &Gateway,
-    parent_refs: &[TCPRouteParentRefs],
-) -> Result<i32, Error> {
-    for parent_ref in parent_refs {
-        if let Some(port) = parent_ref.port {
-            for listener in &gateway.spec.listeners {
-                if listener.port == port {
-                    return Ok(port);
-                }
-            }
-        }
-    }
-
-    Err(TCPRouteError::NoMatchingGatewayPort(
-        gateway.metadata.namespace()?,
-        gateway.metadata.name()?,
-    )
-    .into())
 }
 
 // Sets the provided condition on any Gateway API object so log as it implements
