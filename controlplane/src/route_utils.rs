@@ -16,18 +16,19 @@ limitations under the License.
 
 use std::net::Ipv4Addr;
 
-use crate::Error;
 use crate::consts::GATEWAY_CLASS_CONTROLLER_NAME;
 use crate::traits::HasConditions;
+use crate::{Error, K8sError};
 use api_server::backends::{Target, Targets, Vip};
 
+use crate::controllers::{GatewayError, NamespaceName, TCPRouteError};
 use gateway_api::apis::experimental::tcproutes::{TCPRouteParentRefs, TCPRouteRulesBackendRefs};
 use gateway_api::apis::standard::gateways::Gateway;
 use k8s_openapi::api::core::v1::Endpoints;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
 use kube::{Api, Client};
 
-#[allow(dead_code)]
+// FIXME: use & integrate within controller
 pub async fn is_route_managed(
     client: Client,
     route_namespace: &str,
@@ -39,19 +40,21 @@ pub async fn is_route_managed(
 
         let gateway_api: Api<Gateway> = Api::namespaced(client.clone(), gateway_namespace);
 
+        // TODO: provide a generic 404 continue function
         let gateway = match gateway_api.get(gateway_name).await {
             Ok(gw) => gw,
             Err(kube::Error::Api(kube::core::ErrorResponse { code: 404, .. })) => continue,
-            Err(e) => return Err(Error::KubeError(e)),
+            Err(e) => return Err(K8sError::Client(e).into()),
         };
 
         let gatewayclass_api: Api<gateway_api::apis::standard::gatewayclasses::GatewayClass> =
             Api::all(client.clone());
 
+        // TODO: provide a generic 404 continue function
         let gatewayclass = match gatewayclass_api.get(&gateway.spec.gateway_class_name).await {
             Ok(gwc) => gwc,
             Err(kube::Error::Api(kube::core::ErrorResponse { code: 404, .. })) => continue,
-            Err(e) => return Err(Error::KubeError(e)),
+            Err(e) => return Err(K8sError::Client(e).into()),
         };
 
         if gatewayclass.spec.controller_name != GATEWAY_CLASS_CONTROLLER_NAME {
@@ -75,7 +78,7 @@ pub async fn is_route_managed(
     Ok(None)
 }
 
-#[allow(dead_code)]
+// FIXME: use & integrate within controller
 pub async fn compile_route_to_targets(
     client: Client,
     route_namespace: &str,
@@ -102,7 +105,7 @@ pub async fn compile_route_to_targets(
         let endpoints = endpoints_api
             .get(backend_name)
             .await
-            .map_err(Error::KubeError)?;
+            .map_err(K8sError::Client)?;
 
         for subset in endpoints.subsets.unwrap_or_default() {
             for address in subset.addresses.unwrap_or_default() {
@@ -117,10 +120,13 @@ pub async fn compile_route_to_targets(
         }
     }
 
+    let gw_name = gateway.metadata.name()?;
+    let namespace = gateway.metadata.namespace()?;
     if targets.is_empty() {
-        return Err(Error::LoadBalancerError(
-            "No ready endpoints found".to_string(),
-        ));
+        // FIXME: likely suited as TCPRouteError BackendRefs
+        return Err(
+            GatewayError::ServiceMissingLoadBalancerEndpointsReady(namespace, gw_name).into(),
+        );
     }
 
     Ok(Targets {
@@ -129,11 +135,15 @@ pub async fn compile_route_to_targets(
     })
 }
 
+// FIXME: use & integrate within controller
 fn get_gateway_ip(gateway: &Gateway) -> Result<Ipv4Addr, Error> {
+    let gw_name = gateway.metadata.name()?;
+    let namespace = gateway.metadata.namespace()?;
+
     let gateway_status = gateway
         .status
         .as_ref()
-        .ok_or_else(|| Error::InvalidConfigError("Gateway Status Not Ready".to_string()))?;
+        .ok_or_else(|| GatewayError::NotReady(namespace.clone(), gw_name.clone()))?;
 
     let gateway_address = gateway_status
         .addresses
@@ -145,13 +155,12 @@ fn get_gateway_ip(gateway: &Gateway) -> Result<Ipv4Addr, Error> {
                 None
             }
         })
-        .ok_or_else(|| {
-            Error::InvalidConfigError("Gateway must have exactly one address".to_string())
-        })?;
+        .ok_or_else(|| GatewayError::NotExactlyOneAddress(namespace.clone(), gw_name.clone()))?;
 
     Ok(gateway_address)
 }
 
+// FIXME: use & integrate within controller
 pub fn get_gateway_port_for_refs(
     gateway: &Gateway,
     parent_refs: &[TCPRouteParentRefs],
@@ -166,9 +175,11 @@ pub fn get_gateway_port_for_refs(
         }
     }
 
-    Err(Error::InvalidConfigError(
-        "No matching gateway port found".to_string(),
-    ))
+    Err(TCPRouteError::NoMatchingGatewayPort(
+        gateway.metadata.namespace()?,
+        gateway.metadata.name()?,
+    )
+    .into())
 }
 
 // Sets the provided condition on any Gateway API object so log as it implements

@@ -9,7 +9,7 @@ use crate::client_manager::DataplaneClientManager;
 use crate::consts::{DATAPLANE_FINALIZER, GATEWAY_CLASS_CONTROLLER_NAME};
 use crate::controllers::NamespaceName;
 use crate::controllers::get_gateway_ips;
-use crate::{Error, Result};
+use crate::{K8sError, Result};
 
 use api_server::backends::{Target, Targets, Vip};
 use futures::StreamExt;
@@ -38,6 +38,8 @@ pub struct TCPRouteController {
 
 #[derive(ThisError, Debug)]
 pub enum TCPRouteError {
+    #[error(transparent)]
+    K8s(#[from] K8sError),
     #[error("Gateway {0}/{1} had {2} IP addresses, currently only a single is supported")]
     OnlySingleGatewayIpAddressSupported(String, String, usize),
     #[error("Gateway {0}/{1} has no addresses.")]
@@ -88,6 +90,10 @@ pub enum TCPRouteError {
     ServicePortsMissing(String, String),
     #[error("Gateway {0}/{1} IPv not supported.")]
     GatewayIPv6NotSupported(String, String),
+    #[error("Service {0}/{1} failed to parse target port {2} {3}")]
+    ServiceTargetPortParseError(String, String, String, String),
+    #[error("{0}/{1} no matching port found")]
+    NoMatchingGatewayPort(String, String),
 }
 
 impl TCPRouteController {
@@ -103,7 +109,7 @@ impl TCPRouteController {
         tcproute_api
             .list(&ListParams::default().limit(1))
             .await
-            .map_err(crate::Error::CRDNotFoundError)?;
+            .map_err(K8sError::Client)?; // TODO: map not found
 
         Controller::new(tcproute_api, Config::default().any_semantic())
             .shutdown_on_signal()
@@ -209,7 +215,7 @@ impl TCPRouteController {
         tcp_route_api
             .patch_metadata(&tcp_route_name, &pp, &Patch::Merge(metadata))
             .await
-            .map_err(Error::KubeError)
+            .map_err(|e| K8sError::Client(e).into()) // FIXME: this looks strange
             .map(|_| ())
     }
 
@@ -235,7 +241,7 @@ impl TCPRouteController {
         tcp_route_api
             .patch_metadata(&tcp_route_name, &pp, &Patch::Apply(&metadata))
             .await
-            .map_err(Error::KubeError)
+            .map_err(|e| K8sError::Client(e).into())
             .map(|_| ())
     }
 
@@ -536,7 +542,7 @@ impl TCPRouteController {
         endpoint_api
             .get(&backend_ref.name)
             .await
-            .map_err(Error::KubeError)
+            .map_err(|e| K8sError::Client(e).into())
     }
 
     async fn get_backend_port(
@@ -561,7 +567,7 @@ impl TCPRouteController {
         let service = service_api
             .get(&backend_ref.name)
             .await
-            .map_err(Error::KubeError)?;
+            .map_err(K8sError::Client)?;
 
         let Some(service_spec) = service.spec else {
             return Err(TCPRouteError::ServiceSpecMissing(
@@ -593,10 +599,13 @@ impl TCPRouteController {
                         IntOrString::String(sport) => match i32::from_str(sport.as_str()) {
                             Ok(port) => port,
                             Err(e) => {
-                                return Err(Error::InvalidConfigError(format!(
-                                    "Failed to parse Service {namespace}/{} target port: {target_port:?} {e:?}",
-                                    backend_ref.name
-                                )));
+                                return Err(TCPRouteError::ServiceTargetPortParseError(
+                                    namespace.to_string(),
+                                    backend_ref.name.to_string(),
+                                    format!("{target_port:?}"),
+                                    format!("{e:?}"),
+                                )
+                                .into());
                             }
                         },
                     };

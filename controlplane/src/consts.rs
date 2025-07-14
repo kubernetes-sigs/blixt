@@ -7,7 +7,6 @@ pub const BLIXT_APP_LABEL: &str = "blixt";
 // The component label value to identify the Blixt data-plane component.
 pub const BLIXT_DATAPLANE_COMPONENT_LABEL: &str = "dataplane";
 
-#[allow(dead_code)]
 // The finalizer used for Blixt dataplane cleanup.
 pub const DATAPLANE_FINALIZER: &str = "blixt.gateway.networking.k8s.io/dataplane";
 

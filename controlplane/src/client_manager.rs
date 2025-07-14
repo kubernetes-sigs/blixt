@@ -17,20 +17,33 @@ limitations under the License.
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::consts::{BLIXT_APP_LABEL, BLIXT_DATAPLANE_COMPONENT_LABEL, BLIXT_NAMESPACE};
 use api_server::backends::{Targets, Vip, backends_client::BackendsClient};
-
 use gateway_api::apis::standard::gateways::Gateway;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{Api, Client};
+use thiserror::Error as ThisError;
 use tokio::sync::RwLock;
 use tonic::Request;
 use tonic::transport::Channel;
-use tracing::*;
+use tracing::{info, warn};
+
+use crate::consts::{BLIXT_APP_LABEL, BLIXT_DATAPLANE_COMPONENT_LABEL, BLIXT_NAMESPACE};
+use crate::controllers::{GatewayError, NamespaceName};
+use crate::{Error, K8sError};
 
 #[derive(Clone)]
 pub struct DataplaneClientManager {
     clients: Arc<RwLock<HashMap<String, BackendsClient<Channel>>>>,
+}
+
+#[derive(ThisError, Debug)]
+pub enum DataplaneError {
+    #[error("no dataplane clients available")]
+    MissingClients,
+    #[error("failed to connect to dataplane pod {0} error {1}")]
+    PodConnectionFailed(String, tonic::transport::Error),
+    #[error("Failed to update targets on dataplane pod {0} status {1}")]
+    UpdateFailed(String, tonic::Status),
 }
 
 impl Default for DataplaneClientManager {
@@ -46,13 +59,13 @@ impl DataplaneClientManager {
         }
     }
 
-    pub async fn update_clients(&self, client: Client) -> Result<(), crate::Error> {
+    pub async fn update_clients(&self, client: Client) -> Result<(), Error> {
         let pod_api: Api<Pod> = Api::namespaced(client, BLIXT_NAMESPACE);
 
         let dataplane_pods = pod_api
             .list(&Default::default())
             .await
-            .map_err(crate::Error::KubeError)?
+            .map_err(K8sError::Client)?
             .items
             .into_iter()
             .filter(|pod| match pod.metadata.labels.as_ref() {
@@ -77,9 +90,11 @@ impl DataplaneClientManager {
                         new_clients.insert(pod_ip.to_string(), grpc_client);
                     }
                     Err(err) => {
-                        return Err(crate::Error::DataplaneError(format!(
-                            "Failed to connect to dataplane pod {pod_ip}: {err}"
-                        )));
+                        return Err(DataplaneError::PodConnectionFailed(
+                            pod_ip.as_str().to_string(),
+                            err,
+                        )
+                        .into());
                     }
                 }
             }
@@ -91,12 +106,10 @@ impl DataplaneClientManager {
         Ok(())
     }
 
-    pub async fn update_targets(&self, targets: Targets) -> Result<(), crate::Error> {
+    pub async fn update_targets(&self, targets: Targets) -> Result<(), Error> {
         let clients = self.clients.read().await;
         if clients.is_empty() {
-            return Err(crate::Error::InvalidConfigError(
-                "No dataplane clients available".to_string(),
-            ));
+            return Err(DataplaneError::MissingClients.into());
         }
 
         for (pod_ip, mut client) in clients.clone() {
@@ -106,9 +119,7 @@ impl DataplaneClientManager {
                     info!("Received {:?}", resp.get_ref());
                 }
                 Err(err) => {
-                    return Err(crate::Error::DataplaneError(format!(
-                        "Failed to update targets on dataplane pod {pod_ip}: {err}"
-                    )));
+                    return Err(DataplaneError::UpdateFailed(pod_ip, err).into());
                 }
             }
         }
@@ -116,12 +127,10 @@ impl DataplaneClientManager {
         Ok(())
     }
 
-    pub async fn delete_vip(&self, vip: Vip) -> Result<(), crate::Error> {
+    pub async fn delete_vip(&self, vip: Vip) -> Result<(), Error> {
         let clients = self.clients.read().await;
         if clients.is_empty() {
-            return Err(crate::Error::InvalidConfigError(
-                "No dataplane clients available".to_string(),
-            ));
+            return Err(DataplaneError::MissingClients.into());
         }
 
         for (pod_ip, mut client) in clients.clone() {
@@ -139,12 +148,14 @@ impl DataplaneClientManager {
     }
 }
 
-pub fn get_gateway_ip(gateway: &Gateway) -> Result<std::net::Ipv4Addr, crate::Error> {
+pub fn get_gateway_ip(gateway: &Gateway) -> Result<std::net::Ipv4Addr, Error> {
+    let gw_name = gateway.metadata.name()?;
+    let namespace = gateway.metadata.namespace()?;
     gateway
         .status
         .as_ref()
         .and_then(|status| status.addresses.as_ref())
         .and_then(|addresses| addresses.first())
         .and_then(|addr| addr.value.parse().ok())
-        .ok_or_else(|| crate::Error::InvalidConfigError("Gateway IP not found".to_string()))
+        .ok_or_else(|| GatewayError::IpNotFound(namespace, gw_name).into())
 }

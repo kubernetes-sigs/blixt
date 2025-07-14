@@ -33,7 +33,7 @@ use gateway_api::apis::standard::{
     },
 };
 use kube::{
-    Resource, ResourceExt,
+    ResourceExt,
     api::{Api, Patch, PatchParams, PostParams},
     core::ObjectMeta,
 };
@@ -89,23 +89,31 @@ pub async fn create_endpoint_if_not_exists(
     svc_status: &ServiceStatus,
 ) -> Result<()> {
     let mut lb_addr = None;
-    let lb_status = svc_status
-        .load_balancer
-        .as_ref()
-        .ok_or(Error::LoadBalancerError(
-            "Load balancer not found in service status".to_string(),
-        ))?;
-    let ingress = lb_status.ingress.as_ref().ok_or(Error::LoadBalancerError(
-        "Ingress not found in service status".to_string(),
-    ))?;
+    let lb_status =
+        svc_status
+            .load_balancer
+            .as_ref()
+            .ok_or(GatewayError::ServiceMissingLoadBalancerStatus(
+                key.name.clone(),
+                key.namespace.clone(),
+            ))?;
+    let ingress =
+        lb_status
+            .ingress
+            .as_ref()
+            .ok_or(GatewayError::ServiceMissingLoadBalancerIngress(
+                key.name.clone(),
+                key.namespace.clone(),
+            ))?;
     for addr in ingress {
         if let Some(ip) = &addr.ip {
             lb_addr = Some(ip.clone());
             break;
         }
     }
-    let lb_addr_ip = lb_addr.ok_or(Error::LoadBalancerError(
-        "LoadBalancer ingress ip not found in service status".to_string(),
+    let lb_addr_ip = lb_addr.ok_or(GatewayError::ServiceMissingLoadBalancerIngressIp(
+        key.name.clone(),
+        key.namespace.clone(),
     ))?;
 
     let endpoints_api: Api<Endpoints> = Api::namespaced(k8s_client, &key.namespace);
@@ -140,7 +148,7 @@ pub async fn create_endpoint_if_not_exists(
             let ep = endpoints_api
                 .create(&PostParams::default(), &endpoints)
                 .await
-                .map_err(Error::KubeError)?;
+                .map_err(K8sError::Client)?;
             info!("created Endpoints object {}", ep.name_any());
         }
     }
@@ -198,7 +206,7 @@ pub async fn create_svc_for_gateway(k8s_client: Client, gateway: &Gateway) -> Re
     let service = svc_api
         .create(&PostParams::default(), &svc)
         .await
-        .map_err(Error::KubeError)?;
+        .map_err(K8sError::Client)?;
 
     Ok(service)
 }
@@ -233,7 +241,12 @@ pub fn update_service_for_gateway(gateway: &Gateway, svc: &mut Service) -> Resul
             let addr = addresses[0].clone();
             if let Some(t) = addr.r#type {
                 if t != "IPAddress" {
-                    return Err(Error::InvalidConfigError(format!("addresses of type {t} are not supported; only type IPAddress is supported").to_string()));
+                    return Err(GatewayError::AddressTypeNotSupported(
+                        gateway.metadata.namespace()?,
+                        gateway.metadata.name()?,
+                        t,
+                    )
+                    .into());
                 }
             }
             address = Some(addresses[0].clone());
@@ -242,9 +255,15 @@ pub fn update_service_for_gateway(gateway: &Gateway, svc: &mut Service) -> Resul
             warn!("multiple addresses");
         }
     }
-    let svc_spec = svc.spec.as_mut().ok_or(Error::LoadBalancerError(
-        "Loadbalancer service does not have a spec".to_string(),
-    ))?;
+
+    let svc_name = svc.metadata.name()?;
+    let namespace = svc.metadata.namespace()?;
+    let svc_spec = svc
+        .spec
+        .as_mut()
+        .ok_or(GatewayError::ServiceMissingLoadBalancerSpec(
+            namespace, svc_name,
+        ))?;
     // TODO: check if this is required, using MetalLB this is likely not needed
     // using cloud-provider-kind the port was mapped by default
     svc_spec.allocate_load_balancer_node_ports = Some(false);
@@ -324,7 +343,7 @@ pub async fn patch_status(
     gateway_api
         .patch_status(name.as_str(), &params, &patch)
         .await
-        .map_err(Error::KubeError)?;
+        .map_err(K8sError::Client)?;
     Ok(())
 }
 
@@ -364,7 +383,7 @@ pub fn get_accepted_condition(gateway: &Gateway) -> metav1::Condition {
                     accepted.status = String::from("False");
                     accepted.reason = GatewayConditionReason::UnsupportedAddress.to_string();
                     accepted.message = format!(
-                        "found an addres of type {addr_type}, only type IPAddress is supported"
+                        "found an address of type {addr_type}, only type IPAddress is supported"
                     );
                     break;
                 }
@@ -376,6 +395,9 @@ pub fn get_accepted_condition(gateway: &Gateway) -> metav1::Condition {
 
 // Inspects the provided Gateway and sets the status of its listeners accordingly.
 pub fn set_listener_status(gateway: &mut Gateway) -> Result<()> {
+    let gw_name = gateway.metadata.name()?;
+    let namespace = gateway.metadata.namespace()?;
+
     let gateway_spec: &GatewaySpec = &gateway.spec;
     let mut statuses: Vec<GatewayStatusListeners> = vec![];
     let mut current_listener_statuses: HashMap<String, GatewayStatusListeners> = HashMap::new();
@@ -391,8 +413,10 @@ pub fn set_listener_status(gateway: &mut Gateway) -> Result<()> {
     let generation = gateway
         .metadata
         .generation
-        .ok_or(Error::InvalidConfigError(
-            "Gateway generation not found".to_string(),
+        .ok_or(K8sError::MissingResourceProperty(
+            gw_name,
+            namespace,
+            "metadata.generation".to_string(),
         ))?;
 
     for listener in &gateway_spec.listeners {
@@ -436,12 +460,8 @@ pub fn set_listener_status(gateway: &mut Gateway) -> Result<()> {
 }
 
 pub fn get_service_key(service: &Service) -> Result<NamespacedName> {
-    let svc_name = service.meta().name.clone().ok_or(Error::LoadBalancerError(
-        "Loadbalancer service name not found".to_string(),
-    ))?;
-    let svc_ns = service.namespace().ok_or(Error::LoadBalancerError(
-        "Loadblancer service namespace not found".to_string(),
-    ))?;
+    let svc_name = service.metadata.name()?;
+    let svc_ns = service.metadata.namespace()?;
     Ok(NamespacedName {
         name: svc_name,
         namespace: svc_ns,

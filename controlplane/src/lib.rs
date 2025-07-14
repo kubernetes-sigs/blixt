@@ -22,25 +22,33 @@ mod gatewayclass_utils;
 mod route_utils;
 mod traits;
 
+use crate::client_manager::DataplaneError;
+use crate::controllers::{GatewayError, TCPRouteError};
 use kube::Client;
 use thiserror::Error;
 
-use crate::controllers::tcproute::TCPRouteError;
-
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("kube error: {0}")]
-    KubeError(#[source] kube::Error),
-    #[error("invalid configuration: `{0}`")]
-    InvalidConfigError(String),
-    #[error("error reconciling loadbalancer service: `{0}`")]
-    LoadBalancerError(String),
-    #[error("error querying Gateway API CRDs: `{0}`; are the CRDs installed?")]
-    CRDNotFoundError(#[source] kube::Error),
-    #[error("dataplane error: {0}")]
-    DataplaneError(String),
-    #[error("error reconciling TCPRoute: {0}")]
-    TCPRouteError(#[from] TCPRouteError),
+    #[error(transparent)]
+    K8s(#[from] K8sError),
+    #[error(transparent)]
+    Dataplane(#[from] DataplaneError),
+    #[error(transparent)]
+    TCPRoute(#[from] TCPRouteError),
+    #[error(transparent)]
+    Gateway(#[from] GatewayError),
+}
+
+#[derive(Error, Debug)]
+pub enum K8sError {
+    #[error("kube client error: {0}")]
+    Client(#[from] kube::Error),
+    #[error("{0}/{1} missing property {2}")]
+    MissingResourceProperty(String, String, String),
+    #[error("missing resource namespace")]
+    MissingResourceNamespace,
+    #[error("missing resource name")]
+    MissingResourceName,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

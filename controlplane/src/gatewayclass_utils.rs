@@ -72,6 +72,6 @@ pub async fn patch_status(
     gatewayclass_api
         .patch_status(name.as_str(), &params, &patch)
         .await
-        .map_err(Error::KubeError)?;
+        .map_err(K8sError::Client)?;
     Ok(())
 }

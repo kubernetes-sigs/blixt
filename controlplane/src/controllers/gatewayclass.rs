@@ -26,6 +26,7 @@ use kube::{
     runtime::{Controller, controller::Action, watcher::Config},
 };
 
+use crate::controllers::NamespaceName;
 use crate::{consts::GATEWAY_CLASS_CONTROLLER_NAME, *};
 use gateway_api::apis::standard::gatewayclasses::GatewayClass;
 use gatewayclass_utils::*;
@@ -46,7 +47,7 @@ impl GatewayClassController {
         gwc_api
             .list(&ListParams::default().limit(1))
             .await
-            .map_err(Error::CRDNotFoundError)?;
+            .map_err(K8sError::Client)?; // TODO: map not found
 
         Controller::new(gwc_api, Config::default().any_semantic())
             .shutdown_on_signal()
@@ -60,20 +61,9 @@ impl GatewayClassController {
 
     pub async fn reconcile(gateway_class: Arc<GatewayClass>, ctx: Arc<Self>) -> Result<Action> {
         let start = Instant::now();
-        let name = gateway_class
-            .metadata
-            .name
-            .clone()
-            .ok_or(Error::InvalidConfigError(
-                "no name provided for gatewayclass".to_string(),
-            ))?;
+        let name = gateway_class.metadata.name()?;
 
-        let mut gwc = GatewayClass {
-            metadata: gateway_class.metadata.clone(),
-            spec: gateway_class.spec.clone(),
-            status: gateway_class.status.clone(),
-        };
-
+        let mut gwc = gateway_class.as_ref().clone();
         if gateway_class.spec.controller_name != GATEWAY_CLASS_CONTROLLER_NAME {
             // Skip reconciling because we don't manage this resource
             return Ok(Action::await_change());
