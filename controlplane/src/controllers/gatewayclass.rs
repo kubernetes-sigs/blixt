@@ -36,7 +36,7 @@ use tracing::{info, warn};
 
 use crate::consts::BLIXT_FIELD_MANAGER;
 use crate::controllers::NamespaceName;
-use crate::route_utils::set_condition;
+use crate::utils::set_condition;
 use crate::{consts::GATEWAY_CLASS_CONTROLLER_NAME, *};
 
 #[derive(Clone)]

@@ -44,7 +44,7 @@ use crate::gateway_utils::{
     get_ingress_ip_len, get_service_key, patch_status, set_gateway_status_addresses,
     set_listener_status, update_service_for_gateway,
 };
-use crate::route_utils::set_condition;
+use crate::utils::set_condition;
 use crate::{Error, K8sError, Result};
 
 #[derive(Clone)]

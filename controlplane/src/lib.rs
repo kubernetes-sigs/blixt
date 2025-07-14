@@ -18,8 +18,7 @@ pub mod consts;
 pub mod controllers;
 pub mod dataplane;
 mod gateway_utils;
-mod route_utils;
-mod traits;
+mod utils;
 
 use kube::Client;
 use thiserror::Error;
