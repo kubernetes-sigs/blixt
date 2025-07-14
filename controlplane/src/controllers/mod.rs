@@ -1,4 +1,5 @@
 pub mod gateway;
+pub mod gatewayclass;
 pub mod tcproute;
 
 use std::net::IpAddr;
@@ -10,6 +11,10 @@ use tracing::warn;
 
 use crate::controllers::tcproute::TCPRouteError;
 use crate::{Error, Result};
+
+pub use gateway::GatewayController;
+pub use gatewayclass::GatewayClassController;
+pub use tcproute::TCPRouteController;
 
 // FIXME: potentially drop pub after moving files
 pub(crate) trait NamespaceName {

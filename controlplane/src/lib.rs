@@ -18,24 +18,14 @@ pub mod client_manager;
 pub mod consts;
 pub mod controllers;
 mod gateway_utils;
-mod gatewayclass_controller;
 mod gatewayclass_utils;
 mod route_utils;
 mod traits;
-
-pub use gatewayclass_controller::controller as gatewayclass_controller;
 
 use kube::Client;
 use thiserror::Error;
 
 use crate::controllers::tcproute::TCPRouteError;
-
-// Context for our reconciler
-#[derive(Clone)]
-pub struct Context {
-    /// Kubernetes client
-    pub client: Client,
-}
 
 #[derive(Error, Debug)]
 pub enum Error {

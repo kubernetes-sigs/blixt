@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
-use std::sync::Arc;
 
 use kube::Client;
 use tokio::task::JoinHandle;
@@ -23,10 +22,9 @@ use tokio::try_join;
 use tonic::transport::Server;
 use tracing::*;
 
+use controlplane::Result;
 use controlplane::client_manager::DataplaneClientManager;
-use controlplane::controllers::gateway::GatewayController;
-use controlplane::controllers::tcproute::TCPRouteController;
-use controlplane::{Context, Result, gatewayclass_controller};
+use controlplane::controllers::{GatewayClassController, GatewayController, TCPRouteController};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -43,20 +41,19 @@ pub async fn run() -> anyhow::Result<()> {
     let client = Client::try_default()
         .await
         .expect("failed to create kube Client");
-    let ctx = Arc::new(Context {
-        client: client.clone(),
-    });
 
     let dataplane_client = DataplaneClientManager::default();
-    dataplane_client.update_clients(ctx.client.clone()).await?;
+    // TODO: update clients on Node (add, remove) and Pod events (dataplane rollout)
+    dataplane_client.update_clients(client.clone()).await?;
 
     let tcproute_controller = TCPRouteController::new(client.clone(), dataplane_client.clone());
     let gateway_controller = GatewayController::new(client.clone());
+    let gatewayclass_controller = GatewayClassController::new(client.clone());
 
     if let Err(error) = try_join!(
         gateway_controller.start(),
         tcproute_controller.start(),
-        gatewayclass_controller(ctx),
+        gatewayclass_controller.start(),
         setup_health_checks(IpAddr::from(Ipv4Addr::new(0, 0, 0, 0)), 8080),
     ) {
         error!("failed to start controllers: {error:?}");
