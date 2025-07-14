@@ -1,9 +1,11 @@
+pub mod gateway;
 pub mod tcproute;
+
+use std::net::IpAddr;
+use std::str::FromStr;
 
 use gateway_api::apis::standard::gateways::Gateway;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use std::net::IpAddr;
-use std::str::FromStr;
 use tracing::warn;
 
 use crate::controllers::tcproute::TCPRouteError;

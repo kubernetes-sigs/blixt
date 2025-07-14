@@ -1,15 +1,15 @@
+use kube::Client;
 use std::net::{IpAddr, Ipv4Addr};
 use std::ops::Sub;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::Error;
 use crate::client_manager::DataplaneClientManager;
 use crate::consts::{DATAPLANE_FINALIZER, GATEWAY_CLASS_CONTROLLER_NAME};
 use crate::controllers::NamespaceName;
 use crate::controllers::get_gateway_ips;
-use crate::{Context, Result};
+use crate::{Error, Result};
 
 use api_server::backends::{Target, Targets, Vip};
 use futures::StreamExt;
@@ -32,8 +32,8 @@ use tracing::{info, warn};
 
 #[derive(Clone)]
 pub struct TCPRouteController {
-    dataplane_client: Arc<DataplaneClientManager>,
-    k8s_ctx: Arc<Context>,
+    dataplane_client: DataplaneClientManager,
+    k8s_client: Client,
 }
 
 #[derive(ThisError, Debug)]
@@ -91,15 +91,15 @@ pub enum TCPRouteError {
 }
 
 impl TCPRouteController {
-    pub fn new(k8s_ctx: Arc<Context>, dataplane_client: Arc<DataplaneClientManager>) -> Self {
+    pub fn new(k8s_ctx: Client, dataplane_client: DataplaneClientManager) -> Self {
         Self {
             dataplane_client,
-            k8s_ctx,
+            k8s_client: k8s_ctx,
         }
     }
 
-    pub async fn start(&self) -> Result<()> {
-        let tcproute_api = Api::<TCPRoute>::all(self.k8s_ctx.client.clone());
+    pub async fn start(self) -> Result<()> {
+        let tcproute_api = Api::<TCPRoute>::all(self.k8s_client.clone());
         tcproute_api
             .list(&ListParams::default().limit(1))
             .await
@@ -107,7 +107,7 @@ impl TCPRouteController {
 
         Controller::new(tcproute_api, Config::default().any_semantic())
             .shutdown_on_signal()
-            .run(Self::reconcile, Self::error_policy, Arc::new(self.clone()))
+            .run(Self::reconcile, Self::error_policy, Arc::new(self))
             .filter_map(|x| async move { std::result::Result::ok(x) })
             .for_each(|_| futures::future::ready(()))
             .await;
@@ -115,10 +115,7 @@ impl TCPRouteController {
         Ok(())
     }
 
-    pub async fn reconcile(
-        tcp_route: Arc<TCPRoute>,
-        ctx: Arc<TCPRouteController>,
-    ) -> Result<Action> {
+    pub async fn reconcile(tcp_route: Arc<TCPRoute>, ctx: Arc<Self>) -> Result<Action> {
         error!("TCPRoute: {tcp_route:?}");
         let start = Instant::now();
         // TODO: check if object still exists
@@ -206,7 +203,7 @@ impl TCPRouteController {
         };
 
         let tcp_route_api: Api<TCPRoute> =
-            Api::namespaced(self.k8s_ctx.client.clone(), namespace.as_str());
+            Api::namespaced(self.k8s_client.clone(), namespace.as_str());
         let pp = PatchParams::default();
 
         tcp_route_api
@@ -232,7 +229,7 @@ impl TCPRouteController {
             ..Default::default()
         };
 
-        let tcp_route_api: Api<TCPRoute> = Api::namespaced(self.k8s_ctx.client.clone(), &namespace);
+        let tcp_route_api: Api<TCPRoute> = Api::namespaced(self.k8s_client.clone(), &namespace);
         let pp = PatchParams::apply(crate::consts::BLIXT_FIELD_MANAGER);
 
         tcp_route_api
@@ -256,11 +253,10 @@ impl TCPRouteController {
         };
 
         let mut supported_gateways: Vec<Gateway> = vec![];
-        let gateway_class_api: Api<GatewayClass> = Api::all(self.k8s_ctx.client.clone());
+        let gateway_class_api: Api<GatewayClass> = Api::all(self.k8s_client.clone());
         for parent in parent_refs {
             let namespace = parent.namespace.clone().unwrap_or(namespace.clone());
-            let gateway_api: Api<Gateway> =
-                Api::namespaced(self.k8s_ctx.client.clone(), &namespace);
+            let gateway_api: Api<Gateway> = Api::namespaced(self.k8s_client.clone(), &namespace);
 
             // Get Gateway for TCP Route
             //let gateway_res : std::result::Result<Gateway, KubeError> = gateway_api.get(parent.name.as_str()).await;
@@ -536,7 +532,7 @@ impl TCPRouteController {
             .clone()
             .unwrap_or(tcp_route.metadata.namespace()?);
 
-        let endpoint_api = Api::<Endpoints>::namespaced(self.k8s_ctx.client.clone(), namespace);
+        let endpoint_api = Api::<Endpoints>::namespaced(self.k8s_client.clone(), namespace);
         endpoint_api
             .get(&backend_ref.name)
             .await
@@ -561,7 +557,7 @@ impl TCPRouteController {
             .into());
         };
 
-        let service_api = Api::<Service>::namespaced(self.k8s_ctx.client.clone(), namespace);
+        let service_api = Api::<Service>::namespaced(self.k8s_client.clone(), namespace);
         let service = service_api
             .get(&backend_ref.name)
             .await

@@ -17,15 +17,16 @@ limitations under the License.
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::Arc;
 
-use controlplane::client_manager::DataplaneClientManager;
-use controlplane::controllers::tcproute::TCPRouteController;
-use controlplane::{Context, Result, gateway_controller, gatewayclass_controller};
-
 use kube::Client;
 use tokio::task::JoinHandle;
 use tokio::try_join;
 use tonic::transport::Server;
 use tracing::*;
+
+use controlplane::client_manager::DataplaneClientManager;
+use controlplane::controllers::gateway::GatewayController;
+use controlplane::controllers::tcproute::TCPRouteController;
+use controlplane::{Context, Result, gatewayclass_controller};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -46,15 +47,16 @@ pub async fn run() -> anyhow::Result<()> {
         client: client.clone(),
     });
 
-    let dataplane_client = Arc::new(DataplaneClientManager::default());
+    let dataplane_client = DataplaneClientManager::default();
     dataplane_client.update_clients(ctx.client.clone()).await?;
 
-    let tcproute_controller = TCPRouteController::new(ctx.clone(), dataplane_client.clone());
+    let tcproute_controller = TCPRouteController::new(client.clone(), dataplane_client.clone());
+    let gateway_controller = GatewayController::new(client.clone());
 
     if let Err(error) = try_join!(
-        gateway_controller(ctx.clone()),
-        gatewayclass_controller(ctx),
+        gateway_controller.start(),
         tcproute_controller.start(),
+        gatewayclass_controller(ctx),
         setup_health_checks(IpAddr::from(Ipv4Addr::new(0, 0, 0, 0)), 8080),
     ) {
         error!("failed to start controllers: {error:?}");

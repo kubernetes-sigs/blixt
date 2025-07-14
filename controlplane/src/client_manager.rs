@@ -28,6 +28,7 @@ use tonic::Request;
 use tonic::transport::Channel;
 use tracing::*;
 
+#[derive(Clone)]
 pub struct DataplaneClientManager {
     clients: Arc<RwLock<HashMap<String, BackendsClient<Channel>>>>,
 }

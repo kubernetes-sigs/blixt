@@ -17,14 +17,12 @@ limitations under the License.
 pub mod client_manager;
 pub mod consts;
 pub mod controllers;
-mod gateway_controller;
 mod gateway_utils;
 mod gatewayclass_controller;
 mod gatewayclass_utils;
 mod route_utils;
 mod traits;
 
-pub use gateway_controller::controller as gateway_controller;
 pub use gatewayclass_controller::controller as gatewayclass_controller;
 
 use kube::Client;

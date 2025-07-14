@@ -16,10 +16,7 @@ limitations under the License.
 
 #![allow(clippy::field_reassign_with_default)]
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashMap};
 
 use crate::{
     consts::{BLIXT_FIELD_MANAGER, GATEWAY_SERVICE_LABEL},
@@ -86,7 +83,7 @@ pub fn set_gateway_status_addresses(gateway: &mut Gateway, svc_status: &ServiceS
 // causing traffic to never reach the node.
 // Ref: https://github.com/metallb/metallb/issues/1640
 pub async fn create_endpoint_if_not_exists(
-    ctx: Arc<Context>,
+    k8s_client: Client,
     key: &NamespacedName,
     svc_spec: &ServiceSpec,
     svc_status: &ServiceStatus,
@@ -111,7 +108,7 @@ pub async fn create_endpoint_if_not_exists(
         "LoadBalancer ingress ip not found in service status".to_string(),
     ))?;
 
-    let endpoints_api: Api<Endpoints> = Api::namespaced(ctx.client.clone(), &key.namespace);
+    let endpoints_api: Api<Endpoints> = Api::namespaced(k8s_client, &key.namespace);
 
     if let Some(err) = endpoints_api.get(&key.name).await.err() {
         if check_if_not_found_err(err) {
@@ -172,7 +169,7 @@ pub fn get_ingress_ip_len(svc_status: &ServiceStatus) -> usize {
 }
 
 // Creates a LoadBalancer Service for the provided Gateway.
-pub async fn create_svc_for_gateway(ctx: Arc<Context>, gateway: &Gateway) -> Result<Service> {
+pub async fn create_svc_for_gateway(k8s_client: Client, gateway: &Gateway) -> Result<Service> {
     let namespace = gateway.metadata.namespace()?;
     let gw_name = gateway.metadata.name()?;
 
@@ -197,7 +194,7 @@ pub async fn create_svc_for_gateway(ctx: Arc<Context>, gateway: &Gateway) -> Res
         &svc_name, &gw_name
     );
     debug!("{svc:?}");
-    let svc_api: Api<Service> = Api::namespaced(ctx.client.clone(), namespace.as_str());
+    let svc_api: Api<Service> = Api::namespaced(k8s_client, namespace.as_str());
     let service = svc_api
         .create(&PostParams::default(), &svc)
         .await
