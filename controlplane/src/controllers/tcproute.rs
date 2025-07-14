@@ -16,8 +16,8 @@ use futures::StreamExt;
 use gateway_api::apis::experimental::tcproutes::{
     TCPRoute, TCPRouteParentRefs, TCPRouteRulesBackendRefs, TCPRouteSpec,
 };
-use gateway_api::apis::standard::gateways::{Gateway, GatewaySpec};
-use gateway_api::gatewayclasses::{GatewayClass, GatewayClassSpec};
+use gateway_api::apis::standard::gateways::Gateway;
+use gateway_api::gatewayclasses::GatewayClass;
 use k8s_openapi::api::core::v1::{Endpoints, Service};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
@@ -25,7 +25,7 @@ use kube::api::{ListParams, Patch, PatchParams};
 use kube::runtime::Controller;
 use kube::runtime::controller::Action;
 use kube::runtime::watcher::Config;
-use kube::{Api, Error as KubeError, Resource, ResourceExt};
+use kube::{Api, Resource, ResourceExt};
 use thiserror::Error as ThisError;
 use tracing::log::error;
 use tracing::{info, warn};
@@ -56,8 +56,6 @@ pub enum TCPRouteError {
     RulesMissingBackendRef(String, String),
     #[error("TCPRoute {0}/{1} backendRefs do not have a Service associated.")]
     TCPRouteBackendRefsNoService(String, String),
-    #[error("Gateway {0}/{1} Listener not found for parentRef {2} with port {3}")]
-    GatewayListenerNotFound(String, String, String, i32),
     #[error("TCPRoute {0}/{1} parentRef {2} does not have a port associated.")]
     TcpRouteParentRefPortMissing(String, String, String),
     #[error("backendRef {0}/{1} does not have a port associated.")]
@@ -124,7 +122,7 @@ impl TCPRouteController {
         let start = Instant::now();
         // TODO: check if object still exists
 
-        // TODO: support multiple gateways
+        // TODO: support multiple gateways, the TCPRoute spec allows for multiple parents
         // as of now the function returns an error when multiple gateways are found
         let managed_gateways = ctx.managed_route(&tcp_route).await?;
         if managed_gateways.is_empty() {
@@ -243,6 +241,8 @@ impl TCPRouteController {
             .map(|_| ())
     }
 
+    // TODO: currently errors on > 1 Gateways found
+    // add support for multiple Gateways
     async fn managed_route(&self, tcp_route: &TCPRoute) -> Result<Vec<Gateway>> {
         let tcp_route_spec: &TCPRouteSpec = &tcp_route.spec;
         let namespace = tcp_route.metadata.namespace()?;
@@ -256,128 +256,70 @@ impl TCPRouteController {
             return Err(TCPRouteError::TCPRouteNoRules(namespace, route_name).into());
         };
 
-        let mut supported_gateways: Vec<Gateway> = vec![];
+        let mut managed_gateways: Vec<Gateway> = vec![];
         let gateway_class_api: Api<GatewayClass> = Api::all(self.k8s_client.clone());
-        for parent in parent_refs {
-            let namespace = parent.namespace.clone().unwrap_or(namespace.clone());
+        for parent_ref in parent_refs {
+            let namespace = parent_ref.namespace.clone().unwrap_or(namespace.clone());
+            let gateway_name = parent_ref.name.as_str();
             let gateway_api: Api<Gateway> = Api::namespaced(self.k8s_client.clone(), &namespace);
 
-            // Get Gateway for TCP Route
-            //let gateway_res : std::result::Result<Gateway, KubeError> = gateway_api.get(parent.name.as_str()).await;
-            let gateway_res: std::result::Result<Gateway, KubeError> =
-                gateway_api.get(parent.name.as_str()).await;
-            if gateway_res.is_err() {
-                let e = gateway_res.err().unwrap();
-                match &e {
-                    KubeError::Api(api) => {
-                        if api.code == 404 {
-                            warn!(
-                                "Fetching Gateway {}/{} kubernetes API error 404",
-                                &parent.name, &namespace
-                            );
-                            continue;
-                        }
-                    }
-                    _ => {
-                        return Err(TCPRouteError::GatewayFetchFailed(
-                            namespace,
-                            parent.name.clone(),
-                            e,
-                        )
-                        .into());
-                    }
-                };
-            } else {
-                let gateway = gateway_res.unwrap();
-                let gateway_spec: &GatewaySpec = &gateway.spec;
-
-                // Get GatewayClass for the Gateway and match to our name of controler
-                let gateway_class_res: std::result::Result<GatewayClass, KubeError> =
-                    gateway_class_api
-                        .get(&gateway_spec.gateway_class_name)
-                        .await;
-                if gateway_class_res.is_err() {
-                    let e = gateway_class_res.err().unwrap();
-                    match &e {
-                        KubeError::Api(api) => {
-                            if api.code == 404 {
-                                warn!(
-                                    "Fetching GatewayClass {} kubernetes API error 404",
-                                    &parent.name
-                                );
-                                continue;
-                            }
-                        }
-                        _ => {
-                            return Err(TCPRouteError::GatewayFetchFailed(
-                                namespace,
-                                parent.name.clone(),
-                                e,
-                            )
-                            .into());
-                        }
-                    };
-                } else {
-                    let gateway_class = gateway_class_res.unwrap();
-                    let gateway_class_spec: &GatewayClassSpec = &gateway_class.spec;
-                    if gateway_class_spec.controller_name != GATEWAY_CLASS_CONTROLLER_NAME {
-                        // not managed by this implementation, check the next parent ref
-                        continue;
-                    }
-
-                    match Self::verify_listener(parent, &gateway) {
-                        Ok(()) => {}
-                        Err(e) => {
-                            info!("{}", e);
-                            continue;
-                        }
-                    }
-
-                    supported_gateways.push(gateway)
+            let gateway = match gateway_api.get(gateway_name).await {
+                Ok(gw) => gw,
+                Err(kube::Error::Api(kube::core::ErrorResponse { code: 404, .. })) => {
+                    warn!(
+                        "Fetching Gateway {}/{} kubernetes API error 404",
+                        &namespace, &gateway_name
+                    );
+                    continue;
                 }
+                Err(e) => return Err(K8sError::Client(e).into()),
             };
+
+            let gateway_class = match gateway_class_api
+                .get(&gateway.spec.gateway_class_name)
+                .await
+            {
+                Ok(gwc) => gwc,
+                Err(kube::Error::Api(kube::core::ErrorResponse { code: 404, .. })) => {
+                    warn!(
+                        "Fetching GatewayClass {} kubernetes API error 404",
+                        &gateway.spec.gateway_class_name
+                    );
+                    continue;
+                }
+                Err(e) => return Err(K8sError::Client(e).into()),
+            };
+
+            if gateway_class.spec.controller_name != GATEWAY_CLASS_CONTROLLER_NAME {
+                // not managed by this implementation, check the next parent ref
+                continue;
+            }
+
+            if let Some(port) = parent_ref.port {
+                if !gateway
+                    .spec
+                    .listeners
+                    .iter()
+                    .any(|listener| listener.port == port && listener.protocol == "TCP")
+                {
+                    continue;
+                }
+            }
+
+            managed_gateways.push(gateway)
         }
 
         // TODO: support multiple gateways
-        if supported_gateways.len() > 1 {
+        if managed_gateways.len() > 1 {
             return Err(TCPRouteError::TooManyGatewaysFound(
                 namespace,
                 route_name,
-                supported_gateways.len(),
+                managed_gateways.len(),
             )
             .into());
         }
 
-        Ok(supported_gateways)
-    }
-
-    fn verify_listener(parent_ref: &TCPRouteParentRefs, gateway: &Gateway) -> Result<()> {
-        let gateway_spec: &GatewaySpec = &gateway.spec;
-        let namespace = gateway.metadata.namespace()?;
-        let gateway_name = gateway.metadata.name()?;
-
-        let Some(parent_port) = parent_ref.port else {
-            return Err(TCPRouteError::TcpRouteParentRefPortMissing(
-                namespace,
-                gateway_name,
-                parent_ref.name.clone(),
-            )
-            .into());
-        };
-
-        for listener in &gateway_spec.listeners {
-            if listener.protocol == "TCP" && listener.port == parent_port {
-                return Ok(());
-            }
-        }
-
-        Err(TCPRouteError::GatewayListenerNotFound(
-            namespace,
-            gateway_name,
-            parent_ref.name.clone(),
-            parent_port,
-        )
-        .into())
+        Ok(managed_gateways)
     }
 
     async fn compile_tcproute_to_data_plane_targets(

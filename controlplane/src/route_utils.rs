@@ -23,61 +23,10 @@ use k8s_openapi::api::core::v1::Endpoints;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
 use kube::{Api, Client};
 
-use crate::consts::GATEWAY_CLASS_CONTROLLER_NAME;
 use crate::controllers::{GatewayError, NamespaceName, TCPRouteError};
 use crate::gateway_utils::get_gateway_ipv4;
 use crate::traits::HasConditions;
 use crate::{Error, K8sError};
-
-// FIXME: use & integrate within controller
-pub async fn is_route_managed(
-    client: Client,
-    route_namespace: &str,
-    parent_refs: &[TCPRouteParentRefs],
-) -> Result<Option<Gateway>, Error> {
-    for parent_ref in parent_refs {
-        let gateway_namespace = parent_ref.namespace.as_deref().unwrap_or(route_namespace);
-        let gateway_name = parent_ref.name.as_str();
-
-        let gateway_api: Api<Gateway> = Api::namespaced(client.clone(), gateway_namespace);
-
-        // TODO: provide a generic 404 continue function
-        let gateway = match gateway_api.get(gateway_name).await {
-            Ok(gw) => gw,
-            Err(kube::Error::Api(kube::core::ErrorResponse { code: 404, .. })) => continue,
-            Err(e) => return Err(K8sError::Client(e).into()),
-        };
-
-        let gatewayclass_api: Api<gateway_api::apis::standard::gatewayclasses::GatewayClass> =
-            Api::all(client.clone());
-
-        // TODO: provide a generic 404 continue function
-        let gatewayclass = match gatewayclass_api.get(&gateway.spec.gateway_class_name).await {
-            Ok(gwc) => gwc,
-            Err(kube::Error::Api(kube::core::ErrorResponse { code: 404, .. })) => continue,
-            Err(e) => return Err(K8sError::Client(e).into()),
-        };
-
-        if gatewayclass.spec.controller_name != GATEWAY_CLASS_CONTROLLER_NAME {
-            continue;
-        }
-
-        if let Some(port) = parent_ref.port {
-            if !gateway
-                .spec
-                .listeners
-                .iter()
-                .any(|listener| listener.port == port && listener.protocol == "TCP")
-            {
-                continue;
-            }
-        }
-
-        return Ok(Some(gateway));
-    }
-
-    Ok(None)
-}
 
 // FIXME: use & integrate within controller
 pub async fn compile_route_to_targets(
