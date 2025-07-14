@@ -17,11 +17,10 @@ limitations under the License.
 #![allow(clippy::field_reassign_with_default)]
 
 use std::collections::{BTreeMap, HashMap};
+use std::net::{IpAddr, Ipv4Addr};
+use std::str::FromStr;
 
-use crate::{
-    consts::{BLIXT_FIELD_MANAGER, GATEWAY_SERVICE_LABEL},
-    *,
-};
+use chrono::Utc;
 use gateway_api::apis::standard::{
     constants::{
         GatewayConditionReason, GatewayConditionType, ListenerConditionReason,
@@ -32,23 +31,23 @@ use gateway_api::apis::standard::{
         GatewayStatusAddresses, GatewayStatusListeners, GatewayStatusListenersSupportedKinds,
     },
 };
-use kube::{
-    ResourceExt,
-    api::{Api, Patch, PatchParams, PostParams},
-    core::ObjectMeta,
-};
-
-use controllers::NamespaceName;
 use k8s_openapi::api::core::v1::{
     EndpointAddress, EndpointPort, EndpointSubset, Endpoints, Service, ServicePort, ServiceSpec,
     ServiceStatus,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
-
-use chrono::Utc;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
+use kube::{
+    Client, ResourceExt,
+    api::{Api, Patch, PatchParams, PostParams},
+    core::ObjectMeta,
+};
 use serde_json::json;
-use tracing::*;
+use tracing::{debug, info, warn};
+
+use crate::consts::{BLIXT_FIELD_MANAGER, GATEWAY_SERVICE_LABEL};
+use crate::controllers::{GatewayError, NamespaceName};
+use crate::{K8sError, NamespacedName, Result};
 
 // Modifies the Gateway's status to reflect the LoadBalancer Service's ingress IP address.
 pub fn set_gateway_status_addresses(gateway: &mut Gateway, svc_status: &ServiceStatus) {
@@ -650,4 +649,60 @@ fn check_route_kinds(
         }
     }
     None
+}
+
+/// Get Gateway IPs
+/// WARN: currently the function returns a Vec containing a single IPv4 and errors in other cases
+/// IPv6 and multiple IPs are currently not supported
+pub(crate) fn get_gateway_ips(gateway: &Gateway) -> Result<Vec<IpAddr>> {
+    let namespace = gateway.metadata.namespace()?;
+    let gw_name = gateway.metadata.name()?;
+
+    let Some(status) = &gateway.status else {
+        return Err(GatewayError::NotReady(namespace, gw_name).into());
+    };
+
+    let Some(addresses) = &status.addresses else {
+        return Err(GatewayError::MissingAddresses(namespace, gw_name).into());
+    };
+
+    let ip_addresses = addresses
+        .iter()
+        .filter(|a| {
+            if let Some(r#type) = &a.r#type {
+                r#type == "IPAddress"
+            } else {
+                false
+            }
+        })
+        .filter_map(|a| {
+            IpAddr::from_str(&a.value).ok()
+        })
+        .filter(|a| {
+            if a.is_ipv4() {
+                true
+            } else {
+                warn!("Gateway IpAddress {:?}. IPv6 addresses are currently not supported. Skipping...", a);
+                false
+            }
+        })
+        .collect::<Vec<IpAddr>>();
+
+    if ip_addresses.len() != 1 {
+        return Err(
+            GatewayError::NotExactlyOneIpAddress(namespace, gw_name, ip_addresses.len()).into(),
+        );
+    }
+
+    Ok(ip_addresses)
+}
+
+pub(crate) fn get_gateway_ipv4(gateway: &Gateway) -> Result<Ipv4Addr> {
+    let ips = get_gateway_ips(gateway)?;
+    // FIXME: remove that part
+    // SAFETY: currently get_gateway_ips() errors if not exactly one ipv4 is present
+    match ips[0] {
+        IpAddr::V4(v4) => Ok(v4),
+        IpAddr::V6(_) => unreachable!(),
+    }
 }

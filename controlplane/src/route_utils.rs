@@ -16,17 +16,18 @@ limitations under the License.
 
 use std::net::Ipv4Addr;
 
-use crate::consts::GATEWAY_CLASS_CONTROLLER_NAME;
-use crate::traits::HasConditions;
-use crate::{Error, K8sError};
 use api_server::backends::{Target, Targets, Vip};
-
-use crate::controllers::{GatewayError, NamespaceName, TCPRouteError};
 use gateway_api::apis::experimental::tcproutes::{TCPRouteParentRefs, TCPRouteRulesBackendRefs};
 use gateway_api::apis::standard::gateways::Gateway;
 use k8s_openapi::api::core::v1::Endpoints;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
 use kube::{Api, Client};
+
+use crate::consts::GATEWAY_CLASS_CONTROLLER_NAME;
+use crate::controllers::{GatewayError, NamespaceName, TCPRouteError};
+use crate::gateway_utils::get_gateway_ipv4;
+use crate::traits::HasConditions;
+use crate::{Error, K8sError};
 
 // FIXME: use & integrate within controller
 pub async fn is_route_managed(
@@ -86,7 +87,7 @@ pub async fn compile_route_to_targets(
     gateway: &Gateway,
     parent_refs: &[TCPRouteParentRefs],
 ) -> Result<Targets, Error> {
-    let gateway_ip = get_gateway_ip(gateway)?;
+    let gateway_ip = get_gateway_ipv4(gateway)?;
     let gateway_port = get_gateway_port_for_refs(gateway, parent_refs)?;
 
     let vip = Vip {
@@ -133,31 +134,6 @@ pub async fn compile_route_to_targets(
         vip: Some(vip),
         targets,
     })
-}
-
-// FIXME: use & integrate within controller
-fn get_gateway_ip(gateway: &Gateway) -> Result<Ipv4Addr, Error> {
-    let gw_name = gateway.metadata.name()?;
-    let namespace = gateway.metadata.namespace()?;
-
-    let gateway_status = gateway
-        .status
-        .as_ref()
-        .ok_or_else(|| GatewayError::NotReady(namespace.clone(), gw_name.clone()))?;
-
-    let gateway_address = gateway_status
-        .addresses
-        .as_ref()
-        .and_then(|addresses| {
-            if addresses.len() == 1 {
-                addresses.first().and_then(|addr| addr.value.parse().ok())
-            } else {
-                None
-            }
-        })
-        .ok_or_else(|| GatewayError::NotExactlyOneAddress(namespace.clone(), gw_name.clone()))?;
-
-    Ok(gateway_address)
 }
 
 // FIXME: use & integrate within controller

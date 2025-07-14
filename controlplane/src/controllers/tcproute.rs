@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use crate::client_manager::DataplaneClientManager;
 use crate::consts::{DATAPLANE_FINALIZER, GATEWAY_CLASS_CONTROLLER_NAME};
 use crate::controllers::NamespaceName;
-use crate::controllers::get_gateway_ips;
+use crate::gateway_utils::get_gateway_ips;
 use crate::{K8sError, Result};
 
 use api_server::backends::{Target, Targets, Vip};
@@ -40,8 +40,6 @@ pub struct TCPRouteController {
 pub enum TCPRouteError {
     #[error(transparent)]
     K8s(#[from] K8sError),
-    #[error("Gateway {0}/{1} had {2} IP addresses, currently only a single is supported")]
-    OnlySingleGatewayIpAddressSupported(String, String, usize),
     #[error("Gateway {0}/{1} has no addresses.")]
     GatewayNoStatus(String, String),
     #[error("Gateway {0}/{1} has no addresses.")]
@@ -55,7 +53,7 @@ pub enum TCPRouteError {
     #[error("TCPRoute {0}/{1} has no rules.")]
     TCPRouteNoRules(String, String),
     #[error("TCPRoute {0}/{1} rule has no backendRefs.")]
-    TCPRouteRulesMissingBackendRef(String, String),
+    RulesMissingBackendRef(String, String),
     #[error("TCPRoute {0}/{1} backendRefs do not have a Service associated.")]
     TCPRouteBackendRefsNoService(String, String),
     #[error("Gateway {0}/{1} Listener not found for parentRef {2} with port {3}")]
@@ -75,13 +73,13 @@ pub enum TCPRouteError {
     )]
     TCPRouteTooManyParentRefs(String, String, usize),
     #[error("TCPRoute {0}/{1} endpoint {2} address not ready.")]
-    TCPRouteEndpointAddressNotReady(String, String, String),
+    EndpointAddressNotReady(String, String, String),
     #[error("TCPRoute {0}/{1} endpoint {2} port not ready.")]
-    TCPRouteEndpointPortNotReady(String, String, String),
+    EndpointPortNotReady(String, String, String),
     #[error("TCPRoute {0}/{1} endpoint {2} has no addresses.")]
-    TCPRouteEndpointNoAddresses(String, String, String),
+    EndpointNoAddresses(String, String, String),
     #[error("TCPRoute {0}/{1} endpoint {2} address is empty.")]
-    TCPRouteEndpointAddressEmpty(String, String, String),
+    EndpointAddressEmpty(String, String, String),
     #[error("TCPRoute {0}/{1} does not have healthy backends.")]
     TCPRouteNoHealthyBackends(String, String),
     #[error("Service {0}/{1} does not have a spec.")]
@@ -177,7 +175,7 @@ impl TCPRouteController {
         gateway: &Gateway,
     ) -> Result<()> {
         let targets = self
-            .compile_tcproute_to_data_plane_backend(tcp_route, gateway)
+            .compile_tcproute_to_data_plane_targets(tcp_route, gateway)
             .await?;
 
         info!("Updating targets: {targets:?}");
@@ -382,7 +380,7 @@ impl TCPRouteController {
         .into())
     }
 
-    async fn compile_tcproute_to_data_plane_backend(
+    async fn compile_tcproute_to_data_plane_targets(
         &self,
         tcp_route: &TCPRoute,
         gateway: &Gateway,
@@ -425,21 +423,18 @@ impl TCPRouteController {
         };
 
         let mut backend_targets: Vec<(Ipv4Addr, u16)> = vec![];
-        let tcp_route_spec: &TCPRouteSpec = &tcp_route.spec;
-
-        for rule in tcp_route_spec.rules.iter() {
+        for rule in tcp_route.spec.rules.iter() {
             let Some(backend_refs) = &rule.backend_refs else {
-                return Err(
-                    TCPRouteError::TCPRouteRulesMissingBackendRef(namespace, route_name).into(),
-                );
+                return Err(TCPRouteError::RulesMissingBackendRef(namespace, route_name).into());
             };
+
             for backend_ref in backend_refs {
                 let backend_ref_name = backend_ref.name.clone();
                 let endpoints = self
                     .endpoints_from_backend_ref(tcp_route, backend_ref)
                     .await?;
                 let Some(subsets) = endpoints.subsets else {
-                    return Err(TCPRouteError::TCPRouteEndpointAddressNotReady(
+                    return Err(TCPRouteError::EndpointAddressNotReady(
                         namespace,
                         route_name,
                         backend_ref_name,
@@ -448,7 +443,7 @@ impl TCPRouteController {
                 };
                 for subset in subsets.iter() {
                     let Some(ports) = &subset.ports else {
-                        return Err(TCPRouteError::TCPRouteEndpointPortNotReady(
+                        return Err(TCPRouteError::EndpointPortNotReady(
                             namespace,
                             route_name,
                             backend_ref_name,
@@ -456,7 +451,7 @@ impl TCPRouteController {
                         .into());
                     };
                     if ports.is_empty() {
-                        return Err(TCPRouteError::TCPRouteEndpointPortNotReady(
+                        return Err(TCPRouteError::EndpointPortNotReady(
                             namespace,
                             route_name,
                             backend_ref_name,
@@ -465,7 +460,7 @@ impl TCPRouteController {
                     }
 
                     let Some(addresses) = &subset.addresses else {
-                        return Err(TCPRouteError::TCPRouteEndpointNoAddresses(
+                        return Err(TCPRouteError::EndpointNoAddresses(
                             namespace,
                             route_name,
                             backend_ref_name,
@@ -474,7 +469,7 @@ impl TCPRouteController {
                     };
                     for addr in addresses {
                         if addr.ip.is_empty() {
-                            return Err(TCPRouteError::TCPRouteEndpointAddressEmpty(
+                            return Err(TCPRouteError::EndpointAddressEmpty(
                                 namespace,
                                 route_name,
                                 backend_ref_name,

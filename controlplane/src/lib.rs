@@ -22,10 +22,11 @@ mod gatewayclass_utils;
 mod route_utils;
 mod traits;
 
-use crate::client_manager::DataplaneError;
-use crate::controllers::{GatewayError, TCPRouteError};
 use kube::Client;
 use thiserror::Error;
+
+use crate::client_manager::DataplaneError;
+use crate::controllers::{GatewayError, TCPRouteError};
 
 #[derive(Error, Debug)]
 pub enum Error {

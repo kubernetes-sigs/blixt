@@ -57,13 +57,14 @@ pub enum GatewayError {
     #[error(transparent)]
     K8s(#[from] K8sError),
     #[error("{0}/{1} does not have any IP address associated")]
-    MissingIp(String, String),
+    MissingAddresses(String, String),
+    #[error("{0}/{1} found {2} IP addresses, currently only a single address is supported")]
+    NotExactlyOneIpAddress(String, String, usize),
+
     #[error("{0}/{1} has an invalid configuration: {2}")]
     InvalidConfiguration(String, String, String),
     #[error("{0}/{1} not ready")]
     NotReady(String, String),
-    #[error("{0}/{1} exactly one Address required")]
-    NotExactlyOneAddress(String, String),
     #[error("{0}/{1} IP not found")]
     IpNotFound(String, String),
     #[error("{0}/{1} addresses of type {2} are not supported; only type IPAddress is supported")]
