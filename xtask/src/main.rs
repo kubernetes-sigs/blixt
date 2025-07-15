@@ -33,7 +33,7 @@ enum Command {
     RunControlplane(run::Options),
     BuildProto(build_proto::Options),
     GrpcClient(grpc::Options),
-    ContainerImages(container_images::Options),
+    ContainerImages(container_images::CliArgs),
 }
 
 #[tokio::main]

@@ -41,9 +41,9 @@ pub struct DataplaneClientManager {
 pub enum DataplaneError {
     #[error("no dataplane clients available")]
     MissingClients,
-    #[error("failed to connect to dataplane pod {0:?} error {1}")]
+    #[error("failed to connect to dataplane pod {0} error {1}")]
     PodConnectionFailed(NamespacedName, Box<tonic::transport::Error>),
-    #[error("Failed to update targets on dataplane pod {0:?} status {1}")]
+    #[error("Failed to update targets on dataplane pod {0} status {1}")]
     UpdateFailed(NamespacedName, Box<tonic::Status>),
 }
 
@@ -89,7 +89,7 @@ impl DataplaneClientManager {
                 let endpoint = format!("http://{pod_ip}:{}", self.service_port);
                 match BackendsClient::connect(endpoint.clone()).await {
                     Ok(grpc_client) => {
-                        info!("Connected to dataplane pod: {}", pod_ip);
+                        info!("Connected to dataplane pod {pod_id} on endpoint {endpoint}");
                         new_clients.insert(pod_id, grpc_client);
                     }
                     Err(err) => {
@@ -114,7 +114,7 @@ impl DataplaneClientManager {
         for (pod_id, mut client) in clients.clone() {
             match client.update(Request::new(targets.clone())).await {
                 Ok(resp) => {
-                    info!("Successfully updated targets on dataplane pod: {pod_id:?}");
+                    info!("Successfully updated targets on dataplane pod: {pod_id}");
                     info!("Received {:?}", resp.get_ref());
                 }
                 Err(err) => {
@@ -135,10 +135,10 @@ impl DataplaneClientManager {
         for (pod_id, mut client) in clients.clone() {
             match client.delete(Request::new(vip)).await {
                 Ok(_) => {
-                    info!("Successfully deleted VIP on dataplane pod: {pod_id:?}");
+                    info!("Successfully deleted VIP on dataplane pod: {pod_id}");
                 }
                 Err(err) => {
-                    warn!("Failed to delete VIP on dataplane pod {pod_id:?}: {err:?}");
+                    warn!("Failed to delete VIP on dataplane pod {pod_id}: {err:?}");
                 }
             }
         }

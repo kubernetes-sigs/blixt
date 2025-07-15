@@ -74,7 +74,7 @@ impl K8sError {
             property.to_string(),
         )
     }
-    pub(crate) fn client(err: kube::Error) -> Self {
+    pub fn client(err: kube::Error) -> Self {
         K8sError::Client(Box::new(err))
     }
 }

@@ -8,15 +8,11 @@ version.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
-prost = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-tonic = { workspace = true }
 tonic-build = { workspace = true, features = ["prost"] }
-controlplane = { path = "../controlplane" }
 tracing-subscriber = { workspace = true }
 tracing = { workspace = true }
-xshell = "0.2.7"
-thiserror = "1.0.69"
+tests = { path = "../tests" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 api-server = { path = "../dataplane/api-server" }

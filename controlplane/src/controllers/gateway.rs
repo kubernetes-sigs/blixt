@@ -535,7 +535,7 @@ impl GatewayController {
 /// Get Gateway IPs
 /// WARN: currently the function returns a Vec containing a single IPv4 and errors in other cases
 /// IPv6 and multiple IPs are currently not supported
-pub(super) fn get_gateway_ips(gateway: &Gateway) -> Result<Vec<IpAddr>> {
+pub fn get_gateway_ips(gateway: &Gateway) -> Result<Vec<IpAddr>> {
     let gateway_id = gateway.metadata.namespaced_name()?;
 
     let Some(status) = &gateway.status else {

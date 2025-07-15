@@ -2163,6 +2163,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tests"
+version = "0.3.0"
+dependencies = [
+ "controlplane",
+ "gateway-api",
+ "k8s-openapi",
+ "kube",
+ "regex",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "xshell",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2773,15 +2789,11 @@ dependencies = [
  "anyhow",
  "api-server",
  "clap",
- "controlplane",
- "prost",
- "thiserror 1.0.69",
+ "tests",
  "tokio",
- "tonic",
  "tonic-build",
  "tracing",
  "tracing-subscriber",
- "xshell",
 ]
 
 [[package]]
