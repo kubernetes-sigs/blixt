@@ -16,6 +16,7 @@ limitations under the License.
 
 use chrono::Utc;
 use futures::StreamExt;
+use gateway_api::apis::experimental::tcproutes::TCPRoute;
 use gateway_api::apis::standard::gateways::{Gateway, GatewayStatus};
 use gateway_api::apis::standard::{
     constants::{GatewayConditionReason, GatewayConditionType},
@@ -33,7 +34,7 @@ use k8s_openapi::api::core::v1::{
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
-use kube::api::PostParams;
+use kube::api::{DeleteParams, PostParams};
 use kube::{
     Client, Resource, ResourceExt,
     api::{Api, ListParams, Patch, PatchParams},
@@ -51,7 +52,10 @@ use std::{
 use thiserror::Error as ThisError;
 use tracing::{debug, error, info, warn};
 
-use crate::consts::{BLIXT_FIELD_MANAGER, GATEWAY_CLASS_CONTROLLER_NAME, GATEWAY_SERVICE_LABEL};
+use crate::consts::{
+    BLIXT_FIELD_MANAGER, CONTROLPLANE_FINALIZER, GATEWAY_CLASS_CONTROLLER_NAME,
+    GATEWAY_SERVICE_LABEL,
+};
 use crate::controllers::gatewayclass;
 use crate::utils::set_condition;
 use crate::{Error, K8sError, NamespaceName, NamespacedName, Result};
@@ -116,13 +120,6 @@ impl GatewayController {
     async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<GatewayController>) -> Result<Action> {
         let start = Instant::now();
 
-        let gateway_id = gateway.metadata.namespaced_name()?;
-        let namespace = gateway_id.namespace.as_str();
-        let gateway_name = gateway_id.name.as_str();
-
-        let gateway_api: Api<Gateway> = Api::namespaced(ctx.k8s_client.clone(), namespace);
-        let mut gw = gateway.as_ref().clone();
-
         let gateway_class_api = Api::<GatewayClass>::all(ctx.k8s_client.clone());
         let gateway_class = gateway_class_api
             .get(gateway.spec.gateway_class_name.as_str())
@@ -138,7 +135,7 @@ impl GatewayController {
             gateway_class.name_any()
         );
 
-        // Only reconcile the Gateway object if our GatewayClass has already been accepted
+        // only reconcile the Gateway object if our GatewayClass has already been accepted
         if !gatewayclass::check_accepted(&gateway_class) {
             debug!(
                 "GatewayClass {:?} not yet accepted",
@@ -147,9 +144,47 @@ impl GatewayController {
             return Ok(Action::await_change());
         }
 
-        set_listener_status(&mut gw)?;
-        let accepted_cond = get_accepted_condition(&gw);
-        set_condition(&mut gw, accepted_cond.clone());
+        debug!("gateway_finalizers: {:?}", gateway.finalizers());
+        debug!(
+            "deletion_timestamp: {:?}",
+            gateway.meta().deletion_timestamp
+        );
+        // handle with a finalizer for managing the crated Gateway service
+        if !gateway
+            .finalizers()
+            .contains(&CONTROLPLANE_FINALIZER.to_string())
+        {
+            if gateway.meta().deletion_timestamp.is_some() {
+                // already handled
+                return Ok(Action::await_change());
+            }
+            ctx.set_controlplane_finalizer(&gateway).await?;
+        }
+
+        // if the Gateway is being deleted, remove the according Gateway service
+        if gateway.meta().deletion_timestamp.is_some() {
+            ctx.delete_loadbalancer_service(&gateway).await?;
+            ctx.remove_controlplane_finalizer(&gateway).await?;
+        }
+
+        ctx.configure_gateway(gateway, start).await
+    }
+
+    async fn configure_gateway(
+        &self,
+        gateway: Arc<Gateway>,
+        start: Instant,
+    ) -> Result<Action, Error> {
+        let gateway_id = gateway.metadata.namespaced_name()?;
+        let gateway_name = gateway.metadata.name()?;
+        let namespace = gateway.metadata.namespace()?;
+
+        let gateway_api: Api<Gateway> = Api::namespaced(self.k8s_client.clone(), namespace);
+        let mut gateway_update = gateway.as_ref().clone();
+
+        set_listener_status(&mut gateway_update)?;
+        let accepted_cond = get_accepted_condition(&gateway_update);
+        set_condition(&mut gateway_update, accepted_cond.clone());
 
         // If the controller can't accept responsibility, then set the Condition of type "Programmed" to False and error out.
         if accepted_cond.status == "False" {
@@ -161,11 +196,14 @@ impl GatewayController {
                 message: accepted_cond.message.clone(),
                 reason: GatewayConditionReason::Programmed.to_string(),
             };
-            set_condition(&mut gw, programmed_cond);
+            set_condition(&mut gateway_update, programmed_cond);
             patch_status(
                 &gateway_api,
                 gateway_name,
-                gw.status.as_ref().unwrap_or(&GatewayStatus::default()),
+                gateway_update
+                    .status
+                    .as_ref()
+                    .unwrap_or(&GatewayStatus::default()),
             )
             .await?;
             return Err(GatewayError::InvalidConfiguration(
@@ -176,7 +214,7 @@ impl GatewayController {
         }
 
         // Try to fetch any existing Loadbalancer service(s) for this Gateway.
-        let service_api: Api<Service> = Api::namespaced(ctx.k8s_client.clone(), namespace);
+        let service_api: Api<Service> = Api::namespaced(self.k8s_client.clone(), namespace);
         let services = service_api
             .list(&ListParams::default().labels(&format!("{GATEWAY_SERVICE_LABEL}={gateway_name}")))
             .await
@@ -212,7 +250,7 @@ impl GatewayController {
             }
         } else {
             info!("creating loadbalancer service");
-            service = ctx.create_svc_for_gateway(gateway.as_ref()).await?;
+            service = self.create_loadbalancer_service(gateway.as_ref()).await?;
         }
 
         // invalid_lb_condition is a Condition that signifies that the Loadbalancer service is invalid.
@@ -233,8 +271,13 @@ impl GatewayController {
             Ok(spec) => spec,
             Err(error) => {
                 invalid_lb_condition.message = error.to_string();
-                set_condition(&mut gw, invalid_lb_condition);
-                patch_status(&gateway_api, gateway_name, &gw.status.unwrap_or_default()).await?;
+                set_condition(&mut gateway_update, invalid_lb_condition);
+                patch_status(
+                    &gateway_api,
+                    gateway_name,
+                    &gateway_update.status.unwrap_or_default(),
+                )
+                .await?;
                 return Err(error.into());
             }
         };
@@ -247,8 +290,13 @@ impl GatewayController {
             Ok(status) => status,
             Err(error) => {
                 invalid_lb_condition.message = error.to_string();
-                set_condition(&mut gw, invalid_lb_condition);
-                patch_status(&gateway_api, gateway_name, &gw.status.unwrap_or_default()).await?;
+                set_condition(&mut gateway_update, invalid_lb_condition);
+                patch_status(
+                    &gateway_api,
+                    gateway_name,
+                    &gateway_update.status.unwrap_or_default(),
+                )
+                .await?;
                 return Err(error.into());
             }
         };
@@ -257,14 +305,19 @@ impl GatewayController {
         if get_ingress_ip_len(svc_status) == 0 || svc_spec.cluster_ip.is_none() {
             let msg = "LoadBalancer does not have a ingress IP address".to_string();
             invalid_lb_condition.message.clone_from(&msg);
-            set_condition(&mut gw, invalid_lb_condition);
-            patch_status(&gateway_api, gateway_name, &gw.status.unwrap_or_default()).await?;
+            set_condition(&mut gateway_update, invalid_lb_condition);
+            patch_status(
+                &gateway_api,
+                gateway_name,
+                &gateway_update.status.unwrap_or_default(),
+            )
+            .await?;
             return Err(GatewayError::ServiceMissingIngressIp(gateway_id.clone()).into());
         }
 
-        ctx.create_endpoint_if_not_exists(&svc_key, svc_spec, svc_status)
+        self.create_endpoint_if_not_exists(&svc_key, svc_spec, svc_status)
             .await?;
-        set_gateway_status_addresses(&mut gw, svc_status);
+        set_gateway_status_addresses(&mut gateway_update, svc_status);
 
         let programmed_cond = metav1::Condition {
             last_transition_time: metav1::Time(Utc::now()),
@@ -274,9 +327,14 @@ impl GatewayController {
             reason: GatewayConditionReason::Programmed.to_string(),
             message: "Dataplane configured for gateway".to_string(),
         };
-        set_condition(&mut gw, programmed_cond);
+        set_condition(&mut gateway_update, programmed_cond);
 
-        patch_status(&gateway_api, gateway_name, &gw.status.unwrap_or_default()).await?;
+        patch_status(
+            &gateway_api,
+            gateway_name,
+            &gateway_update.status.unwrap_or_default(),
+        )
+        .await?;
 
         let duration = Instant::now().sub(start);
         info!("finished reconciling in {:?} ms", duration.as_millis());
@@ -288,39 +346,112 @@ impl GatewayController {
         Action::requeue(Duration::from_secs(5))
     }
 
-    // Creates a LoadBalancer Service for the provided Gateway.
-    async fn create_svc_for_gateway(&self, gateway: &Gateway) -> Result<Service> {
+    async fn set_controlplane_finalizer(&self, gateway: &Gateway) -> Result<()> {
         let namespace = gateway.metadata.namespace()?;
-        let gw_name = gateway.metadata.name()?;
+        let gateway_name = gateway.metadata.name()?;
 
-        let mut svc_meta = ObjectMeta::default();
-        let svc_name = format!("gateway-{}", &gw_name);
-        svc_meta.namespace = Some(namespace.to_string());
-        svc_meta.name = Some(svc_name.clone());
+        let metadata = ObjectMeta {
+            finalizers: Some(vec![CONTROLPLANE_FINALIZER.to_string()]),
+            ..Default::default()
+        };
+
+        let gateway_api: Api<TCPRoute> = Api::namespaced(self.k8s_client.clone(), namespace);
+        let pp = PatchParams::default();
+
+        debug!(
+            "setting controlplane finalizer for gateway {}",
+            &gateway_name
+        );
+        gateway_api
+            .patch_metadata(gateway_name, &pp, &Patch::Merge(metadata))
+            .await
+            .map_err(|e| K8sError::client(e).into())
+            .map(|_| ())
+    }
+
+    async fn remove_controlplane_finalizer(&self, gateway: &Gateway) -> Result<()> {
+        let namespace = gateway.metadata.namespace()?;
+        let gateway_name = gateway.metadata.name()?;
+
+        let finalizers = gateway
+            .finalizers()
+            .iter()
+            .filter(|f| *f != CONTROLPLANE_FINALIZER)
+            .cloned()
+            .collect::<Vec<String>>();
+
+        let metadata = ObjectMeta {
+            finalizers: Some(finalizers),
+            ..Default::default()
+        };
+
+        let tcp_route_api: Api<TCPRoute> = Api::namespaced(self.k8s_client.clone(), namespace);
+        let pp = PatchParams::apply(BLIXT_FIELD_MANAGER);
+
+        debug!(
+            "removing controlplane finalizer for gateway {}",
+            &gateway_name
+        );
+        tcp_route_api
+            .patch_metadata(gateway_name, &pp, &Patch::Apply(&metadata))
+            .await
+            .map_err(|e| K8sError::client(e).into())
+            .map(|_| ())
+    }
+
+    // creates the LoadBalancer Service for the provided Gateway
+    async fn create_loadbalancer_service(&self, gateway: &Gateway) -> Result<Service> {
+        let namespace = gateway.metadata.namespace()?;
+        let gateway_name = gateway.metadata.name()?;
+
+        let mut service_meta = ObjectMeta::default();
+        let service_name = format!("gateway-{}", &gateway_name);
+        service_meta.namespace = Some(namespace.to_string());
+        service_meta.name = Some(service_name.clone());
         let mut labels = BTreeMap::new();
-        labels.insert(GATEWAY_SERVICE_LABEL.to_string(), gw_name.to_string());
-        svc_meta.labels = Some(labels);
+        labels.insert(GATEWAY_SERVICE_LABEL.to_string(), gateway_name.to_string());
+        service_meta.labels = Some(labels);
 
-        let mut svc = Service {
-            metadata: svc_meta,
+        let mut service = Service {
+            metadata: service_meta,
             spec: Some(ServiceSpec::default()),
             status: Some(ServiceStatus::default()),
         };
 
-        let _ = update_service_for_gateway(gateway, &mut svc)?;
+        let _ = update_service_for_gateway(gateway, &mut service)?;
 
         info!(
             "creating loadbalancer service {} for gateway {}",
-            &svc_name, &gw_name
+            &service_name, &gateway_name
         );
-        debug!("{svc:?}");
-        let svc_api: Api<Service> = Api::namespaced(self.k8s_client.clone(), namespace);
-        let service = svc_api
-            .create(&PostParams::default(), &svc)
+        debug!("{service:?}");
+        let service_api: Api<Service> = Api::namespaced(self.k8s_client.clone(), namespace);
+        let service = service_api
+            .create(&PostParams::default(), &service)
             .await
             .map_err(K8sError::client)?;
 
         Ok(service)
+    }
+
+    // deletes the LoadBalancer Service for the provided Gateway
+    async fn delete_loadbalancer_service(&self, gateway: &Gateway) -> Result<()> {
+        let namespace = gateway.metadata.namespace()?;
+        let gateway_name = gateway.metadata.name()?;
+
+        let service_name = format!("gateway-{}", &gateway_name);
+        info!(
+            "deleting loadbalancer service {} for gateway {}",
+            &service_name, &gateway_name
+        );
+
+        let service_api: Api<Service> = Api::namespaced(self.k8s_client.clone(), namespace);
+        service_api
+            // TODO: add deletion grace period
+            .delete(&service_name, &DeleteParams::default())
+            .await
+            .map_err(|e| K8sError::client(e).into())
+            .map(|_| ())
     }
 
     // Creates an Endpoints object for the provided Service pointing to it's ingress IP address.

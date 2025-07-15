@@ -9,6 +9,7 @@ pub const BLIXT_DATAPLANE_COMPONENT_LABEL: &str = "dataplane";
 
 // The finalizer used for Blixt dataplane cleanup.
 pub const DATAPLANE_FINALIZER: &str = "blixt.gateway.networking.k8s.io/dataplane";
+pub const CONTROLPLANE_FINALIZER: &str = "blixt.gateway.networking.k8s.io/controlplane";
 
 // Controller name for the Blixt GatewayClass.
 pub const GATEWAY_CLASS_CONTROLLER_NAME: &str = "gateway.networking.k8s.io/blixt";

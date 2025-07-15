@@ -107,19 +107,15 @@ impl TCPRouteController {
             .contains(&DATAPLANE_FINALIZER.to_string())
         {
             if tcp_route.meta().deletion_timestamp.is_some() {
-                // if the finalizer isn't set, AND the object is being deleted then there's
-                // no reason to bother with dataplane configuration for it its already
-                // handled.
+                // already handled
                 return Ok(Action::await_change());
             }
-            // if the finalizer is not set, and the object is not being deleted, set the
-            // finalizer before we do anything else to ensure we don't lose track of
-            // dataplane configuration.
+
             ctx.set_dataplane_finalizer(&tcp_route).await?;
         };
 
         // if the TCPRoute is being deleted, remove it from the DataPlane
-        // TODO: enable deletion grace period
+        // TODO: add deletion grace period
         if tcp_route.meta().deletion_timestamp.is_some() {
             for gateway in managed_gateways.iter() {
                 ctx.ensure_tcp_route_deleted_in_dataplane(&tcp_route, gateway)
@@ -242,7 +238,7 @@ impl TCPRouteController {
         let finalizers = tcp_route
             .finalizers()
             .iter()
-            .filter(|f| *f != crate::consts::DATAPLANE_FINALIZER)
+            .filter(|f| *f != DATAPLANE_FINALIZER)
             .cloned()
             .collect::<Vec<String>>();
 
