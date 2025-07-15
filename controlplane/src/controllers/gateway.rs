@@ -52,9 +52,9 @@ use thiserror::Error as ThisError;
 use tracing::{debug, error, info, warn};
 
 use crate::consts::{BLIXT_FIELD_MANAGER, GATEWAY_CLASS_CONTROLLER_NAME, GATEWAY_SERVICE_LABEL};
-use crate::controllers::{NamespaceName, gatewayclass};
+use crate::controllers::gatewayclass;
 use crate::utils::set_condition;
-use crate::{Error, K8sError, NamespacedName, Result};
+use crate::{Error, K8sError, NamespaceName, NamespacedName, Result};
 
 #[derive(Clone)]
 pub struct GatewayController {
@@ -65,34 +65,34 @@ pub struct GatewayController {
 pub enum GatewayError {
     #[error(transparent)]
     K8s(#[from] K8sError),
-    #[error("{0}/{1} does not have any IP address associated")]
-    MissingAddresses(String, String),
-    #[error("{0}/{1} found {2} IP addresses, currently only a single address is supported")]
-    NotExactlyOneIpAddress(String, String, usize),
-    #[error("{0}/{1} has an invalid configuration: {2}")]
-    InvalidConfiguration(String, String, String),
-    #[error("{0}/{1} not ready")]
-    NotReady(String, String),
-    #[error("{0}/{1} IP not found")]
-    IpNotFound(String, String),
-    #[error("{0}/{1} addresses of type {2} are not supported; only type IPAddress is supported")]
-    AddressTypeNotSupported(String, String, String),
-    #[error("{0}/{1} exactly one Service required")]
-    NotExactlyOneService(String, String),
-    #[error("{0}/{1} does not have any matching Service")]
-    MissingService(String, String),
-    #[error("{0}/{1} Service does not have a Status")]
-    MissingServiceStatus(String, String),
-    #[error("{0}/{1} Service does not have an ingress IP assigned")]
-    ServiceMissingIngressIp(String, String),
-    #[error("{0}/{1} Service does not have an ingress IP assigned")]
-    ServiceMissingLoadBalancerIngressIp(String, String),
-    #[error("{0}/{1} Service does not have a spec")]
-    ServiceMissingLoadBalancerSpec(String, String),
-    #[error("{0}/{1} Service does not have a status.loadBalancer.spec")]
-    ServiceMissingLoadBalancerStatus(String, String),
-    #[error("{0}/{1} Service does not have a status.loadBalancer.ingress")]
-    ServiceMissingLoadBalancerIngress(String, String),
+    #[error("{0:?} does not have any IP address associated")]
+    MissingAddresses(NamespacedName),
+    #[error("{0:?} found {1} IP addresses, currently only a single address is supported")]
+    NotExactlyOneIpAddress(NamespacedName, usize),
+    #[error("{0:?} has an invalid configuration: {1}")]
+    InvalidConfiguration(NamespacedName, String),
+    #[error("{0:?} not ready")]
+    NotReady(NamespacedName),
+    #[error("{0:?} IP not found")]
+    IpNotFound(NamespacedName),
+    #[error("{0:?} addresses of type {1} are not supported; only type IPAddress is supported")]
+    AddressTypeNotSupported(NamespacedName, String),
+    #[error("{0:?} exactly one Service required")]
+    NotExactlyOneService(NamespacedName),
+    #[error("{0:?} does not have any matching Service")]
+    MissingService(NamespacedName),
+    #[error("{0:?} Service does not have a Status")]
+    MissingServiceStatus(NamespacedName),
+    #[error("{0:?} Service does not have an ingress IP assigned")]
+    ServiceMissingIngressIp(NamespacedName),
+    #[error("{0:?} Service does not have an ingress IP assigned")]
+    ServiceMissingLoadBalancerIngressIp(NamespacedName),
+    #[error("{0:?} Service does not have a spec")]
+    ServiceMissingLoadBalancerSpec(NamespacedName),
+    #[error("{0:?} Service does not have a status.loadBalancer.spec")]
+    ServiceMissingLoadBalancerStatus(NamespacedName),
+    #[error("{0:?} Service does not have a status.loadBalancer.ingress")]
+    ServiceMissingLoadBalancerIngress(NamespacedName),
 }
 
 impl GatewayController {
@@ -119,10 +119,12 @@ impl GatewayController {
 
     async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<GatewayController>) -> Result<Action> {
         let start = Instant::now();
-        let gw_name = gateway.metadata.name()?;
-        let namespace = gateway.metadata.namespace()?;
 
-        let gateway_api: Api<Gateway> = Api::namespaced(ctx.k8s_client.clone(), &namespace);
+        let gateway_id = gateway.metadata.namespaced_name()?;
+        let namespace = gateway_id.namespace.as_str();
+        let gateway_name = gateway_id.name.as_str();
+
+        let gateway_api: Api<Gateway> = Api::namespaced(ctx.k8s_client.clone(), namespace);
         let mut gw = gateway.as_ref().clone();
 
         let gateway_class_api = Api::<GatewayClass>::all(ctx.k8s_client.clone());
@@ -166,22 +168,21 @@ impl GatewayController {
             set_condition(&mut gw, programmed_cond);
             patch_status(
                 &gateway_api,
-                gw_name.clone(),
+                gateway_name,
                 gw.status.as_ref().unwrap_or(&GatewayStatus::default()),
             )
             .await?;
             return Err(GatewayError::InvalidConfiguration(
-                namespace.clone(),
-                gw_name.clone(),
+                gateway_id.clone(),
                 accepted_cond.message,
             )
             .into());
         }
 
         // Try to fetch any existing Loadbalancer service(s) for this Gateway.
-        let service_api: Api<Service> = Api::namespaced(ctx.k8s_client.clone(), &namespace);
+        let service_api: Api<Service> = Api::namespaced(ctx.k8s_client.clone(), namespace);
         let services = service_api
-            .list(&ListParams::default().labels(&format!("{GATEWAY_SERVICE_LABEL}={gw_name}")))
+            .list(&ListParams::default().labels(&format!("{GATEWAY_SERVICE_LABEL}={gateway_name}")))
             .await
             .map_err(K8sError::Client)?;
 
@@ -193,7 +194,7 @@ impl GatewayController {
                 }
             }
             error!(services = ?names, "found multiple Services");
-            return Err(GatewayError::NotExactlyOneService(namespace, gw_name).into());
+            return Err(GatewayError::NotExactlyOneService(gateway_id).into());
         }
 
         // If we found a Loadbalancer service, then correct any drift if necessary, else create the service.
@@ -228,49 +229,41 @@ impl GatewayController {
             type_: GatewayConditionType::Programmed.to_string(),
         };
 
-        let svc_spec: &ServiceSpec = match service.spec.as_ref().ok_or(
-            GatewayError::MissingService(namespace.clone(), gw_name.clone()),
-        ) {
+        let svc_spec: &ServiceSpec = match service
+            .spec
+            .as_ref()
+            .ok_or(GatewayError::MissingService(gateway_id.clone()))
+        {
             Ok(spec) => spec,
             Err(error) => {
                 invalid_lb_condition.message = error.to_string();
                 set_condition(&mut gw, invalid_lb_condition);
-                patch_status(&gateway_api, gw_name, &gw.status.unwrap_or_default()).await?;
+                patch_status(&gateway_api, gateway_name, &gw.status.unwrap_or_default()).await?;
                 return Err(error.into());
             }
         };
 
-        let svc_status: &ServiceStatus =
-            match service
-                .status
-                .as_ref()
-                .ok_or(GatewayError::MissingServiceStatus(
-                    namespace.clone(),
-                    gw_name.clone(),
-                )) {
-                Ok(status) => status,
-                Err(error) => {
-                    invalid_lb_condition.message = error.to_string();
-                    set_condition(&mut gw, invalid_lb_condition);
-                    patch_status(&gateway_api, gw_name, &gw.status.unwrap_or_default()).await?;
-                    return Err(error.into());
-                }
-            };
+        let svc_status: &ServiceStatus = match service
+            .status
+            .as_ref()
+            .ok_or(GatewayError::MissingServiceStatus(gateway_id.clone()))
+        {
+            Ok(status) => status,
+            Err(error) => {
+                invalid_lb_condition.message = error.to_string();
+                set_condition(&mut gw, invalid_lb_condition);
+                patch_status(&gateway_api, gateway_name, &gw.status.unwrap_or_default()).await?;
+                return Err(error.into());
+            }
+        };
 
         let svc_key = get_service_key(&service)?;
         if get_ingress_ip_len(svc_status) == 0 || svc_spec.cluster_ip.is_none() {
             let msg = "LoadBalancer does not have a ingress IP address".to_string();
             invalid_lb_condition.message.clone_from(&msg);
             set_condition(&mut gw, invalid_lb_condition);
-            patch_status(
-                &gateway_api,
-                gw_name.clone(),
-                &gw.status.unwrap_or_default(),
-            )
-            .await?;
-            return Err(
-                GatewayError::ServiceMissingIngressIp(namespace.clone(), gw_name.clone()).into(),
-            );
+            patch_status(&gateway_api, gateway_name, &gw.status.unwrap_or_default()).await?;
+            return Err(GatewayError::ServiceMissingIngressIp(gateway_id.clone()).into());
         }
 
         ctx.create_endpoint_if_not_exists(&svc_key, svc_spec, svc_status)
@@ -287,7 +280,7 @@ impl GatewayController {
         };
         set_condition(&mut gw, programmed_cond);
 
-        patch_status(&gateway_api, gw_name, &gw.status.unwrap_or_default()).await?;
+        patch_status(&gateway_api, gateway_name, &gw.status.unwrap_or_default()).await?;
 
         let duration = Instant::now().sub(start);
         info!("finished reconciling in {:?} ms", duration.as_millis());
@@ -306,7 +299,7 @@ impl GatewayController {
 
         let mut svc_meta = ObjectMeta::default();
         let svc_name = format!("gateway-{}", &gw_name);
-        svc_meta.namespace = Some(namespace.clone());
+        svc_meta.namespace = Some(namespace.to_string());
         svc_meta.name = Some(svc_name.clone());
         let mut labels = BTreeMap::new();
         labels.insert(GATEWAY_SERVICE_LABEL.to_string(), gw_name.to_string());
@@ -325,7 +318,7 @@ impl GatewayController {
             &svc_name, &gw_name
         );
         debug!("{svc:?}");
-        let svc_api: Api<Service> = Api::namespaced(self.k8s_client.clone(), namespace.as_str());
+        let svc_api: Api<Service> = Api::namespaced(self.k8s_client.clone(), namespace);
         let service = svc_api
             .create(&PostParams::default(), &svc)
             .await
@@ -342,21 +335,20 @@ impl GatewayController {
     // Ref: https://github.com/metallb/metallb/issues/1640
     async fn create_endpoint_if_not_exists(
         &self,
-        key: &NamespacedName,
+        gateway_id: &NamespacedName,
         svc_spec: &ServiceSpec,
         svc_status: &ServiceStatus,
     ) -> Result<()> {
         let mut lb_addr = None;
         let lb_status = svc_status.load_balancer.as_ref().ok_or(
-            GatewayError::ServiceMissingLoadBalancerStatus(key.name.clone(), key.namespace.clone()),
+            GatewayError::ServiceMissingLoadBalancerStatus(gateway_id.clone()),
         )?;
         let ingress =
             lb_status
                 .ingress
                 .as_ref()
                 .ok_or(GatewayError::ServiceMissingLoadBalancerIngress(
-                    key.name.clone(),
-                    key.namespace.clone(),
+                    gateway_id.clone(),
                 ))?;
         for addr in ingress {
             if let Some(ip) = &addr.ip {
@@ -365,14 +357,13 @@ impl GatewayController {
             }
         }
         let lb_addr_ip = lb_addr.ok_or(GatewayError::ServiceMissingLoadBalancerIngressIp(
-            key.name.clone(),
-            key.namespace.clone(),
+            gateway_id.clone(),
         ))?;
 
         let endpoints_api: Api<Endpoints> =
-            Api::namespaced(self.k8s_client.clone(), &key.namespace);
+            Api::namespaced(self.k8s_client.clone(), &gateway_id.namespace);
 
-        if let Some(err) = endpoints_api.get(&key.name).await.err() {
+        if let Some(err) = endpoints_api.get(&gateway_id.name).await.err() {
             if check_if_not_found_err(err) {
                 let mut ep_ports: Vec<EndpointPort> = vec![];
                 if let Some(ports) = &svc_spec.ports {
@@ -386,8 +377,8 @@ impl GatewayController {
                 }
 
                 let obj_meta = ObjectMeta {
-                    name: Some(key.name.clone()),
-                    namespace: Some(key.namespace.clone()),
+                    name: Some(gateway_id.name.clone()),
+                    namespace: Some(gateway_id.namespace.clone()),
                     ..Default::default()
                 };
                 let ep_addr = EndpointAddress {
@@ -418,15 +409,14 @@ impl GatewayController {
 /// WARN: currently the function returns a Vec containing a single IPv4 and errors in other cases
 /// IPv6 and multiple IPs are currently not supported
 pub(super) fn get_gateway_ips(gateway: &Gateway) -> Result<Vec<IpAddr>> {
-    let namespace = gateway.metadata.namespace()?;
-    let gw_name = gateway.metadata.name()?;
+    let gateway_id = NamespacedName::new(gateway.metadata.namespace()?, gateway.metadata.name()?);
 
     let Some(status) = &gateway.status else {
-        return Err(GatewayError::NotReady(namespace, gw_name).into());
+        return Err(GatewayError::NotReady(gateway_id.clone()).into());
     };
 
     let Some(addresses) = &status.addresses else {
-        return Err(GatewayError::MissingAddresses(namespace, gw_name).into());
+        return Err(GatewayError::MissingAddresses(gateway_id.clone()).into());
     };
 
     let ip_addresses = addresses
@@ -453,7 +443,7 @@ pub(super) fn get_gateway_ips(gateway: &Gateway) -> Result<Vec<IpAddr>> {
 
     if ip_addresses.len() != 1 {
         return Err(
-            GatewayError::NotExactlyOneIpAddress(namespace, gw_name, ip_addresses.len()).into(),
+            GatewayError::NotExactlyOneIpAddress(gateway_id.clone(), ip_addresses.len()).into(),
         );
     }
 
@@ -463,7 +453,7 @@ pub(super) fn get_gateway_ips(gateway: &Gateway) -> Result<Vec<IpAddr>> {
 // Patch the provided status on the Gateway object.
 async fn patch_status(
     gateway_api: &Api<Gateway>,
-    name: String,
+    name: &str,
     status: &GatewayStatus,
 ) -> Result<()> {
     let mut listeners = &vec![];
@@ -489,7 +479,7 @@ async fn patch_status(
     }));
     let params = PatchParams::apply(BLIXT_FIELD_MANAGER).force();
     gateway_api
-        .patch_status(name.as_str(), &params, &patch)
+        .patch_status(name, &params, &patch)
         .await
         .map_err(K8sError::Client)?;
     Ok(())
@@ -542,10 +532,9 @@ fn set_listener_status(gateway: &mut Gateway) -> Result<()> {
     let generation = gateway
         .metadata
         .generation
-        .ok_or(K8sError::MissingResourceProperty(
-            gw_name,
-            namespace,
-            "metadata.generation".to_string(),
+        .ok_or(K8sError::missing_resource_property(
+            &NamespacedName::new(gw_name, namespace),
+            "metadata.generation",
         ))?;
 
     for listener in &gateway_spec.listeners {
@@ -849,8 +838,7 @@ fn update_service_for_gateway(gateway: &Gateway, svc: &mut Service) -> Result<bo
             if let Some(t) = addr.r#type {
                 if t != "IPAddress" {
                     return Err(GatewayError::AddressTypeNotSupported(
-                        gateway.metadata.namespace()?,
-                        gateway.metadata.name()?,
+                        gateway.metadata.namespaced_name()?,
                         t,
                     )
                     .into());
@@ -863,13 +851,11 @@ fn update_service_for_gateway(gateway: &Gateway, svc: &mut Service) -> Result<bo
         }
     }
 
-    let svc_name = svc.metadata.name()?;
-    let namespace = svc.metadata.namespace()?;
     let svc_spec = svc
         .spec
         .as_mut()
         .ok_or(GatewayError::ServiceMissingLoadBalancerSpec(
-            namespace, svc_name,
+            svc.metadata.namespaced_name()?,
         ))?;
 
     // TODO: this is not required when using MetalLB
@@ -925,10 +911,7 @@ fn update_service_for_gateway(gateway: &Gateway, svc: &mut Service) -> Result<bo
 fn get_service_key(service: &Service) -> Result<NamespacedName> {
     let svc_name = service.metadata.name()?;
     let svc_ns = service.metadata.namespace()?;
-    Ok(NamespacedName {
-        name: svc_name,
-        namespace: svc_ns,
-    })
+    Ok(NamespacedName::new(svc_name, svc_ns))
 }
 
 // Returns true if the provided error is a not found error.

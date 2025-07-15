@@ -19,6 +19,7 @@ pub mod controllers;
 pub mod dataplane;
 mod utils;
 
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::Client;
 use thiserror::Error;
 
@@ -41,18 +42,71 @@ pub enum Error {
 pub enum K8sError {
     #[error("kube client error: {0}")]
     Client(#[from] kube::Error),
-    #[error("{0}/{1} missing property {2}")]
-    MissingResourceProperty(String, String, String),
+    #[error("{0} missing property {1}")]
+    MissingResourceProperty(String, String),
+    #[error("{0} missing property {1}")]
+    EmptyResourceProperty(String, String),
     #[error("missing resource namespace")]
     MissingResourceNamespace,
     #[error("missing resource name")]
     MissingResourceName,
 }
 
+impl K8sError {
+    pub(crate) fn missing_resource_property(id: &NamespacedName, property: &str) -> K8sError {
+        K8sError::MissingResourceProperty(
+            format!("{}/{}", id.namespace, id.name),
+            property.to_string(),
+        )
+    }
+    pub(crate) fn empty_resource_property(id: &NamespacedName, property: &str) -> K8sError {
+        K8sError::MissingResourceProperty(
+            format!("{}/{}", id.namespace, id.name),
+            property.to_string(),
+        )
+    }
+}
+
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct NamespacedName {
     pub name: String,
     pub namespace: String,
+}
+
+impl NamespacedName {
+    pub(crate) fn new(namespace: &str, name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+        }
+    }
+}
+
+pub(crate) trait NamespaceName {
+    fn namespace(&self) -> Result<&str>;
+    fn name(&self) -> Result<&str>;
+    fn namespaced_name(&self) -> Result<NamespacedName>;
+}
+
+impl NamespaceName for ObjectMeta {
+    fn namespace(&self) -> Result<&str> {
+        self.namespace
+            .as_deref()
+            .ok_or(K8sError::MissingResourceNamespace.into())
+    }
+
+    fn name(&self) -> Result<&str> {
+        self.name
+            .as_deref()
+            .ok_or(K8sError::MissingResourceName.into())
+    }
+
+    fn namespaced_name(&self) -> Result<NamespacedName> {
+        Ok(NamespacedName {
+            name: self.name()?.to_string(),
+            namespace: self.namespace()?.to_string(),
+        })
+    }
 }

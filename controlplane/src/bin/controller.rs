@@ -47,7 +47,8 @@ pub async fn run() -> Result<()> {
         .await
         .expect("failed to create kube Client");
 
-    let dataplane_client = DataplaneClientManager::default();
+    // FIXME: allow to configure port via CLI arg
+    let dataplane_client = DataplaneClientManager::new(9874);
     // TODO: update clients on Node (add, remove) and Pod events (dataplane rollout)
     dataplane_client.update_clients(client.clone()).await?;
 

@@ -39,8 +39,8 @@ use thiserror::Error as ThisError;
 use tracing::log::error;
 use tracing::{info, warn};
 
+use crate::NamespaceName;
 use crate::consts::{DATAPLANE_FINALIZER, GATEWAY_CLASS_CONTROLLER_NAME};
-use crate::controllers::NamespaceName;
 use crate::controllers::gateway::get_gateway_ips;
 use crate::dataplane::DataplaneClientManager;
 use crate::{K8sError, NamespacedName, Result};
@@ -55,12 +55,6 @@ pub struct TCPRouteController {
 pub enum TCPRouteError {
     #[error(transparent)]
     K8s(#[from] K8sError),
-    #[error("{0:?} has no parentRefs.")]
-    NoParentRefs(NamespacedName),
-    #[error("{0:?} has no rules.")]
-    NoRules(NamespacedName),
-    #[error("TCPRoute {0:?} rule has no backendRefs.")]
-    RulesMissingBackendRef(NamespacedName),
     #[error("{0:?} found too many Gateways {1}. Currently only a single Gateway is supported.")]
     TooManyGatewaysFound(NamespacedName, usize),
     #[error("TCPRoute {0:?} does not have healthy backends.")]
@@ -100,31 +94,9 @@ impl TCPRouteController {
         error!("TCPRoute: {tcp_route:?}");
         let start = Instant::now();
 
-        let tcp_route_id = NamespacedName {
-            name: tcp_route.metadata.name()?,
-            namespace: tcp_route.metadata.namespace()?,
-        };
-
-        let Some(parent_refs) = &tcp_route.spec.parent_refs else {
-            return Err(TCPRouteError::NoParentRefs(tcp_route_id).into());
-        };
-        if parent_refs.is_empty() {
-            return Err(TCPRouteError::NoParentRefs(tcp_route_id).into());
-        }
-        if tcp_route.spec.rules.is_empty() {
-            return Err(TCPRouteError::NoRules(tcp_route_id).into());
-        };
-        let backend_refs = &tcp_route
-            .spec
-            .rules
-            .iter()
-            .filter_map(|r| r.backend_refs.clone())
-            .flatten()
-            .collect::<Vec<_>>();
-
-        if backend_refs.is_empty() {
-            return Err(TCPRouteError::RulesMissingBackendRef(tcp_route_id).into());
-        };
+        let tcp_route_id =
+            NamespacedName::new(tcp_route.metadata.namespace()?, tcp_route.metadata.name()?);
+        let (parent_refs, backend_refs) = Self::validate_tcp_route(&tcp_route_id, &tcp_route)?;
 
         // TODO: support multiple gateways, the TCPRoute spec allows for multiple parents
         // as of now the function returns an error when multiple gateways are found
@@ -166,7 +138,7 @@ impl TCPRouteController {
                 &tcp_route_id,
                 parent_refs,
                 gateway,
-                backend_refs,
+                &backend_refs,
             )
             .await?;
         }
@@ -176,12 +148,49 @@ impl TCPRouteController {
         Ok(Action::await_change())
     }
 
+    fn validate_tcp_route<'a>(
+        tcp_route_id: &NamespacedName,
+        tcp_route: &'a TCPRoute,
+    ) -> Result<(
+        &'a Vec<TCPRouteParentRefs>,
+        Vec<&'a TCPRouteRulesBackendRefs>,
+    )> {
+        let Some(parent_refs) = &tcp_route.spec.parent_refs else {
+            return Err(
+                K8sError::missing_resource_property(tcp_route_id, "spec.parent_refs").into(),
+            );
+        };
+        if parent_refs.is_empty() {
+            return Err(K8sError::empty_resource_property(tcp_route_id, "spec.parent_refs").into());
+        }
+        if tcp_route.spec.rules.is_empty() {
+            return Err(K8sError::empty_resource_property(tcp_route_id, "spec.rules").into());
+        };
+        let backend_refs = tcp_route
+            .spec
+            .rules
+            .iter()
+            .filter_map(|r| r.backend_refs.as_ref())
+            .flatten()
+            .collect::<Vec<_>>();
+
+        if backend_refs.is_empty() {
+            return Err(K8sError::empty_resource_property(
+                tcp_route_id,
+                "spec.rules.backend_refs[]",
+            )
+            .into());
+        };
+
+        Ok((parent_refs, backend_refs))
+    }
+
     async fn ensure_tcp_route_configure_in_dataplane(
         &self,
         tcp_route_id: &NamespacedName,
         parent_refs: &[TCPRouteParentRefs],
         gateway: &Gateway,
-        backend_refs: &[TCPRouteRulesBackendRefs],
+        backend_refs: &[&TCPRouteRulesBackendRefs],
     ) -> Result<()> {
         let targets = self
             .compile_tcp_route_to_data_plane_targets(
@@ -220,12 +229,11 @@ impl TCPRouteController {
             ..Default::default()
         };
 
-        let tcp_route_api: Api<TCPRoute> =
-            Api::namespaced(self.k8s_client.clone(), namespace.as_str());
+        let tcp_route_api: Api<TCPRoute> = Api::namespaced(self.k8s_client.clone(), namespace);
         let pp = PatchParams::default();
 
         tcp_route_api
-            .patch_metadata(&tcp_route_name, &pp, &Patch::Merge(metadata))
+            .patch_metadata(tcp_route_name, &pp, &Patch::Merge(metadata))
             .await
             .map_err(|e| K8sError::Client(e).into()) // FIXME: this looks strange
             .map(|_| ())
@@ -247,11 +255,11 @@ impl TCPRouteController {
             ..Default::default()
         };
 
-        let tcp_route_api: Api<TCPRoute> = Api::namespaced(self.k8s_client.clone(), &namespace);
+        let tcp_route_api: Api<TCPRoute> = Api::namespaced(self.k8s_client.clone(), namespace);
         let pp = PatchParams::apply(crate::consts::BLIXT_FIELD_MANAGER);
 
         tcp_route_api
-            .patch_metadata(&tcp_route_name, &pp, &Patch::Apply(&metadata))
+            .patch_metadata(tcp_route_name, &pp, &Patch::Apply(&metadata))
             .await
             .map_err(|e| K8sError::Client(e).into())
             .map(|_| ())
@@ -336,7 +344,7 @@ impl TCPRouteController {
         &self,
         tcp_route_id: &NamespacedName,
         parent_refs: &[TCPRouteParentRefs],
-        backend_refs: &[TCPRouteRulesBackendRefs],
+        backend_refs: &[&TCPRouteRulesBackendRefs],
         gateway: &Gateway,
     ) -> Result<Targets> {
         let gateway_port =

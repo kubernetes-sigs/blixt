@@ -35,8 +35,8 @@ use kube::{
 use serde_json::json;
 use tracing::{info, warn};
 
+use crate::NamespaceName;
 use crate::consts::BLIXT_FIELD_MANAGER;
-use crate::controllers::NamespaceName;
 use crate::utils::set_condition;
 use crate::{consts::GATEWAY_CLASS_CONTROLLER_NAME, *};
 
@@ -95,7 +95,7 @@ impl GatewayClassController {
     }
 
     // TODO: unify with GatewayController in case possible
-    async fn patch_status(&self, name: String, status: &GatewayClassStatus) -> Result<()> {
+    async fn patch_status(&self, name: &str, status: &GatewayClassStatus) -> Result<()> {
         let gatewayclass_api = Api::<GatewayClass>::all(self.k8s_client.clone());
         let mut conditions = &vec![];
         if let Some(c) = status.conditions.as_ref() {
@@ -110,7 +110,7 @@ impl GatewayClassController {
         }));
         let params = PatchParams::apply(BLIXT_FIELD_MANAGER).force();
         gatewayclass_api
-            .patch_status(name.as_str(), &params, &patch)
+            .patch_status(name, &params, &patch)
             .await
             .map_err(K8sError::Client)?;
         Ok(())

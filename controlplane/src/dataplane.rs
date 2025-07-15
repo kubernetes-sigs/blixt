@@ -27,33 +27,29 @@ use tonic::transport::Channel;
 use tracing::{info, warn};
 
 use crate::consts::{BLIXT_APP_LABEL, BLIXT_DATAPLANE_COMPONENT_LABEL, BLIXT_NAMESPACE};
-use crate::{Error, K8sError};
+use crate::{Error, K8sError, NamespaceName, NamespacedName};
 
 #[derive(Clone)]
 pub struct DataplaneClientManager {
-    clients: Arc<RwLock<HashMap<String, BackendsClient<Channel>>>>,
+    clients: Arc<RwLock<HashMap<NamespacedName, BackendsClient<Channel>>>>,
+    service_port: u16,
 }
 
 #[derive(ThisError, Debug)]
 pub enum DataplaneError {
     #[error("no dataplane clients available")]
     MissingClients,
-    #[error("failed to connect to dataplane pod {0} error {1}")]
-    PodConnectionFailed(String, Box<tonic::transport::Error>),
-    #[error("Failed to update targets on dataplane pod {0} status {1}")]
-    UpdateFailed(String, Box<tonic::Status>),
-}
-
-impl Default for DataplaneClientManager {
-    fn default() -> Self {
-        Self::new()
-    }
+    #[error("failed to connect to dataplane pod {0:?} error {1}")]
+    PodConnectionFailed(NamespacedName, Box<tonic::transport::Error>),
+    #[error("Failed to update targets on dataplane pod {0:?} status {1}")]
+    UpdateFailed(NamespacedName, Box<tonic::Status>),
 }
 
 impl DataplaneClientManager {
-    pub fn new() -> Self {
+    pub fn new(service_port: u16) -> Self {
         Self {
             clients: Arc::new(RwLock::new(HashMap::new())),
+            service_port,
         }
     }
 
@@ -79,20 +75,16 @@ impl DataplaneClientManager {
         let mut new_clients = HashMap::new();
 
         for pod in dataplane_pods {
+            let pod_id = pod.metadata.namespaced_name()?;
             if let Some(pod_ip) = &pod.status.as_ref().and_then(|s| s.pod_ip.as_ref()) {
-                // FIXME: allow to configure port via CLI arg
-                let endpoint = format!("http://{pod_ip}:9874");
+                let endpoint = format!("http://{pod_ip}:{}", self.service_port);
                 match BackendsClient::connect(endpoint.clone()).await {
                     Ok(grpc_client) => {
                         info!("Connected to dataplane pod: {}", pod_ip);
-                        new_clients.insert(pod_ip.to_string(), grpc_client);
+                        new_clients.insert(pod_id, grpc_client);
                     }
                     Err(err) => {
-                        return Err(DataplaneError::PodConnectionFailed(
-                            pod_ip.as_str().to_string(),
-                            err.into(),
-                        )
-                        .into());
+                        return Err(DataplaneError::PodConnectionFailed(pod_id, err.into()).into());
                     }
                 }
             }
@@ -110,14 +102,14 @@ impl DataplaneClientManager {
             return Err(DataplaneError::MissingClients.into());
         }
 
-        for (pod_ip, mut client) in clients.clone() {
+        for (pod_id, mut client) in clients.clone() {
             match client.update(Request::new(targets.clone())).await {
                 Ok(resp) => {
-                    info!("Successfully updated targets on dataplane pod: {}", pod_ip);
+                    info!("Successfully updated targets on dataplane pod: {pod_id:?}");
                     info!("Received {:?}", resp.get_ref());
                 }
                 Err(err) => {
-                    return Err(DataplaneError::UpdateFailed(pod_ip, err.into()).into());
+                    return Err(DataplaneError::UpdateFailed(pod_id, err.into()).into());
                 }
             }
         }
@@ -131,13 +123,13 @@ impl DataplaneClientManager {
             return Err(DataplaneError::MissingClients.into());
         }
 
-        for (pod_ip, mut client) in clients.clone() {
+        for (pod_id, mut client) in clients.clone() {
             match client.delete(Request::new(vip)).await {
                 Ok(_) => {
-                    info!("Successfully deleted VIP on dataplane pod: {}", pod_ip);
+                    info!("Successfully deleted VIP on dataplane pod: {pod_id:?}");
                 }
                 Err(err) => {
-                    warn!("Failed to delete VIP on dataplane pod {}: {}", pod_ip, err);
+                    warn!("Failed to delete VIP on dataplane pod {pod_id:?}: {err:?}");
                 }
             }
         }
