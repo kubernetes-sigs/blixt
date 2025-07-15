@@ -398,6 +398,7 @@ version = "0.3.0"
 dependencies = [
  "api-server",
  "chrono",
+ "clap",
  "futures",
  "gateway-api",
  "k8s-openapi",

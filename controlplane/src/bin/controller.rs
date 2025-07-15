@@ -16,19 +16,52 @@ limitations under the License.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
+use clap::Parser;
 use kube::Client;
 use tokio::task::JoinHandle;
 use tokio::try_join;
 use tonic::transport::Server;
-use tracing::*;
+use tracing::{debug, error, info};
 
 use controlplane::Result;
+use controlplane::consts::{BLIXT_APP_LABEL, BLIXT_DATAPLANE_COMPONENT_LABEL, BLIXT_NAMESPACE};
 use controlplane::controllers::{GatewayClassController, GatewayController, TCPRouteController};
 use controlplane::dataplane::DataplaneClientManager;
 
+const BEFORE_HELP_MESSAGE: &str = "
+Blixt Controlplane
+
+Provides the required k8s controllers to configure the Blixt Controlplane through
+GatewayApi CRDs like Gateway, GatewayClass, TCPRoute, ...";
+
+#[derive(Debug, Parser)]
+#[command(author, version, about, before_help = BEFORE_HELP_MESSAGE)]
+pub struct Options {
+    /// dataplane backend service GRPC port
+    #[clap(default_value_t = 9874)]
+    pub dataplane_service_port: u16,
+    /// dataplane service namespace
+    #[clap(default_value_t = BLIXT_NAMESPACE.to_string())]
+    pub dataplane_service_namespace: String,
+    /// dataplane service app label to locate dataplane pods
+    #[clap(default_value_t = BLIXT_APP_LABEL.to_string())]
+    pub dataplane_service_app_label: String,
+    /// dataplane service component label to locate dataplane pods
+    #[clap(default_value_t = BLIXT_DATAPLANE_COMPONENT_LABEL.to_string())]
+    pub dataplane_service_component_label: String,
+}
+
 #[tokio::main]
 async fn main() {
-    match run().await {
+    tracing_subscriber::fmt()
+        .with_file(true)
+        .with_line_number(true)
+        .init();
+
+    let opts = Options::parse();
+    info!("cli options: {:?}", opts);
+
+    match run(&opts).await {
         Ok(()) => info!("Success."),
         Err(e) => {
             error!("{e:?}");
@@ -37,18 +70,18 @@ async fn main() {
     }
 }
 
-pub async fn run() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_file(true)
-        .with_line_number(true)
-        .init();
-
+pub async fn run(opts: &Options) -> Result<()> {
     let client = Client::try_default()
         .await
         .expect("failed to create kube Client");
 
-    // FIXME: allow to configure port via CLI arg
-    let dataplane_client = DataplaneClientManager::new(9874);
+    let dataplane_client = DataplaneClientManager::new(
+        opts.dataplane_service_namespace.clone(),
+        opts.dataplane_service_app_label.clone(),
+        opts.dataplane_service_component_label.clone(),
+        opts.dataplane_service_port,
+    );
+
     // TODO: update clients on Node (add, remove) and Pod events (dataplane rollout)
     dataplane_client.update_clients(client.clone()).await?;
 
@@ -87,7 +120,7 @@ async fn setup_health_checks(addr: IpAddr, port: u16) -> Result<JoinHandle<()>> 
 
         let server = server_builder.serve(addr, health_service);
 
-        log::debug!("gRPC Health Checking service listens on {addr}");
+        debug!("gRPC Health Checking service listens on {addr}");
         server
             .await
             .expect("Failed to serve gRPC Health Checking service");

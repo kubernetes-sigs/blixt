@@ -26,13 +26,15 @@ use tonic::Request;
 use tonic::transport::Channel;
 use tracing::{info, warn};
 
-use crate::consts::{BLIXT_APP_LABEL, BLIXT_DATAPLANE_COMPONENT_LABEL, BLIXT_NAMESPACE};
 use crate::{Error, K8sError, NamespaceName, NamespacedName};
 
 #[derive(Clone)]
 pub struct DataplaneClientManager {
     clients: Arc<RwLock<HashMap<NamespacedName, BackendsClient<Channel>>>>,
     service_port: u16,
+    service_app_label: String,
+    service_component_label: String,
+    service_namespace: String,
 }
 
 #[derive(ThisError, Debug)]
@@ -46,15 +48,23 @@ pub enum DataplaneError {
 }
 
 impl DataplaneClientManager {
-    pub fn new(service_port: u16) -> Self {
+    pub fn new(
+        service_namespace: String,
+        service_app_label: String,
+        service_component_label: String,
+        service_port: u16,
+    ) -> Self {
         Self {
             clients: Arc::new(RwLock::new(HashMap::new())),
             service_port,
+            service_app_label,
+            service_component_label,
+            service_namespace,
         }
     }
 
     pub async fn update_clients(&self, client: Client) -> Result<(), Error> {
-        let pod_api: Api<Pod> = Api::namespaced(client, BLIXT_NAMESPACE);
+        let pod_api: Api<Pod> = Api::namespaced(client, &self.service_namespace);
 
         let dataplane_pods = pod_api
             .list(&Default::default())
@@ -64,9 +74,8 @@ impl DataplaneClientManager {
             .into_iter()
             .filter(|pod| match pod.metadata.labels.as_ref() {
                 Some(labels) => {
-                    labels.get("app") == Some(&BLIXT_APP_LABEL.to_string())
-                        && labels.get("component")
-                            == Some(&BLIXT_DATAPLANE_COMPONENT_LABEL.to_string())
+                    labels.get("app") == Some(&self.service_app_label)
+                        && labels.get("component") == Some(&self.service_component_label)
                 }
                 None => false,
             })
