@@ -29,7 +29,7 @@ use gateway_api::gatewayclasses::GatewayClassStatus;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
 use kube::api::{Patch, PatchParams};
 use kube::{
-    api::{Api, ListParams},
+    api::Api,
     runtime::{Controller, controller::Action, watcher::Config},
 };
 use serde_json::json;
@@ -52,10 +52,6 @@ impl GatewayClassController {
 
     pub async fn start(self) -> Result<()> {
         let gwc_api = Api::<GatewayClass>::all(self.k8s_client.clone());
-        gwc_api
-            .list(&ListParams::default().limit(1))
-            .await
-            .map_err(K8sError::Client)?; // TODO: map not found
 
         Controller::new(gwc_api, Config::default().any_semantic())
             .shutdown_on_signal()
@@ -112,7 +108,7 @@ impl GatewayClassController {
         gatewayclass_api
             .patch_status(name, &params, &patch)
             .await
-            .map_err(K8sError::Client)?;
+            .map_err(K8sError::client)?;
         Ok(())
     }
 }

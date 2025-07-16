@@ -102,10 +102,6 @@ impl GatewayController {
 
     pub async fn start(self) -> Result<()> {
         let gateway_api = Api::<Gateway>::all(self.k8s_client.clone());
-        gateway_api
-            .list(&ListParams::default().limit(1))
-            .await
-            .map_err(K8sError::Client)?; // TODO: map not found
 
         Controller::new(gateway_api, Config::default().any_semantic())
             .shutdown_on_signal()
@@ -131,7 +127,7 @@ impl GatewayController {
         let gateway_class = gateway_class_api
             .get(gateway.spec.gateway_class_name.as_str())
             .await
-            .map_err(K8sError::Client)?;
+            .map_err(K8sError::client)?;
 
         // Only reconcile the Gateway object if it belongs to our controller's gateway class.
         if gateway_class.spec.controller_name.as_str() != GATEWAY_CLASS_CONTROLLER_NAME {
@@ -184,7 +180,7 @@ impl GatewayController {
         let services = service_api
             .list(&ListParams::default().labels(&format!("{GATEWAY_SERVICE_LABEL}={gateway_name}")))
             .await
-            .map_err(K8sError::Client)?;
+            .map_err(K8sError::client)?;
 
         if services.items.len() > 1 {
             let mut names: Vec<String> = vec![];
@@ -212,7 +208,7 @@ impl GatewayController {
                         &Patch::Strategic(&service),
                     )
                     .await
-                    .map_err(K8sError::Client)?;
+                    .map_err(K8sError::client)?;
             }
         } else {
             info!("creating loadbalancer service");
@@ -322,7 +318,7 @@ impl GatewayController {
         let service = svc_api
             .create(&PostParams::default(), &svc)
             .await
-            .map_err(K8sError::Client)?;
+            .map_err(K8sError::client)?;
 
         Ok(service)
     }
@@ -396,7 +392,7 @@ impl GatewayController {
                 let ep = endpoints_api
                     .create(&PostParams::default(), &endpoints)
                     .await
-                    .map_err(K8sError::Client)?;
+                    .map_err(K8sError::client)?;
                 info!("created Endpoints object {}", ep.name_any());
             }
         }
@@ -481,7 +477,7 @@ async fn patch_status(
     gateway_api
         .patch_status(name, &params, &patch)
         .await
-        .map_err(K8sError::Client)?;
+        .map_err(K8sError::client)?;
     Ok(())
 }
 

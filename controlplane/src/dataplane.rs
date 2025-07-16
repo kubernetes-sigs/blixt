@@ -69,7 +69,7 @@ impl DataplaneClientManager {
         let dataplane_pods = pod_api
             .list(&Default::default())
             .await
-            .map_err(K8sError::Client)?
+            .map_err(K8sError::client)?
             .items
             .into_iter()
             .filter(|pod| match pod.metadata.labels.as_ref() {

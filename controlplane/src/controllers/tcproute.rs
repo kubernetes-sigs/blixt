@@ -30,7 +30,7 @@ use gateway_api::apis::standard::gateways::Gateway;
 use gateway_api::gatewayclasses::GatewayClass;
 use k8s_openapi::api::core::v1::Endpoints;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use kube::api::{ListParams, Patch, PatchParams};
+use kube::api::{Patch, PatchParams};
 use kube::runtime::Controller;
 use kube::runtime::controller::Action;
 use kube::runtime::watcher::Config;
@@ -75,10 +75,6 @@ impl TCPRouteController {
 
     pub async fn start(self) -> Result<()> {
         let tcproute_api = Api::<TCPRoute>::all(self.k8s_client.clone());
-        tcproute_api
-            .list(&ListParams::default().limit(1))
-            .await
-            .map_err(K8sError::Client)?; // TODO: map not found
 
         Controller::new(tcproute_api, Config::default().any_semantic())
             .shutdown_on_signal()
@@ -235,7 +231,7 @@ impl TCPRouteController {
         tcp_route_api
             .patch_metadata(tcp_route_name, &pp, &Patch::Merge(metadata))
             .await
-            .map_err(|e| K8sError::Client(e).into()) // FIXME: this looks strange
+            .map_err(|e| K8sError::client(e).into())
             .map(|_| ())
     }
 
@@ -261,7 +257,7 @@ impl TCPRouteController {
         tcp_route_api
             .patch_metadata(tcp_route_name, &pp, &Patch::Apply(&metadata))
             .await
-            .map_err(|e| K8sError::Client(e).into())
+            .map_err(|e| K8sError::client(e).into())
             .map(|_| ())
     }
 
@@ -291,7 +287,7 @@ impl TCPRouteController {
                     );
                     continue;
                 }
-                Err(e) => return Err(K8sError::Client(e).into()),
+                Err(e) => return Err(K8sError::client(e).into()),
             };
 
             let gateway_class = match gateway_class_api
@@ -306,7 +302,7 @@ impl TCPRouteController {
                     );
                     continue;
                 }
-                Err(e) => return Err(K8sError::Client(e).into()),
+                Err(e) => return Err(K8sError::client(e).into()),
             };
 
             if gateway_class.spec.controller_name != GATEWAY_CLASS_CONTROLLER_NAME {
@@ -372,7 +368,7 @@ impl TCPRouteController {
             let endpoints = endpoint_api
                 .get(backend_name.as_str())
                 .await
-                .map_err(K8sError::Client)?;
+                .map_err(K8sError::client)?;
 
             for subset in endpoints.subsets.unwrap_or_default() {
                 for address in subset.addresses.unwrap_or_default() {

@@ -23,10 +23,10 @@ use tokio::try_join;
 use tonic::transport::Server;
 use tracing::{debug, error, info};
 
-use controlplane::Result;
 use controlplane::consts::{BLIXT_APP_LABEL, BLIXT_DATAPLANE_COMPONENT_LABEL, BLIXT_NAMESPACE};
 use controlplane::controllers::{GatewayClassController, GatewayController, TCPRouteController};
 use controlplane::dataplane::DataplaneClientManager;
+use controlplane::{Result, check_gateway_api_installed};
 
 const BEFORE_HELP_MESSAGE: &str = "
 Blixt Controlplane
@@ -37,18 +37,18 @@ GatewayApi CRDs like Gateway, GatewayClass, TCPRoute, ...";
 #[derive(Debug, Parser)]
 #[command(author, version, about, before_help = BEFORE_HELP_MESSAGE)]
 pub struct Options {
-    /// dataplane backend service GRPC port
-    #[clap(default_value_t = 9874)]
-    pub dataplane_service_port: u16,
-    /// dataplane service namespace
+    /// Blixt service namespace
     #[clap(default_value_t = BLIXT_NAMESPACE.to_string())]
-    pub dataplane_service_namespace: String,
+    pub service_namespace: String,
     /// dataplane service app label to locate dataplane pods
     #[clap(default_value_t = BLIXT_APP_LABEL.to_string())]
     pub dataplane_service_app_label: String,
     /// dataplane service component label to locate dataplane pods
     #[clap(default_value_t = BLIXT_DATAPLANE_COMPONENT_LABEL.to_string())]
     pub dataplane_service_component_label: String,
+    /// dataplane backend service GRPC port
+    #[clap(default_value_t = 9874)]
+    pub dataplane_service_port: u16,
 }
 
 #[tokio::main]
@@ -71,23 +71,25 @@ async fn main() {
 }
 
 pub async fn run(opts: &Options) -> Result<()> {
-    let client = Client::try_default()
+    let k8s_client = Client::try_default()
         .await
         .expect("failed to create kube Client");
 
+    check_gateway_api_installed(k8s_client.clone(), &opts.service_namespace).await?;
+
     let dataplane_client = DataplaneClientManager::new(
-        opts.dataplane_service_namespace.clone(),
+        opts.service_namespace.clone(),
         opts.dataplane_service_app_label.clone(),
         opts.dataplane_service_component_label.clone(),
         opts.dataplane_service_port,
     );
 
     // TODO: update clients on Node (add, remove) and Pod events (dataplane rollout)
-    dataplane_client.update_clients(client.clone()).await?;
+    dataplane_client.update_clients(k8s_client.clone()).await?;
 
-    let tcproute_controller = TCPRouteController::new(client.clone(), dataplane_client.clone());
-    let gateway_controller = GatewayController::new(client.clone());
-    let gatewayclass_controller = GatewayClassController::new(client.clone());
+    let tcproute_controller = TCPRouteController::new(k8s_client.clone(), dataplane_client.clone());
+    let gateway_controller = GatewayController::new(k8s_client.clone());
+    let gatewayclass_controller = GatewayClassController::new(k8s_client.clone());
 
     if let Err(error) = try_join!(
         gateway_controller.start(),

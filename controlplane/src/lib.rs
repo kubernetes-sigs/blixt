@@ -19,9 +19,15 @@ pub mod controllers;
 pub mod dataplane;
 mod utils;
 
+use gateway_api::apis::experimental::gateways::Gateway;
+use gateway_api::apis::experimental::tcproutes::TCPRoute;
+use gateway_api::apis::experimental::udproutes::UDPRoute;
+use gateway_api::gatewayclasses::GatewayClass;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use kube::Client;
+use kube::api::ListParams;
+use kube::{Api, Client};
 use thiserror::Error;
+use tracing::{error, warn};
 
 use crate::controllers::{GatewayError, TCPRouteError};
 use crate::dataplane::DataplaneError;
@@ -41,7 +47,7 @@ pub enum Error {
 #[derive(Error, Debug)]
 pub enum K8sError {
     #[error("kube client error: {0}")]
-    Client(#[from] kube::Error),
+    Client(#[from] Box<kube::Error>),
     #[error("{0} missing property {1}")]
     MissingResourceProperty(String, String),
     #[error("{0} missing property {1}")]
@@ -50,6 +56,8 @@ pub enum K8sError {
     MissingResourceNamespace,
     #[error("missing resource name")]
     MissingResourceName,
+    #[error("GatewayApi Custom Resource Definitions ({0}) are likely not installed.")]
+    GatewayApiNotInstalled(String, Box<kube::Error>),
 }
 
 impl K8sError {
@@ -64,6 +72,9 @@ impl K8sError {
             format!("{}/{}", id.namespace, id.name),
             property.to_string(),
         )
+    }
+    pub(crate) fn client(err: kube::Error) -> K8sError {
+        K8sError::Client(Box::new(err))
     }
 }
 
@@ -109,4 +120,56 @@ impl NamespaceName for ObjectMeta {
             namespace: self.namespace()?.to_string(),
         })
     }
+}
+
+pub async fn check_gateway_api_installed(k8s_client: Client, namespace: &str) -> Result<()> {
+    let gateway_class_api = Api::<GatewayClass>::all(k8s_client);
+    gateway_class_api
+        .list(&ListParams::default().limit(1))
+        .await
+        .map_err(|e| match e {
+            kube::Error::Api(kube::core::ErrorResponse { code: 404, .. }) => {
+                error!("Listing GatewayClass resources on k8s API error 404.");
+                K8sError::GatewayApiNotInstalled("GatewayClass".to_string(), Box::new(e))
+            }
+            _ => K8sError::client(e),
+        })?;
+
+    let gateway_api = Api::<Gateway>::namespaced(gateway_class_api.into_client(), namespace);
+    gateway_api
+        .list(&ListParams::default().limit(1))
+        .await
+        .map_err(|e| match e {
+            kube::Error::Api(kube::core::ErrorResponse { code: 404, .. }) => {
+                error!("Listing Gateway resources on k8s API error 404.");
+                K8sError::GatewayApiNotInstalled("Gateway".to_string(), Box::new(e))
+            }
+            _ => K8sError::client(e),
+        })?;
+
+    let tcp_route_api = Api::<TCPRoute>::all(gateway_api.into_client());
+    tcp_route_api
+        .list(&ListParams::default().limit(1))
+        .await
+        .map_err(|e| match e {
+            kube::Error::Api(kube::core::ErrorResponse { code: 404, .. }) => {
+                error!("Listing TCPRoute resources on k8s API error 404.");
+                K8sError::GatewayApiNotInstalled("TCPRoute".to_string(), Box::new(e))
+            }
+            _ => K8sError::client(e),
+        })?;
+
+    let udp_route_api = Api::<UDPRoute>::all(tcp_route_api.into_client());
+    udp_route_api
+        .list(&ListParams::default().limit(1))
+        .await
+        .map_err(|e| match e {
+            kube::Error::Api(kube::core::ErrorResponse { code: 404, .. }) => {
+                warn!("Listing UDPRoute on k8s API error 404.");
+                K8sError::GatewayApiNotInstalled("UDPRoute".to_string(), Box::new(e))
+            }
+            _ => K8sError::client(e),
+        })?;
+
+    Ok(())
 }
