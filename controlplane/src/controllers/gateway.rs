@@ -69,33 +69,33 @@ pub struct GatewayController {
 pub enum GatewayError {
     #[error(transparent)]
     K8s(#[from] K8sError),
-    #[error("{0:?} does not have any IP address associated")]
+    #[error("{0} does not have any IP address associated")]
     MissingAddresses(NamespacedName),
-    #[error("{0:?} found {1} IP addresses, currently only a single address is supported")]
+    #[error("{0} found {1} IP addresses, currently only a single address is supported")]
     NotExactlyOneIpAddress(NamespacedName, usize),
-    #[error("{0:?} has an invalid configuration: {1}")]
+    #[error("{0} has an invalid configuration: {1}")]
     InvalidConfiguration(NamespacedName, String),
-    #[error("{0:?} not ready")]
+    #[error("{0} not ready")]
     NotReady(NamespacedName),
-    #[error("{0:?} IP not found")]
+    #[error("{0} IP not found")]
     IpNotFound(NamespacedName),
-    #[error("{0:?} addresses of type {1} are not supported; only type IPAddress is supported")]
+    #[error("{0} addresses of type {1} are not supported; only type IPAddress is supported")]
     AddressTypeNotSupported(NamespacedName, String),
-    #[error("{0:?} exactly one Service required")]
+    #[error("{0} exactly one Service required")]
     NotExactlyOneService(NamespacedName),
-    #[error("{0:?} does not have any matching Service")]
+    #[error("{0} does not have any matching Service")]
     MissingService(NamespacedName),
-    #[error("{0:?} Service does not have a Status")]
+    #[error("{0} Service does not have a Status")]
     MissingServiceStatus(NamespacedName),
-    #[error("{0:?} Service does not have an ingress IP assigned")]
+    #[error("{0} Service does not have an ingress IP assigned")]
     ServiceMissingIngressIp(NamespacedName),
-    #[error("{0:?} Service does not have an ingress IP assigned")]
+    #[error("{0} Service does not have an ingress IP assigned")]
     ServiceMissingLoadBalancerIngressIp(NamespacedName),
-    #[error("{0:?} Service does not have a spec")]
+    #[error("{0} Service does not have a spec")]
     ServiceMissingLoadBalancerSpec(NamespacedName),
-    #[error("{0:?} Service does not have a status.loadBalancer.spec")]
+    #[error("{0} Service does not have a status.loadBalancer.spec")]
     ServiceMissingLoadBalancerStatus(NamespacedName),
-    #[error("{0:?} Service does not have a status.loadBalancer.ingress")]
+    #[error("{0} Service does not have a status.loadBalancer.ingress")]
     ServiceMissingLoadBalancerIngress(NamespacedName),
 }
 
@@ -301,7 +301,7 @@ impl GatewayController {
             }
         };
 
-        let svc_key = get_service_key(&service)?;
+        let service_id = service.metadata.namespaced_name()?;
         if get_ingress_ip_len(svc_status) == 0 || svc_spec.cluster_ip.is_none() {
             let msg = "LoadBalancer does not have a ingress IP address".to_string();
             invalid_lb_condition.message.clone_from(&msg);
@@ -315,7 +315,7 @@ impl GatewayController {
             return Err(GatewayError::ServiceMissingIngressIp(gateway_id.clone()).into());
         }
 
-        self.create_endpoint_if_not_exists(&svc_key, svc_spec, svc_status)
+        self.create_endpoint_if_not_exists(&service_id, svc_spec, svc_status)
             .await?;
         set_gateway_status_addresses(&mut gateway_update, svc_status);
 
@@ -536,7 +536,7 @@ impl GatewayController {
 /// WARN: currently the function returns a Vec containing a single IPv4 and errors in other cases
 /// IPv6 and multiple IPs are currently not supported
 pub(super) fn get_gateway_ips(gateway: &Gateway) -> Result<Vec<IpAddr>> {
-    let gateway_id = NamespacedName::new(gateway.metadata.namespace()?, gateway.metadata.name()?);
+    let gateway_id = gateway.metadata.namespaced_name()?;
 
     let Some(status) = &gateway.status else {
         return Err(GatewayError::NotReady(gateway_id.clone()).into());
@@ -641,9 +641,6 @@ fn set_gateway_status_addresses(gateway: &mut Gateway, svc_status: &ServiceStatu
 
 // Inspects the provided Gateway and sets the status of its listeners accordingly.
 fn set_listener_status(gateway: &mut Gateway) -> Result<()> {
-    let gw_name = gateway.metadata.name()?;
-    let namespace = gateway.metadata.namespace()?;
-
     let gateway_spec: &GatewaySpec = &gateway.spec;
     let mut statuses: Vec<GatewayStatusListeners> = vec![];
     let mut current_listener_statuses: HashMap<String, GatewayStatusListeners> = HashMap::new();
@@ -660,7 +657,7 @@ fn set_listener_status(gateway: &mut Gateway) -> Result<()> {
         .metadata
         .generation
         .ok_or(K8sError::missing_resource_property(
-            &NamespacedName::new(gw_name, namespace),
+            &gateway.metadata.namespaced_name()?,
             "metadata.generation",
         ))?;
 
@@ -1033,12 +1030,6 @@ fn update_service_for_gateway(gateway: &Gateway, svc: &mut Service) -> Result<bo
     }
 
     Ok(updated)
-}
-
-fn get_service_key(service: &Service) -> Result<NamespacedName> {
-    let svc_name = service.metadata.name()?;
-    let svc_ns = service.metadata.namespace()?;
-    Ok(NamespacedName::new(svc_name, svc_ns))
 }
 
 // Returns true if the provided error is a not found error.

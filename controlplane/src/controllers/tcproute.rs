@@ -37,7 +37,7 @@ use kube::runtime::watcher::Config;
 use kube::{Api, Resource, ResourceExt};
 use thiserror::Error as ThisError;
 use tracing::log::error;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::NamespaceName;
 use crate::consts::{DATAPLANE_FINALIZER, GATEWAY_CLASS_CONTROLLER_NAME};
@@ -90,8 +90,7 @@ impl TCPRouteController {
         error!("TCPRoute: {tcp_route:?}");
         let start = Instant::now();
 
-        let tcp_route_id =
-            NamespacedName::new(tcp_route.metadata.namespace()?, tcp_route.metadata.name()?);
+        let tcp_route_id = tcp_route.metadata.namespaced_name()?;
         let (parent_refs, backend_refs) = Self::validate_tcp_route(&tcp_route_id, &tcp_route)?;
 
         // TODO: support multiple gateways, the TCPRoute spec allows for multiple parents
@@ -193,9 +192,8 @@ impl TCPRouteController {
             )
             .await?;
 
-        info!("Updating targets: {targets:?}");
+        debug!("Updating targets: {targets:?}");
         self.dataplane_client.update_targets(targets).await?;
-        info!("successfully updated dataplane");
         Ok(())
     }
 

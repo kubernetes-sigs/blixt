@@ -26,6 +26,7 @@ use gateway_api::gatewayclasses::GatewayClass;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::api::ListParams;
 use kube::{Api, Client};
+use std::fmt::{Debug, Display, Formatter};
 use thiserror::Error;
 use tracing::{error, warn};
 
@@ -61,60 +62,63 @@ pub enum K8sError {
 }
 
 impl K8sError {
-    pub(crate) fn missing_resource_property(id: &NamespacedName, property: &str) -> K8sError {
+    pub(crate) fn missing_resource_property(id: &NamespacedName, property: &str) -> Self {
         K8sError::MissingResourceProperty(
             format!("{}/{}", id.namespace, id.name),
             property.to_string(),
         )
     }
-    pub(crate) fn empty_resource_property(id: &NamespacedName, property: &str) -> K8sError {
+    pub(crate) fn empty_resource_property(id: &NamespacedName, property: &str) -> Self {
         K8sError::MissingResourceProperty(
             format!("{}/{}", id.namespace, id.name),
             property.to_string(),
         )
     }
-    pub(crate) fn client(err: kube::Error) -> K8sError {
+    pub(crate) fn client(err: kube::Error) -> Self {
         K8sError::Client(Box::new(err))
     }
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Hash, Eq, PartialEq)]
 pub struct NamespacedName {
     pub name: String,
     pub namespace: String,
 }
 
-impl NamespacedName {
-    pub(crate) fn new(namespace: &str, name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            namespace: namespace.to_string(),
-        }
+impl Display for NamespacedName {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.namespace.as_str())?;
+        f.write_str("/")?;
+        f.write_str(self.name.as_str())
     }
 }
 
-pub(crate) trait NamespaceName {
-    fn namespace(&self) -> Result<&str>;
-    fn name(&self) -> Result<&str>;
-    fn namespaced_name(&self) -> Result<NamespacedName>;
+impl Debug for NamespacedName {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+pub trait NamespaceName {
+    fn namespace(&self) -> std::result::Result<&str, K8sError>;
+    fn name(&self) -> std::result::Result<&str, K8sError>;
+    fn namespaced_name(&self) -> std::result::Result<NamespacedName, K8sError>;
 }
 
 impl NamespaceName for ObjectMeta {
-    fn namespace(&self) -> Result<&str> {
+    fn namespace(&self) -> std::result::Result<&str, K8sError> {
         self.namespace
             .as_deref()
-            .ok_or(K8sError::MissingResourceNamespace.into())
+            .ok_or(K8sError::MissingResourceNamespace)
     }
 
-    fn name(&self) -> Result<&str> {
-        self.name
-            .as_deref()
-            .ok_or(K8sError::MissingResourceName.into())
+    fn name(&self) -> std::result::Result<&str, K8sError> {
+        self.name.as_deref().ok_or(K8sError::MissingResourceName)
     }
 
-    fn namespaced_name(&self) -> Result<NamespacedName> {
+    fn namespaced_name(&self) -> std::result::Result<NamespacedName, K8sError> {
         Ok(NamespacedName {
             name: self.name()?.to_string(),
             namespace: self.namespace()?.to_string(),
