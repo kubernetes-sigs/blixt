@@ -1,6 +1,5 @@
 use kube::config::KubeConfigOptions;
 use kube::{Client, Config};
-use std::borrow::Borrow;
 use std::time::Duration;
 use thiserror::Error as ThisError;
 use tracing::info;
@@ -157,12 +156,12 @@ impl KindCluster {
     /// In case wait_status is None the rollouts are not waiting for successful
     /// In case wait_status is Some(Duration) the rollouts wait for success with
     /// the duration as timeout per rollout
-    pub async fn rollout<T: Borrow<WorkloadImageTag>>(
+    pub async fn rollout<T: AsRef<WorkloadImageTag>>(
         &self,
         workload: T,
         wait_status: Option<Duration>,
     ) -> Result<()> {
-        let workload = workload.borrow();
+        let workload = workload.as_ref();
         let k8s_ctx = self.k8s_context();
 
         let (workload_type, namespace, name) = workload.workload_namespace_name();
@@ -197,25 +196,25 @@ impl KindCluster {
         Ok(())
     }
 
-    pub async fn rollouts<T: Borrow<WorkloadImageTag>>(
+    pub async fn rollouts<T: AsRef<WorkloadImageTag>>(
         &self,
         workloads: &[T],
         wait_status: Option<Duration>,
     ) -> Result<()> {
         for workload in workloads {
-            self.rollout(workload.borrow(), wait_status).await?;
+            self.rollout(workload, wait_status).await?;
         }
         Ok(())
     }
 
-    pub async fn rollout_status<T: Borrow<Workload>>(
+    pub async fn rollout_status<T: AsRef<Workload>>(
         &self,
         workload: T,
         timeout_secs: Duration,
     ) -> Result<()> {
-        let workload = workload.borrow();
         let k8s_ctx = self.k8s_context();
         let timeout = timeout_secs.as_secs().to_string();
+        let workload = workload.as_ref();
 
         info!(
             "Waiting for rollout {} to complete. Timeout: {}",

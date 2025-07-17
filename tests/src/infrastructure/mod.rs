@@ -173,3 +173,15 @@ impl Debug for Workload {
         Display::fmt(self, f)
     }
 }
+
+impl AsRef<WorkloadImageTag> for WorkloadImageTag {
+    fn as_ref(&self) -> &WorkloadImageTag {
+        self
+    }
+}
+
+impl AsRef<Workload> for Workload {
+    fn as_ref(&self) -> &Workload {
+        self
+    }
+}
