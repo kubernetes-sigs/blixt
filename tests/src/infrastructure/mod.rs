@@ -32,10 +32,38 @@ pub enum ContainerRuntime {
     Docker,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Workload {
     DaemonSet(NamespacedName),
     Deployment(NamespacedName),
+}
+
+pub struct ImageTag {
+    pub image: String,
+    pub tag: String,
+}
+pub struct WorkloadImageTag {
+    pub id: Workload,
+    pub image_tag: Option<ImageTag>,
+}
+impl WorkloadImageTag {
+    fn image_tag(&self) -> Option<(&str, &str)> {
+        self.image_tag
+            .as_ref()
+            .map(|it| (it.image.as_str(), it.tag.as_str()))
+    }
+    fn workload_namespace_name(&self) -> (&str, &str, &str) {
+        self.id.workload_namespace_name()
+    }
+}
+
+impl Workload {
+    fn workload_namespace_name(&self) -> (&str, &str, &str) {
+        match &self {
+            Workload::DaemonSet(id) => ("daemonset", id.namespace.as_str(), id.name.as_str()),
+            Workload::Deployment(id) => ("deployment", id.namespace.as_str(), id.name.as_str()),
+        }
+    }
 }
 
 pub fn default_containers(mode: TestMode, cargo_workspace_dir: &str) -> Result<Vec<Container>> {
@@ -118,6 +146,29 @@ impl Display for ContainerRuntime {
 }
 
 impl Debug for ContainerRuntime {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+impl Display for Workload {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let id = match self {
+            Workload::DaemonSet(id) => {
+                f.write_str("daemonset")?;
+                id
+            }
+            Workload::Deployment(id) => {
+                f.write_str("deployment")?;
+                id
+            }
+        };
+        f.write_str(" ")?;
+        Display::fmt(id, f)
+    }
+}
+
+impl Debug for Workload {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }

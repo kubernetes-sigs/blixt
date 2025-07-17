@@ -1,17 +1,19 @@
 use std::path::PathBuf;
+use std::time::Duration;
 use thiserror::Error;
 use tracing::info;
 use xshell::{Shell, cmd};
 
 use crate::Result;
-use crate::infrastructure::{ContainerRuntime, KindCluster, KindError, KustomizeError, Workload};
+use crate::infrastructure::{ContainerRuntime, ImageTag, KindCluster, Workload, WorkloadImageTag};
 
 #[derive(Clone, Debug, Default)]
 pub enum ImageAction {
     Build,
     #[default]
     Load,
-    Start,
+    Rollout,
+    RolloutWait,
 }
 
 pub struct ContainerImages {
@@ -22,18 +24,7 @@ pub struct ContainerImages {
     pub action: ImageAction,
     pub tag: String,
     pub registry: Option<String>,
-    pub kind_cluster: KindCluster,
-}
-
-struct ImageTag {
-    image: String,
-    tag: String,
-}
-
-pub struct WorkloadImageTag {
-    pub image: String,
-    pub tag: String,
-    pub workload: Workload,
+    pub kind_cluster: Option<KindCluster>,
 }
 
 #[derive(Debug)]
@@ -55,12 +46,14 @@ pub enum ImageError {
     Load(String, String),
     #[error("Failed to start image: {0}:{1}")]
     Start(String, String),
+    #[error("config is invalid: {0}")]
+    InvalidConfig(String),
 }
 
-// TODO: eventually extract KindCluster to isolate build
-// and call load(kind: KindCluster), and start(kind: KindCluster)
 impl ContainerImages {
     pub async fn process(&self) -> Result<()> {
+        self.verify_config()?;
+
         let sh = match Shell::new() {
             Ok(sh) => sh,
             Err(e) => return Err(ImageError::CouldNotCreateShell(e).into()),
@@ -82,22 +75,65 @@ impl ContainerImages {
 
             if matches!(self.action, ImageAction::Build)
                 || matches!(self.action, ImageAction::Load)
-                || matches!(self.action, ImageAction::Start)
+                || matches!(self.action, ImageAction::Rollout)
             {
                 self.build_image(&sh, &image, &container.containerfile)?
             };
 
-            if matches!(self.action, ImageAction::Load) || matches!(self.action, ImageAction::Start)
-            {
-                self.load_image(&sh, &image)?
+            let Some(cluster) = &self.kind_cluster else {
+                continue;
             };
 
-            if matches!(self.action, ImageAction::Start) {
-                self.start_image(&sh, &image, &container.workload)?
+            if matches!(self.action, ImageAction::Load)
+                || matches!(self.action, ImageAction::Rollout)
+            {
+                cluster.load_image(&image, &self.tag).await?
+            };
+
+            if matches!(self.action, ImageAction::Rollout)
+                || matches!(self.action, ImageAction::RolloutWait)
+            {
+                if let Some(workload_id) = &container.workload {
+                    let workload = WorkloadImageTag {
+                        image_tag: Some(ImageTag {
+                            image: image.to_string(),
+                            tag: self.tag.to_string(),
+                        }),
+                        id: workload_id.clone(),
+                    };
+                    if matches!(self.action, ImageAction::Rollout) {
+                        cluster.rollout(&workload, None).await?;
+                    };
+                    if matches!(self.action, ImageAction::RolloutWait) {
+                        cluster
+                            .rollout(&workload, Some(Duration::from_secs(60)))
+                            .await?;
+                    };
+                } else {
+                    // no workload defined, no action required
+                    continue;
+                }
             }
         }
 
         Ok(())
+    }
+
+    fn verify_config(&self) -> Result<()> {
+        match self.action {
+            ImageAction::Build => Ok(()),
+            ImageAction::Load | ImageAction::Rollout | ImageAction::RolloutWait => {
+                if self.kind_cluster.is_some() {
+                    Ok(())
+                } else {
+                    Err(ImageError::InvalidConfig(format!(
+                        "Missing Kind cluster. Required for {:?}",
+                        self.action
+                    ))
+                    .into())
+                }
+            }
+        }
     }
 
     fn build_image(&self, sh: &Shell, image: &str, containerfile: &PathBuf) -> Result<()> {
@@ -118,91 +154,18 @@ impl ContainerImages {
         .map(|_| ())
     }
 
-    fn load_image(&self, sh: &Shell, image: &str) -> Result<()> {
-        let tag = &self.tag;
-        let kind_cluster = self.kind_cluster.name();
-
-        info!("loading image {image:?} to kind cluster {kind_cluster:?}");
-        cmd!(
-            sh,
-            "kind load docker-image {image}:{tag} --name {kind_cluster}"
-        )
-        .run()
-        .map_err(|_| ImageError::Load(image.to_string(), tag.to_string()).into())
-        .map(|_| ())
-    }
-
-    fn start_image(&self, sh: &Shell, image: &str, workload: &Option<Workload>) -> Result<()> {
-        info!("{image}");
-        let image = *image.split(":").collect::<Vec<_>>().first().unwrap();
-        let image = *image.split("/").collect::<Vec<_>>().last().unwrap();
-        info!("{image}");
-
-        let Some(workload) = workload else {
-            return Ok(());
-        };
-
-        let (workload, namespace, name) = match workload {
-            Workload::DaemonSet(d) => ("daemonset", &d.namespace, &d.name),
-            Workload::Deployment(d) => ("deployment", &d.namespace, &d.name),
-        };
-
-        let k8s_ctx = self.kind_cluster.k8s_context();
-        info!("restarting kubernetes {workload}/{name}");
-        cmd!(
-            sh,
-            "kubectl --context={k8s_ctx} -n {namespace} rollout restart {workload}/{name}"
-        )
-        .run()
-        .map_err(|_| ImageError::Start(workload.to_string(), name.to_string()).into())
-        .map(|_| ())
-    }
-
-    // currently sync, provisional async in case cmd is replaced
-    pub async fn rollout_restart(&self, wait_status: bool) -> Result<()> {
-        let workload_image_tags = self.workload_image_tags();
-        let sh = Shell::new().map_err(|e| KustomizeError::Execution(e.to_string()))?;
-        let k8s_ctx = self.kind_cluster.k8s_context();
-
-        for workload_image_tag in &workload_image_tags {
-            let (workload, namespace, name, image, tag) =
-                workload_image_tag.workload_namespace_name_image_tag();
-            cmd!(
-            sh,
-            "kubectl --context={k8s_ctx} set image -n {namespace} {workload}/{name} *={image}:{tag}"
-        )
-                .run()
-                .map_err(|e| KindError::Execution(e.to_string()))?;
-
-            cmd!(
-                sh,
-                "kubectl --context={k8s_ctx} rollout restart -n {namespace} {workload}/{name}"
-            )
-            .run()
-            .map_err(|e| KindError::Execution(e.to_string()))?;
-
-            if wait_status {
-                cmd!(
-            sh,
-            "kubectl --context={k8s_ctx} rollout status -n {namespace} {workload}/{name} --timeout 60s"
-        )
-                .run()
-                .map_err(|e| KindError::Execution(e.to_string()))?
-            }
-        }
-        Ok(())
-    }
-
-    fn workload_image_tags(&self) -> Vec<WorkloadImageTag> {
+    pub fn get_workloads(&self) -> Vec<WorkloadImageTag> {
         self.containers
             .iter()
             .filter(|c| c.workload.is_some())
             .map(|c| {
                 let image_tag = self.image_tag(c);
                 WorkloadImageTag {
-                    image: image_tag.image,
-                    tag: image_tag.tag,
-                    workload: c.workload.clone().unwrap(),
+                    image_tag: Some(ImageTag {
+                        image: image_tag.image,
+                        tag: image_tag.tag,
+                    }),
+                    id: c.workload.clone().unwrap(),
                 }
             })
             .collect()
@@ -218,27 +181,6 @@ impl ContainerImages {
         ImageTag {
             image,
             tag: self.tag.to_string(),
-        }
-    }
-}
-
-impl WorkloadImageTag {
-    fn workload_namespace_name_image_tag(&self) -> (&str, &str, &str, &str, &str) {
-        match &self.workload {
-            Workload::DaemonSet(id) => (
-                "daemonset",
-                id.namespace.as_str(),
-                id.name.as_str(),
-                self.image.as_str(),
-                self.tag.as_str(),
-            ),
-            Workload::Deployment(id) => (
-                "deployment",
-                id.namespace.as_str(),
-                id.name.as_str(),
-                self.image.as_str(),
-                self.tag.as_str(),
-            ),
         }
     }
 }

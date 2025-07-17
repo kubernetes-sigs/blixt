@@ -3,10 +3,10 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddrV4};
 use std::time::Duration;
 use std::{env, io};
 
-use controlplane::{K8sError, controllers};
+use controlplane::{K8sError, NamespacedName, controllers};
 use gateway_api::apis::standard::gateways::Gateway;
 use tests::infrastructure::{
-    ContainerImages, ContainerRuntime, ImageAction, KindCluster, KustomizeDeployments,
+    ContainerImages, ContainerRuntime, ImageAction, KindCluster, KustomizeDeployments, Workload,
     cargo_workspace_dir, default_containers,
 };
 use tests::{Error, Result, TestMode};
@@ -28,7 +28,7 @@ async fn integration_tcp_route() -> Result<()> {
     // TODO: the test is not successful on environments where a controlplane or dataplane is already
     // successfully running; ensure this cluster is fresh
     // for further details please refer to the FIXME in tests::deployments::default_containers
-    match cluster.delete() {
+    match cluster.delete().await {
         Ok(_) => (),
         Err(e) => {
             debug!("failed to delete cluster {} error {e:?}", cluster.name())
@@ -42,9 +42,12 @@ async fn integration_tcp_route() -> Result<()> {
 
     // patches the workload images and runs a rollout restart & status
     // this is the first time the containers launch, as the default deployment is on "latest" tag
-    images.rollout_restart(true).await?;
+    let workloads = images.get_workloads();
+    cluster
+        .rollouts(&workloads, Some(Duration::from_secs(60)))
+        .await?;
 
-    let k8s_client = cluster.get_client().await?;
+    let k8s_client = cluster.k8s_client().await?;
     let tcp_route_namespace = "blixt-samples-tcproute";
     let tcp_route_basename = "blixt-tcproute-sample";
     let tcp_route_port = 8080;
@@ -119,7 +122,9 @@ async fn prepare_default_cluster(
     cluster: &KindCluster,
     image_tag: &str,
 ) -> Result<ContainerImages> {
-    cluster.start()?;
+    cluster.start().await?;
+    let images = default_images(cluster.clone(), image_tag)?;
+    images.process().await?;
 
     let gateway_api_metallb = vec![
         "https://github.com/metallb/metallb/config/native?ref=v0.13.11",
@@ -129,8 +134,15 @@ async fn prepare_default_cluster(
     let deployments = KustomizeDeployments::new(cluster.clone(), gateway_api_metallb)?;
     deployments.apply().await?;
 
-    let images = default_images(cluster.clone(), image_tag)?;
-    images.process().await?;
+    cluster
+        .rollout_status(
+            Workload::Deployment(NamespacedName {
+                name: "controller".to_string(),
+                namespace: "metallb-system".to_string(),
+            }),
+            Duration::from_secs(30),
+        )
+        .await?;
 
     let deployments = vec!["../config/metallb/", "../config/default/"];
     let deployments = KustomizeDeployments::new(cluster.clone(), deployments)?;
@@ -149,7 +161,7 @@ fn default_images(cluster: KindCluster, image_tag: &str) -> Result<ContainerImag
         action: ImageAction::default(),
         tag: image_tag.to_string(),
         registry: Some("ghcr.io/kubernetes-sigs".to_string()),
-        kind_cluster: cluster.clone(),
+        kind_cluster: Some(cluster.clone()),
     };
     Ok(images)
 }

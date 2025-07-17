@@ -1,8 +1,9 @@
-use crate::infrastructure::{KindCluster, KindError};
-use crate::{Error, Result};
 use std::path::{Path, PathBuf};
 use thiserror::Error as ThisError;
 use xshell::{Shell, cmd};
+
+use crate::infrastructure::{KindCluster, KindError};
+use crate::{Error, Result};
 
 #[derive(ThisError, Debug)]
 pub enum KustomizeError {
@@ -59,7 +60,7 @@ impl KustomizeDeployments {
     }
 
     pub async fn apply(&self) -> Result<()> {
-        self.cluster.ready()?;
+        self.cluster.ready().await?;
 
         let k8s_ctx = self.cluster.k8s_context();
         for deployment in &self.kustomize_paths {

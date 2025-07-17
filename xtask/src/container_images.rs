@@ -56,7 +56,10 @@ pub async fn run(opts: CliArgs) -> Result<(), anyhow::Error> {
         action: opts.action.into(),
         tag: opts.tag,
         registry: Some(opts.registry),
-        kind_cluster: KindCluster::new(&opts.kind_cluster, opts.container_runtime.into())?,
+        kind_cluster: Some(KindCluster::new(
+            &opts.kind_cluster,
+            opts.container_runtime.into(),
+        )?),
     };
 
     images.process().await.map_err(|e| anyhow!("{}", e))
@@ -67,7 +70,7 @@ impl From<ImageAction> for infrastructure::ImageAction {
         match value {
             ImageAction::Build => infrastructure::ImageAction::Build,
             ImageAction::Load => infrastructure::ImageAction::Load,
-            ImageAction::Start => infrastructure::ImageAction::Start,
+            ImageAction::Start => infrastructure::ImageAction::Rollout,
         }
     }
 }
