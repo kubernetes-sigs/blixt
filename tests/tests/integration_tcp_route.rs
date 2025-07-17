@@ -123,6 +123,7 @@ async fn prepare_default_cluster(
     image_tag: &str,
 ) -> Result<ContainerImages> {
     cluster.start().await?;
+
     let images = default_images(cluster.clone(), image_tag)?;
     images.process().await?;
 
@@ -140,7 +141,7 @@ async fn prepare_default_cluster(
                 name: "controller".to_string(),
                 namespace: "metallb-system".to_string(),
             }),
-            Duration::from_secs(30),
+            Duration::from_secs(60),
         )
         .await?;
 

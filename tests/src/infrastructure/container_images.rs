@@ -13,7 +13,7 @@ pub enum ImageAction {
     #[default]
     Load,
     Rollout,
-    RolloutWait,
+    RolloutStatus,
 }
 
 pub struct ContainerImages {
@@ -71,13 +71,13 @@ impl ContainerImages {
         };
 
         for container in self.containers.iter() {
-            let image = self.image_tag(container).image;
+            let image_tag = self.image_tag(container);
 
             if matches!(self.action, ImageAction::Build)
                 || matches!(self.action, ImageAction::Load)
                 || matches!(self.action, ImageAction::Rollout)
             {
-                self.build_image(&sh, &image, &container.containerfile)?
+                self.build_image(&sh, &image_tag.image, &container.containerfile)?
             };
 
             let Some(cluster) = &self.kind_cluster else {
@@ -87,24 +87,21 @@ impl ContainerImages {
             if matches!(self.action, ImageAction::Load)
                 || matches!(self.action, ImageAction::Rollout)
             {
-                cluster.load_image(&image, &self.tag).await?
+                cluster.load_image(&image_tag.image, &image_tag.tag).await?
             };
 
             if matches!(self.action, ImageAction::Rollout)
-                || matches!(self.action, ImageAction::RolloutWait)
+                || matches!(self.action, ImageAction::RolloutStatus)
             {
                 if let Some(workload_id) = &container.workload {
                     let workload = WorkloadImageTag {
-                        image_tag: Some(ImageTag {
-                            image: image.to_string(),
-                            tag: self.tag.to_string(),
-                        }),
+                        image_tag: Some(image_tag),
                         id: workload_id.clone(),
                     };
                     if matches!(self.action, ImageAction::Rollout) {
                         cluster.rollout(&workload, None).await?;
                     };
-                    if matches!(self.action, ImageAction::RolloutWait) {
+                    if matches!(self.action, ImageAction::RolloutStatus) {
                         cluster
                             .rollout(&workload, Some(Duration::from_secs(60)))
                             .await?;
@@ -122,7 +119,7 @@ impl ContainerImages {
     fn verify_config(&self) -> Result<()> {
         match self.action {
             ImageAction::Build => Ok(()),
-            ImageAction::Load | ImageAction::Rollout | ImageAction::RolloutWait => {
+            ImageAction::Load | ImageAction::Rollout | ImageAction::RolloutStatus => {
                 if self.kind_cluster.is_some() {
                     Ok(())
                 } else {
@@ -161,10 +158,7 @@ impl ContainerImages {
             .map(|c| {
                 let image_tag = self.image_tag(c);
                 WorkloadImageTag {
-                    image_tag: Some(ImageTag {
-                        image: image_tag.image,
-                        tag: image_tag.tag,
-                    }),
+                    image_tag: Some(image_tag),
                     id: c.workload.clone().unwrap(),
                 }
             })
@@ -182,5 +176,13 @@ impl ContainerImages {
             image,
             tag: self.tag.to_string(),
         }
+    }
+
+    pub async fn load_images(&self, cluster: &KindCluster) -> Result<()> {
+        for container in self.containers.iter() {
+            let image_tag = self.image_tag(container);
+            cluster.load_image(&image_tag.image, &image_tag.tag).await?;
+        }
+        Ok(())
     }
 }

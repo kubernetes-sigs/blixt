@@ -30,6 +30,9 @@ pub enum KindError {
 
 // NOTE: public facing methods are having provisional async even this is at the moment not utilized
 // this is likely useful when replacing the xshell/cmds (e.g. with api calls through async clients)
+// using tokio::process::Command to allow spawning tasks for the processes could be another approach
+// xshell is not thread safe, but it would be great to e.g. spawn tokio tasks for
+// cluster build and image build in parallel
 impl KindCluster {
     pub fn new(name: &str, runtime: ContainerRuntime) -> Result<Self> {
         Ok(KindCluster {

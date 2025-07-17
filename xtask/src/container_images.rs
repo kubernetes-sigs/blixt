@@ -14,7 +14,7 @@ pub struct CliArgs {
     #[clap(default_value = "latest")]
     pub tag: String,
 
-    #[clap(value_enum, default_value_t = ImageAction::Start)]
+    #[clap(value_enum, default_value_t = ImageAction::Rollout)]
     pub action: ImageAction,
 
     #[clap(default_value = "ghcr.io/kubernetes-sigs")]
@@ -35,7 +35,8 @@ pub enum ImageAction {
     Build,
     #[default]
     Load,
-    Start,
+    Rollout,
+    RolloutStatus,
 }
 
 #[derive(ValueEnum, Default, Debug, Clone)]
@@ -70,7 +71,8 @@ impl From<ImageAction> for infrastructure::ImageAction {
         match value {
             ImageAction::Build => infrastructure::ImageAction::Build,
             ImageAction::Load => infrastructure::ImageAction::Load,
-            ImageAction::Start => infrastructure::ImageAction::Rollout,
+            ImageAction::Rollout => infrastructure::ImageAction::Rollout,
+            ImageAction::RolloutStatus => infrastructure::ImageAction::RolloutStatus,
         }
     }
 }
