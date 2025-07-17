@@ -5,9 +5,9 @@ use std::{env, io};
 
 use controlplane::{K8sError, controllers};
 use gateway_api::apis::standard::gateways::Gateway;
-use tests::deployments::{
-    ContainerRuntime, ImageAction, Images, KindCluster, KustomizeDeployments, cargo_workspace_dir,
-    default_containers,
+use tests::infrastructure::{
+    ContainerImages, ContainerRuntime, ImageAction, KindCluster, KustomizeDeployments,
+    cargo_workspace_dir, default_containers,
 };
 use tests::{Error, Result, TestMode};
 use tokio::io::AsyncWriteExt;
@@ -115,7 +115,10 @@ async fn integration_tcp_route() -> Result<()> {
     Ok(())
 }
 
-async fn prepare_default_cluster(cluster: &KindCluster, image_tag: &str) -> Result<Images> {
+async fn prepare_default_cluster(
+    cluster: &KindCluster,
+    image_tag: &str,
+) -> Result<ContainerImages> {
     cluster.start()?;
 
     let gateway_api_metallb = vec![
@@ -136,9 +139,9 @@ async fn prepare_default_cluster(cluster: &KindCluster, image_tag: &str) -> Resu
 }
 
 /// builds and loads controlplane, dataplane, udp_test_server
-fn default_images(cluster: KindCluster, image_tag: &str) -> Result<Images, Error> {
+fn default_images(cluster: KindCluster, image_tag: &str) -> Result<ContainerImages, Error> {
     let cargo_workspace_dir = cargo_workspace_dir("tests")?;
-    let images = Images {
+    let images = ContainerImages {
         cargo_workspace_dir: cargo_workspace_dir.clone(),
         container_runtime: ContainerRuntime::default(),
         container_host: env::var("CONTAINER_HOST").ok(),

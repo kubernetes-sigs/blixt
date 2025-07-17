@@ -1,5 +1,5 @@
 mod container_images;
-mod kind;
+mod kind_cluster;
 mod kustomize;
 
 use std::env;
@@ -7,11 +7,11 @@ use std::fmt::{Debug, Display, Formatter};
 use std::path::PathBuf;
 
 pub use container_images::Container;
+pub use container_images::ContainerImages;
 pub use container_images::ImageAction;
 pub use container_images::ImageError;
-pub use container_images::Images;
-pub use kind::KindCluster;
-pub use kind::KindError;
+pub use kind_cluster::KindCluster;
+pub use kind_cluster::KindError;
 pub use kustomize::KustomizeDeployments;
 pub use kustomize::KustomizeError;
 

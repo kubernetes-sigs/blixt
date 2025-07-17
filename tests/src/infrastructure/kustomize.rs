@@ -1,4 +1,4 @@
-use crate::deployments::{KindCluster, KindError};
+use crate::infrastructure::{KindCluster, KindError};
 use crate::{Error, Result};
 use std::path::{Path, PathBuf};
 use thiserror::Error as ThisError;

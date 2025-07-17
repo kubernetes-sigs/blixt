@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::deployments::{ContainerRuntime, ContainerState};
+use crate::infrastructure::{ContainerRuntime, ContainerState};
 use kube::config::KubeConfigOptions;
 use kube::{Client, Config};
 use thiserror::Error as ThisError;
@@ -22,6 +22,7 @@ pub enum KindError {
     #[error("failed to create client {1} for k8s context {0:?}")]
     Client(String, String),
 }
+
 impl KindCluster {
     pub fn new(name: &str, runtime: ContainerRuntime) -> Result<Self> {
         Ok(KindCluster {

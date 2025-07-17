@@ -4,7 +4,7 @@ use tracing::info;
 use xshell::{Shell, cmd};
 
 use crate::Result;
-use crate::deployments::{ContainerRuntime, KindCluster, KindError, KustomizeError, Workload};
+use crate::infrastructure::{ContainerRuntime, KindCluster, KindError, KustomizeError, Workload};
 
 #[derive(Clone, Debug, Default)]
 pub enum ImageAction {
@@ -14,7 +14,7 @@ pub enum ImageAction {
     Start,
 }
 
-pub struct Images {
+pub struct ContainerImages {
     pub cargo_workspace_dir: String,
     pub container_runtime: ContainerRuntime,
     pub container_host: Option<String>,
@@ -48,18 +48,18 @@ pub enum ImageError {
     #[error("Failed to create shell: {0}")]
     CouldNotCreateShell(xshell::Error),
     #[error("Failed to create shell: {0}")]
-    CargoBuildFailed(xshell::Error),
+    CargoBuild(xshell::Error),
     #[error("Failed to build image {1}:{2} with containerfile {0}")]
-    ImageBuildFailed(PathBuf, String, String),
+    Build(PathBuf, String, String),
     #[error("Failed to load image: {0}:{1}")]
-    ImageLoadFailed(String, String),
+    Load(String, String),
     #[error("Failed to start image: {0}:{1}")]
-    ImageStartFailed(String, String),
+    Start(String, String),
 }
 
 // TODO: eventually extract KindCluster to isolate build
 // and call load(kind: KindCluster), and start(kind: KindCluster)
-impl Images {
+impl ContainerImages {
     pub async fn process(&self) -> Result<()> {
         let sh = match Shell::new() {
             Ok(sh) => sh,
@@ -69,7 +69,7 @@ impl Images {
         info!("running cargo build");
         cmd!(sh, "cargo build")
             .run()
-            .map_err(ImageError::CargoBuildFailed)?;
+            .map_err(ImageError::CargoBuild)?;
 
         let _env_guard = if let Some(container_host) = &self.container_host {
             sh.push_env("CONTAINER_HOST", container_host)
@@ -113,8 +113,7 @@ impl Images {
         )
         .run()
         .map_err(|_| {
-            ImageError::ImageBuildFailed(containerfile.clone(), image.to_string(), tag.to_string())
-                .into()
+            ImageError::Build(containerfile.clone(), image.to_string(), tag.to_string()).into()
         })
         .map(|_| ())
     }
@@ -129,7 +128,7 @@ impl Images {
             "kind load docker-image {image}:{tag} --name {kind_cluster}"
         )
         .run()
-        .map_err(|_| ImageError::ImageLoadFailed(image.to_string(), tag.to_string()).into())
+        .map_err(|_| ImageError::Load(image.to_string(), tag.to_string()).into())
         .map(|_| ())
     }
 
@@ -155,7 +154,7 @@ impl Images {
             "kubectl --context={k8s_ctx} -n {namespace} rollout restart {workload}/{name}"
         )
         .run()
-        .map_err(|_| ImageError::ImageStartFailed(workload.to_string(), name.to_string()).into())
+        .map_err(|_| ImageError::Start(workload.to_string(), name.to_string()).into())
         .map(|_| ())
     }
 

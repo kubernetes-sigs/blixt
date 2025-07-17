@@ -28,7 +28,7 @@ use kube::api::ListParams;
 use kube::{Api, Client};
 use std::fmt::{Debug, Display, Formatter};
 use thiserror::Error;
-use tracing::{error, warn};
+use tracing::error;
 
 use crate::controllers::{GatewayError, TCPRouteError};
 use crate::dataplane::DataplaneError;
@@ -169,7 +169,7 @@ pub async fn check_gateway_api_installed(k8s_client: Client, namespace: &str) ->
         .await
         .map_err(|e| match e {
             kube::Error::Api(kube::core::ErrorResponse { code: 404, .. }) => {
-                warn!("Listing UDPRoute on k8s API error 404.");
+                error!("Listing UDPRoute on k8s API error 404.");
                 K8sError::GatewayApiNotInstalled("UDPRoute".to_string(), Box::new(e))
             }
             _ => K8sError::client(e),

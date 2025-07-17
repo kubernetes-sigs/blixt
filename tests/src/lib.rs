@@ -1,7 +1,7 @@
-pub mod deployments;
+pub mod infrastructure;
 
-use crate::deployments::KustomizeError;
-use crate::deployments::{ImageError, KindError};
+use crate::infrastructure::KustomizeError;
+use crate::infrastructure::{ImageError, KindError};
 use controlplane::K8sError;
 use std::path::PathBuf;
 use thiserror::Error as ThisError;

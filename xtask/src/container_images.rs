@@ -4,7 +4,9 @@ use std::path::PathBuf;
 use anyhow::anyhow;
 use clap::{Parser, ValueEnum};
 use tests::TestMode;
-use tests::deployments::{self, Images, KindCluster, cargo_workspace_dir, default_containers};
+use tests::infrastructure::{
+    self, ContainerImages, KindCluster, cargo_workspace_dir, default_containers,
+};
 use tracing::info;
 
 #[derive(Debug, Parser)]
@@ -46,7 +48,7 @@ pub async fn run(opts: CliArgs) -> Result<(), anyhow::Error> {
     info!("{:?}", opts);
 
     let cargo_workspace_dir = cargo_workspace_dir("xtask")?;
-    let images = Images {
+    let images = ContainerImages {
         cargo_workspace_dir: cargo_workspace_dir.clone(),
         container_runtime: opts.container_runtime.clone().into(),
         container_host: env::var("CONTAINER_HOST").ok(),
@@ -60,20 +62,20 @@ pub async fn run(opts: CliArgs) -> Result<(), anyhow::Error> {
     images.process().await.map_err(|e| anyhow!("{}", e))
 }
 
-impl From<ImageAction> for deployments::ImageAction {
+impl From<ImageAction> for infrastructure::ImageAction {
     fn from(value: ImageAction) -> Self {
         match value {
-            ImageAction::Build => deployments::ImageAction::Build,
-            ImageAction::Load => deployments::ImageAction::Load,
-            ImageAction::Start => deployments::ImageAction::Start,
+            ImageAction::Build => infrastructure::ImageAction::Build,
+            ImageAction::Load => infrastructure::ImageAction::Load,
+            ImageAction::Start => infrastructure::ImageAction::Start,
         }
     }
 }
 
-impl From<ContainerRuntime> for deployments::ContainerRuntime {
+impl From<ContainerRuntime> for infrastructure::ContainerRuntime {
     fn from(value: ContainerRuntime) -> Self {
         match value {
-            ContainerRuntime::Podman => deployments::ContainerRuntime::Podman,
+            ContainerRuntime::Podman => infrastructure::ContainerRuntime::Podman,
         }
     }
 }
