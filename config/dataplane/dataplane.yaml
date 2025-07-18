@@ -28,7 +28,7 @@ spec:
           - containerPort: 9874
         env:
         - name: RUST_LOG
-          value: "trace,tonic=info,h2=info,tracing=info"
+          value: "aya=trace,aya_obj=trace,api_server=trace,ebpf=trace,loader=trace"
         - name: RUST_BACKTRACE
           value: "1"
         imagePullPolicy: IfNotPresent

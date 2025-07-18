@@ -9,15 +9,16 @@ use std::sync::Arc;
 
 use anyhow::Error;
 use aya::maps::{HashMap, MapData, MapError};
+use common::{
+    BACKENDS_ARRAY_CAPACITY, Backend, BackendKey, BackendList, ClientKey, LoadBalancerMapping,
+};
 use tokio::sync::Mutex;
 use tonic::{Request, Response, Status};
+use tracing::debug;
 
 use crate::backends::backends_server::Backends;
 use crate::backends::{Confirmation, InterfaceIndexConfirmation, PodIp, Targets, Vip};
 use crate::netutils::if_index_for_routing_ip;
-use common::{
-    BACKENDS_ARRAY_CAPACITY, Backend, BackendKey, BackendList, ClientKey, LoadBalancerMapping,
-};
 
 pub struct BackendService {
     backends_map: Arc<Mutex<HashMap<MapData, BackendKey, BackendList>>>,
@@ -160,13 +161,15 @@ impl Backends for BackendService {
             backends_len: count,
         };
         match self.insert_and_reset_index(key, backend_list).await {
-            Ok(_) => Ok(Response::new(Confirmation {
-                confirmation: format!(
-                    "success, vip {}:{} was updated with {count} backends",
+            Ok(_) => {
+                let confirmation = format!(
+                    "Success, vip {}:{} was updated with {count} backends",
                     Ipv4Addr::from(vip.ip),
                     vip.port,
-                ),
-            })),
+                );
+                debug!("Confirming: {}", confirmation);
+                Ok(Response::new(Confirmation { confirmation }))
+            }
             Err(err) => Err(Status::internal(format!("failure: {err}"))),
         }
     }
@@ -182,13 +185,15 @@ impl Backends for BackendService {
         let addr_ddn = Ipv4Addr::from(vip.ip);
 
         match self.remove(key).await {
-            Ok(()) => Ok(Response::new(Confirmation {
-                confirmation: format!("success, vip {addr_ddn}:{} was deleted", vip.port),
-            })),
+            Ok(()) => {
+                let confirmation = format!("Success, vip {addr_ddn}:{} was deleted", vip.port);
+                debug!("Confirming: {}", confirmation);
+                Ok(Response::new(Confirmation { confirmation }))
+            }
             Err(err) if err.to_string().contains("syscall failed with code -1") => {
-                Ok(Response::new(Confirmation {
-                    confirmation: format!("success, vip {addr_ddn}:{} did not exist", vip.port),
-                }))
+                let confirmation = format!("Success, vip {addr_ddn}:{} did not exist", vip.port);
+                debug!("Confirming: {}", confirmation);
+                Ok(Response::new(Confirmation { confirmation }))
             }
             Err(err) => Err(Status::internal(format!("failure: {err}"))),
         }

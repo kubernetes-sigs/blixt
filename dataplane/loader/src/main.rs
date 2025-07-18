@@ -15,7 +15,10 @@ use aya::{Ebpf, include_bytes_aligned};
 use aya_log::EbpfLogger;
 use clap::Parser;
 use common::{BackendKey, BackendList, ClientKey, LoadBalancerMapping};
-use log::{info, warn};
+use tracing::info;
+use tracing::warn;
+use tracing_log::LogTracer;
+use tracing_subscriber::EnvFilter;
 
 /// Command-line options for the application.
 ///
@@ -64,9 +67,16 @@ struct Opt {
 /// ```
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let opt = Opt::parse();
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_file(true)
+        .with_line_number(true)
+        .init();
 
-    env_logger::init();
+    LogTracer::init()?;
+
+    let opts = Opt::parse();
+    info!("cli options: {:?}", opts);
 
     info!("loading ebpf programs");
 
@@ -82,27 +92,27 @@ async fn main() -> Result<(), anyhow::Error> {
         warn!("failed to initialize eBPF logger: {e}");
     }
 
-    info!("attaching tc_ingress program to {}", &opt.iface);
+    info!("attaching tc_ingress program to {}", &opts.iface);
 
-    let _ = tc::qdisc_add_clsact(&opt.iface);
+    let _ = tc::qdisc_add_clsact(&opts.iface);
     let ingress_program: &mut SchedClassifier =
         bpf_program.program_mut("tc_ingress").unwrap().try_into()?;
     ingress_program.load()?;
     ingress_program
-        .attach(&opt.iface, TcAttachType::Ingress)
+        .attach(&opts.iface, TcAttachType::Ingress)
         .context("failed to attach the ingress TC program")?;
 
-    info!("attaching tc_egress program to {}", &opt.iface);
+    info!("attaching tc_egress program to {}", &opts.iface);
 
     let egress_program: &mut SchedClassifier =
         bpf_program.program_mut("tc_egress").unwrap().try_into()?;
     egress_program.load()?;
     egress_program
-        .attach(&opt.iface, TcAttachType::Egress)
+        .attach(&opts.iface, TcAttachType::Egress)
         .context("failed to attach the egress TC program")?;
 
     info!("starting api server");
-    info!("Using tls config: {:?}", &opt.tls_config);
+    info!("Using tls config: {:?}", &opts.tls_config);
     let backends: HashMap<_, BackendKey, BackendList> = HashMap::try_from(
         bpf_program
             .take_map("BACKENDS")
@@ -125,7 +135,7 @@ async fn main() -> Result<(), anyhow::Error> {
         backends,
         gateway_indexes,
         tcp_conns,
-        opt.tls_config,
+        opts.tls_config,
     )
     .await?;
 

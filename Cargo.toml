@@ -24,20 +24,13 @@ aya = { version = "0.13.1" }
 aya-log = { version = "0.2.1" }
 chrono = { version = "0.4.41", default-features = false }
 clap = { version = "4.5", default-features = true }
-env_logger = { version = "0.11", default-features = false }
 gateway-api = { version = "0.16.0", default-features = false }
 futures = { version="0.3.31", default-features = true }
 kube = { version = "1.1.0", default-features = false }
 k8s-openapi = { version = "0.25.0", default-features = false }
-libc = { version = "0.2", default-features = false }
-log = { version = "0.4", default-features = false }
-memoffset = { version = "0.9", default-features = false }
-network-types = { version = "0.0.8", default-features = false }
 prost = { version = "0.13.5", default-features = false }
 regex = { version = "1", default-features = true }
-serde = { version = "1.0.219", default-features = false }
 serde_json = { version = "1.0.140", default-features = false }
-serde_yaml = { version = "0.9.34", default-features = false }
 thiserror = { version = "2.0.12", default-features = true }
 tokio = { version = "1.46.1", default-features = false }
 tonic = { version = "0.13.1", default-features = false }
@@ -45,4 +38,5 @@ tonic-build = { version = "0.13.1", default-features = false, features = ["prost
 tonic-health = { version = "0.13.1", default-features = false }
 tracing = { version = "0.1.41", default-features = false }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "env-filter", "fmt"] }
+tracing-log = { version = "0.2.0" }
 xshell = "0.2.7"

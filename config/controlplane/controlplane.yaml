@@ -49,7 +49,7 @@ spec:
               - "ALL"
         env:
         - name: RUST_LOG
-          value: "trace,tonic=info,h2=info,tracing=info"
+          value: "controlplane=trace"
         - name: RUST_BACKTRACE
           value: "1"
         livenessProbe:

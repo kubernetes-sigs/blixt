@@ -10,7 +10,7 @@ anyhow = { workspace = true }
 aya = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 common = { path = "../common", features = ["user"] }
-log = { workspace = true }
+tracing.workspace = true
 netlink-packet-core = { version = "0.7.0" }
 netlink-packet-route = { version = "0.24.0" }
 netlink-sys = { version = "0.8.7" }
