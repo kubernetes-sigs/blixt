@@ -20,7 +20,7 @@ use clap::Parser;
 use controlplane::consts::{BLIXT_APP_LABEL, BLIXT_DATAPLANE_COMPONENT_LABEL, BLIXT_NAMESPACE};
 use controlplane::controllers::{GatewayClassController, GatewayController, TCPRouteController};
 use controlplane::dataplane::DataplaneClientManager;
-use controlplane::{Result, check_gateway_api_installed};
+use controlplane::{GrpcError, K8sError, Result, check_gateway_api_installed};
 use kube::Client;
 use tokio::task::JoinHandle;
 use tokio::try_join;
@@ -72,9 +72,7 @@ async fn main() {
 }
 
 pub async fn run(opts: &Options) -> Result<()> {
-    let k8s_client = Client::try_default()
-        .await
-        .expect("failed to create kube Client");
+    let k8s_client = Client::try_default().await.map_err(K8sError::client)?;
 
     check_gateway_api_installed(k8s_client.clone(), &opts.service_namespace).await?;
 
@@ -107,7 +105,7 @@ pub async fn run(opts: &Options) -> Result<()> {
 
 // TODO: integrate with DataplaneClientManager connection status
 // only get healthy once the dataplane pod connections are established
-async fn setup_health_checks(addr: IpAddr, port: u16) -> Result<JoinHandle<()>> {
+async fn setup_health_checks(addr: IpAddr, port: u16) -> Result<JoinHandle<Result<()>>> {
     let healthchecks = tokio::spawn(async move {
         let (_, health_service) = tonic_health::server::health_reporter();
         let server_builder = Server::builder();
@@ -124,9 +122,7 @@ async fn setup_health_checks(addr: IpAddr, port: u16) -> Result<JoinHandle<()>> 
         let server = server_builder.serve(addr, health_service);
 
         debug!("gRPC Health Checking service listens on {addr}");
-        server
-            .await
-            .expect("Failed to serve gRPC Health Checking service");
+        server.await.map_err(|e| GrpcError::Transport(e).into())
     });
     Ok(healthchecks)
 }

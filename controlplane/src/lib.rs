@@ -38,6 +38,8 @@ pub enum Error {
     #[error(transparent)]
     K8s(#[from] K8sError),
     #[error(transparent)]
+    GrpcError(#[from] GrpcError),
+    #[error(transparent)]
     Dataplane(#[from] DataplaneError),
     #[error(transparent)]
     TCPRoute(#[from] TCPRouteError),
@@ -59,6 +61,12 @@ pub enum K8sError {
     MissingResourceName,
     #[error("GatewayApi Custom Resource Definitions ({0}) are likely not installed.")]
     GatewayApiNotInstalled(String, Box<kube::Error>),
+}
+
+#[derive(Error, Debug)]
+pub enum GrpcError {
+    #[error("{0}")]
+    Transport(#[from] tonic::transport::Error),
 }
 
 impl K8sError {
