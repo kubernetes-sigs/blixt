@@ -16,8 +16,8 @@ kube = { workspace = true, features = ["runtime", "client", "derive", "rustls-tl
 k8s-openapi = { workspace = true, features = ["v1_32", "schemars"] }
 chrono = { workspace = true, features = ["serde"] }
 serde_json = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["fmt"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
 thiserror = { workspace = true }
 gateway-api = { workspace = true }
 tonic = { workspace = true, features = ["tls-ring"] }

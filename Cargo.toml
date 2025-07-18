@@ -44,5 +44,5 @@ tonic = { version = "0.13.1", default-features = false }
 tonic-build = { version = "0.13.1", default-features = false, features = ["prost"] }
 tonic-health = { version = "0.13.1", default-features = false }
 tracing = { version = "0.1.41", default-features = false }
-tracing-subscriber = { version = "0.3", default-features = false }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "env-filter", "fmt"] }
 xshell = "0.2.7"

@@ -17,16 +17,16 @@ limitations under the License.
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
 use clap::Parser;
+use controlplane::consts::{BLIXT_APP_LABEL, BLIXT_DATAPLANE_COMPONENT_LABEL, BLIXT_NAMESPACE};
+use controlplane::controllers::{GatewayClassController, GatewayController, TCPRouteController};
+use controlplane::dataplane::DataplaneClientManager;
+use controlplane::{Result, check_gateway_api_installed};
 use kube::Client;
 use tokio::task::JoinHandle;
 use tokio::try_join;
 use tonic::transport::Server;
 use tracing::{debug, error, info};
-
-use controlplane::consts::{BLIXT_APP_LABEL, BLIXT_DATAPLANE_COMPONENT_LABEL, BLIXT_NAMESPACE};
-use controlplane::controllers::{GatewayClassController, GatewayController, TCPRouteController};
-use controlplane::dataplane::DataplaneClientManager;
-use controlplane::{Result, check_gateway_api_installed};
+use tracing_subscriber::EnvFilter;
 
 const BEFORE_HELP_MESSAGE: &str = "
 Blixt Controlplane
@@ -56,6 +56,7 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_file(true)
         .with_line_number(true)
+        .with_env_filter(EnvFilter::from_default_env())
         .init();
 
     let opts = Options::parse();
