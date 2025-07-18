@@ -1,9 +1,7 @@
 [package]
 name = "ebpf"
 version = "0.1.0"
-# FIXME: upgrade to 2024 as the rest of the project is already on 2024
-# are there technical reasons to stay on 2021 for ebpf
-edition = "2021"
+edition = "2024"
 publish = false
 
 [dependencies]
@@ -15,7 +13,7 @@ memoffset = "0.9"
 network-types = "0.0.5"
 
 [[bin]]
-name = "loader"
+name = "ebpf"
 path = "src/main.rs"
 
 [profile.dev]
