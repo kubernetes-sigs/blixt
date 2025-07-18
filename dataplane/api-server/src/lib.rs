@@ -16,8 +16,8 @@ use std::{
 
 use anyhow::{Context, Result};
 use aya::maps::{HashMap, MapData};
-use log::{debug, info};
 use tonic::transport::{Certificate, Identity, Server, ServerTlsConfig};
+use tracing::{debug, info};
 
 use backends::backends_server::BackendsServer;
 use common::{BackendKey, BackendList, ClientKey, LoadBalancerMapping};

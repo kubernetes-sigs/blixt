@@ -7,23 +7,20 @@ version = { workspace = true }
 
 [[bin]]
 name = "controller"
-path = "src/main.rs"
+path = "src/bin/controller.rs"
 
 [dependencies]
 futures = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 kube = { workspace = true, features = ["runtime", "client", "derive", "rustls-tls"] }
 k8s-openapi = { workspace = true, features = ["v1_32", "schemars"] }
-serde = { workspace = true, features = ["derive"] }
 chrono = { workspace = true, features = ["serde"] }
 serde_json = { workspace = true }
-serde_yaml = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["fmt"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
 thiserror = { workspace = true }
-anyhow = { workspace = true }
 gateway-api = { workspace = true }
 tonic = { workspace = true, features = ["tls-ring"] }
 tonic-health = { workspace = true }
-prost = { workspace = true }
 api-server = { path = "../dataplane/api-server" }
+clap = { workspace = true, features = ["derive"] }

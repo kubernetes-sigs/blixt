@@ -10,7 +10,7 @@ use anyhow::Context as _;
 use clap::Parser;
 
 #[cfg(target_os = "linux")]
-use crate::build_ebpf::{build_ebpf, Architecture, Options as BuildOptions};
+use crate::build_ebpf::{Architecture, Options as BuildOptions, build_ebpf};
 
 #[derive(Debug, Parser)]
 pub struct Options {

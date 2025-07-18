@@ -8,5 +8,5 @@ spec:
     port: 8080
   rules:
   - backendRefs:
-    - name: blixt-tcproute-sample
+    - name: echo-blixt-tcproute-sample
       port: 8080

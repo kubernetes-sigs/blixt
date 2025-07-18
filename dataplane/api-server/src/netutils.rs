@@ -5,12 +5,12 @@ SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 */
 
 use anyhow::Error;
-use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NetlinkPayload, NLM_F_REQUEST};
+use netlink_packet_core::{NLM_F_REQUEST, NetlinkHeader, NetlinkMessage, NetlinkPayload};
 use netlink_packet_route::{
-    route::{RouteAddress, RouteAttribute, RouteFlags, RouteHeader, RouteMessage},
     AddressFamily, RouteNetlinkMessage,
+    route::{RouteAddress, RouteAttribute, RouteFlags, RouteHeader, RouteMessage},
 };
-use netlink_sys::{protocols::NETLINK_ROUTE, Socket, SocketAddr};
+use netlink_sys::{Socket, SocketAddr, protocols::NETLINK_ROUTE};
 use std::net::Ipv4Addr;
 
 const ERR_NO_IFINDEX: &str = "no ifindex found to route";

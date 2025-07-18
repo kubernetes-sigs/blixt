@@ -1,0 +1,18 @@
+[package]
+name = "tests"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+xshell.workspace = true
+tokio = { workspace = true, features = ["rt", "macros"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+regex.workspace = true
+kube.workspace = true
+controlplane = { path = "../controlplane" }
+gateway-api = { workspace = true }
+k8s-openapi = { workspace = true, features = ["v1_32", "schemars"] }

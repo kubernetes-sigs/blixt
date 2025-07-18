@@ -1,0 +1,18 @@
+# ------------------------------------------------------------------------------
+# Image
+# ------------------------------------------------------------------------------
+
+FROM debian:trixie-slim
+
+LABEL org.opencontainers.image.source=https://github.com/kubernetes-sigs/blixt
+
+WORKDIR /
+
+RUN cp /workspace/target/debug/controller /controller \
+    && /usr/bin/ldd /controller
+
+USER 1000:1000
+
+EXPOSE 8081
+
+ENTRYPOINT [ "/controller" ]

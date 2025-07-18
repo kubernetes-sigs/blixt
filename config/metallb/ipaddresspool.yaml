@@ -1,0 +1,9 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: blixt-system-pool
+spec:
+  addresses:
+    - 10.89.0.100-10.89.0.250
+  autoAssign: true
+  avoidBuggyIPs: false

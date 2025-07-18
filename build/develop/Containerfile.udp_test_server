@@ -1,0 +1,22 @@
+# ------------------------------------------------------------------------------
+# Image
+# ------------------------------------------------------------------------------
+
+FROM debian:trixie-slim
+
+LABEL org.opencontainers.image.source=https://github.com/kubernetes-sigs/blixt
+
+WORKDIR /
+
+RUN cp /workspace/target/debug/udp-test-server /udp-test-server \
+    && /usr/bin/ldd /udp-test-server
+
+USER 1000:1000
+
+EXPOSE 9875
+
+EXPOSE 9876
+
+EXPOSE 9877
+
+ENTRYPOINT ["/udp-test-server"]

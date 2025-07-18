@@ -1,7 +1,7 @@
 use anyhow::Result;
 use api_server::config::{MutualTLSConfig, ServerOnlyTLSConfig, TLSConfig};
 use api_server::setup_tls;
-use rcgen::{generate_simple_self_signed, CertificateParams, CertifiedKey};
+use rcgen::{CertificateParams, CertifiedKey, generate_simple_self_signed};
 use std::fs;
 use tempfile::tempdir;
 use tonic::transport::Server;
