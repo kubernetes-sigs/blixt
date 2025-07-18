@@ -24,7 +24,7 @@ use thiserror::Error as ThisError;
 use tokio::sync::RwLock;
 use tonic::Request;
 use tonic::transport::Channel;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::{Error, K8sError, NamespaceName, NamespacedName};
 
@@ -115,7 +115,7 @@ impl DataplaneClientManager {
             match client.update(Request::new(targets.clone())).await {
                 Ok(resp) => {
                     info!("Successfully updated targets on dataplane pod: {pod_id}");
-                    info!("Received {:?}", resp.get_ref());
+                    debug!("Received {:?}", resp.get_ref());
                 }
                 Err(err) => {
                     return Err(DataplaneError::UpdateFailed(pod_id, err.into()).into());
@@ -134,8 +134,9 @@ impl DataplaneClientManager {
 
         for (pod_id, mut client) in clients.clone() {
             match client.delete(Request::new(vip)).await {
-                Ok(_) => {
+                Ok(resp) => {
                     info!("Successfully deleted VIP on dataplane pod: {pod_id}");
+                    debug!("Received {:?}", resp.get_ref());
                 }
                 Err(err) => {
                     warn!("Failed to delete VIP on dataplane pod {pod_id}: {err:?}");

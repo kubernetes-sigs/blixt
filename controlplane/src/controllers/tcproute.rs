@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 use kube::Client;
+use std::collections::HashSet;
 use std::net::{IpAddr, Ipv4Addr};
 use std::ops::Sub;
 use std::str::FromStr;
@@ -29,20 +30,20 @@ use gateway_api::apis::experimental::tcproutes::{
 use gateway_api::apis::standard::gateways::Gateway;
 use gateway_api::gatewayclasses::GatewayClass;
 use k8s_openapi::api::core::v1::Endpoints;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::api::{Patch, PatchParams};
 use kube::runtime::Controller;
 use kube::runtime::controller::Action;
 use kube::runtime::watcher::Config;
 use kube::{Api, Resource, ResourceExt};
+use serde_json::json;
 use thiserror::Error as ThisError;
 use tracing::log::error;
 use tracing::{debug, info, warn};
 
-use crate::NamespaceName;
-use crate::consts::{DATAPLANE_FINALIZER, GATEWAY_CLASS_CONTROLLER_NAME};
+use crate::consts::{BLIXT_FIELD_MANAGER, DATAPLANE_FINALIZER, GATEWAY_CLASS_CONTROLLER_NAME};
 use crate::controllers::gateway::get_gateway_ips;
 use crate::dataplane::DataplaneClientManager;
+use crate::{Error, NamespaceName};
 use crate::{K8sError, NamespacedName, Result};
 
 #[derive(Clone)]
@@ -91,14 +92,14 @@ impl TCPRouteController {
         let start = Instant::now();
 
         let tcp_route_id = tcp_route.metadata.namespaced_name()?;
-        let (parent_refs, backend_refs) = Self::validate_tcp_route(&tcp_route_id, &tcp_route)?;
+        let (parent_refs, backend_refs) = Self::validate_tcp_route(&tcp_route)?;
 
         // TODO: support multiple gateways, the TCPRoute spec allows for multiple parents
         // as of now the function returns an error when multiple gateways are found
         let managed_gateways = ctx.managed_route(&tcp_route_id, parent_refs).await?;
         if managed_gateways.is_empty() {
             // TODO: enable orphan checking
-            return Ok(Action::await_change());
+            return Ok(Action::requeue(Duration::from_secs(5)));
         };
 
         if !tcp_route
@@ -121,6 +122,7 @@ impl TCPRouteController {
                     .await?;
             }
             ctx.remove_dataplane_finalizer(&tcp_route).await?;
+            return Ok(Action::await_change());
         }
 
         // in all other cases ensure the TCPRoute is configured in the dataplane
@@ -135,17 +137,15 @@ impl TCPRouteController {
         }
 
         let duration = Instant::now().sub(start);
-        info!("finished reconciling in {:?} ms", duration.as_millis());
+        info!("Finished reconciling in {:?} ms", duration.as_millis());
         Ok(Action::await_change())
     }
 
-    fn validate_tcp_route<'a>(
-        tcp_route_id: &NamespacedName,
-        tcp_route: &'a TCPRoute,
-    ) -> Result<(
-        &'a Vec<TCPRouteParentRefs>,
-        Vec<&'a TCPRouteRulesBackendRefs>,
-    )> {
+    fn validate_tcp_route(
+        tcp_route: &TCPRoute,
+    ) -> Result<(&Vec<TCPRouteParentRefs>, Vec<&TCPRouteRulesBackendRefs>)> {
+        let tcp_route_id = &tcp_route.metadata.namespaced_name()?;
+
         let Some(parent_refs) = &tcp_route.spec.parent_refs else {
             return Err(
                 K8sError::missing_resource_property(tcp_route_id, "spec.parent_refs").into(),
@@ -192,47 +192,72 @@ impl TCPRouteController {
             )
             .await?;
 
-        debug!("Updating targets: {targets:?}");
-        self.dataplane_client.update_targets(targets).await?;
-        Ok(())
+        debug!(
+            "Updating targets for TCPRoute {}: {targets:?}",
+            tcp_route_id
+        );
+        self.dataplane_client.update_targets(targets).await
     }
 
     async fn ensure_tcp_route_deleted_in_dataplane(
         &self,
-        _tcp_route: &TCPRoute,
-        _gateway: &Gateway,
+        tcp_route: &TCPRoute,
+        gateway: &Gateway,
     ) -> Result<()> {
-        todo!()
+        let (parent_refs, _) = Self::validate_tcp_route(tcp_route)?;
+
+        let gateway_ips = get_gateway_ips(gateway)?;
+        // TODO: multiple gateways and IPv6 support
+        let gw_ip: Ipv4Addr = match gateway_ips[0] {
+            IpAddr::V4(v4) => v4,
+            IpAddr::V6(_) => {
+                return Err(TCPRouteError::GatewayIPv6NotSupported(
+                    tcp_route.metadata.namespaced_name()?,
+                )
+                .into());
+            }
+        };
+
+        if let Some(port) = parent_refs[0].port {
+            debug!(
+                "Removing Vip for TCPRoute {}: {:?}:{port}",
+                tcp_route.metadata.namespaced_name()?,
+                gw_ip
+            );
+            self.dataplane_client
+                .delete_vip(Vip {
+                    ip: gw_ip.to_bits(),
+                    port: port as u32,
+                })
+                .await
+        } else {
+            Err(TCPRouteError::NoMatchingGatewayPort(tcp_route.metadata.namespaced_name()?).into())
+        }
     }
 
     fn error_policy(_: Arc<TCPRoute>, error: &crate::Error, _: Arc<TCPRouteController>) -> Action {
-        warn!("reconcile failed: {:?}", error);
+        warn!("Failed to reconcile: {:?}", error);
         Action::requeue(Duration::from_secs(5))
     }
 
     async fn set_dataplane_finalizer(&self, tcp_route: &TCPRoute) -> Result<()> {
-        let namespace = tcp_route.metadata.namespace()?;
-        let tcp_route_name = tcp_route.metadata.name()?;
+        let mut finalizers = tcp_route
+            .finalizers()
+            .iter()
+            .cloned()
+            .collect::<HashSet<String>>();
+        finalizers.insert(DATAPLANE_FINALIZER.to_string());
+        let finalizers = finalizers.into_iter().collect::<Vec<String>>();
 
-        let metadata = ObjectMeta {
-            finalizers: Some(vec![DATAPLANE_FINALIZER.to_string()]),
-            ..Default::default()
-        };
-
-        let tcp_route_api: Api<TCPRoute> = Api::namespaced(self.k8s_client.clone(), namespace);
-        let pp = PatchParams::default();
-
-        tcp_route_api
-            .patch_metadata(tcp_route_name, &pp, &Patch::Merge(metadata))
-            .await
-            .map_err(|e| K8sError::client(e).into())
-            .map(|_| ())
+        debug!(
+            "Setting dataplane finalizers {:?} for TCPRoute {}",
+            &finalizers,
+            tcp_route.metadata.namespaced_name()?
+        );
+        self.apply_finalizers(tcp_route, finalizers).await
     }
 
     async fn remove_dataplane_finalizer(&self, tcp_route: &TCPRoute) -> Result<()> {
-        let namespace = tcp_route.metadata.namespace()?;
-        let tcp_route_name = tcp_route.metadata.name()?;
-
         let finalizers = tcp_route
             .finalizers()
             .iter()
@@ -240,16 +265,33 @@ impl TCPRouteController {
             .cloned()
             .collect::<Vec<String>>();
 
-        let metadata = ObjectMeta {
-            finalizers: Some(finalizers),
-            ..Default::default()
-        };
+        debug!(
+            "Removing dataplane finalizer for TCPRoute {}",
+            tcp_route.metadata.namespaced_name()?
+        );
+        self.apply_finalizers(tcp_route, finalizers).await
+    }
 
-        let tcp_route_api: Api<TCPRoute> = Api::namespaced(self.k8s_client.clone(), namespace);
-        let pp = PatchParams::apply(crate::consts::BLIXT_FIELD_MANAGER);
+    async fn apply_finalizers(
+        &self,
+        tcp_route: &TCPRoute,
+        finalizers: Vec<String>,
+    ) -> Result<(), Error> {
+        let tcp_route_id = tcp_route.metadata.namespaced_name()?;
 
+        let pp = PatchParams::apply(BLIXT_FIELD_MANAGER);
+        let patch = Patch::Apply(json!({
+            "apiVersion": TCPRoute::api_version(&()),
+            "kind": TCPRoute::kind(&()),
+            "metadata": {
+                "finalizers": Some(finalizers.clone()),
+            }
+        }));
+
+        let tcp_route_api: Api<TCPRoute> =
+            Api::namespaced(self.k8s_client.clone(), &tcp_route_id.namespace);
         tcp_route_api
-            .patch_metadata(tcp_route_name, &pp, &Patch::Apply(&metadata))
+            .patch_metadata(&tcp_route_id.name, &pp, &patch)
             .await
             .map_err(|e| K8sError::client(e).into())
             .map(|_| ())
