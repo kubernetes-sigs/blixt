@@ -8,8 +8,6 @@ RUN apk add --no-cache musl-dev clang lld
 
 WORKDIR /workspace
 
-WORKDIR /workspace
-
 ARG PROJECT_DIR=/workspace
 
 ARG BUILD_DIR=$PROJECT_DIR/build
@@ -19,6 +17,8 @@ COPY Cargo.toml Cargo.lock ./
 COPY controlplane/ controlplane/
 
 COPY dataplane/ dataplane/
+
+COPY tests-integration/ tests-integration/
 
 COPY tools/ tools/
 

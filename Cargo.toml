@@ -5,6 +5,7 @@ members = [
 	"dataplane/api-server",
 	"dataplane/common",
 	"dataplane/loader",
+	"tests-integration",
 	"tools/udp-test-server",
 	"xtask",
 ]
