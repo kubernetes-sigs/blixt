@@ -45,5 +45,3 @@ resources:
 - ../rbac
 - ../manager
 - ../dataplane
-patches:
-- path: manager_auth_proxy_patch.yaml
