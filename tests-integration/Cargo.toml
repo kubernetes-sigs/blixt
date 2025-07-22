@@ -1,0 +1,15 @@
+[package]
+name = "tests-integration"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+publish = false
+
+[dependencies]
+k8s-openapi= { workspace = true, features = ["v1_32"] }
+kube = { workspace = true, features = ["client", "rustls-tls", "ring"] }
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt", "macros", "process"] }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+tracing.workspace = true
