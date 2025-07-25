@@ -24,6 +24,8 @@ spec:
         securityContext:
           privileged: true
         args: ["-i", "eth0"]
+        ports:
+          - containerPort: 9874
         env:
         - name: RUST_LOG
           value: debug

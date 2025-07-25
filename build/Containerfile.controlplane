@@ -18,6 +18,8 @@ COPY controlplane/ controlplane/
 
 COPY dataplane/ dataplane/
 
+COPY tests-integration/ tests-integration/
+
 COPY tools/ tools/
 
 COPY xtask/ xtask/
