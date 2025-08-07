@@ -35,7 +35,7 @@ spec:
         #   type: RuntimeDefault
       containers:
       - command:
-        - /workspace/manager
+        - /controller
         args:
         - --leader-elect
         image: ghcr.io/kubernetes-sigs/blixt-controlplane:latest
@@ -47,14 +47,12 @@ spec:
             drop:
               - "ALL"
         livenessProbe:
-          httpGet:
-            path: /healthz
+          grpc:
             port: 8081
           initialDelaySeconds: 15
           periodSeconds: 20
         readinessProbe:
-          httpGet:
-            path: /readyz
+          grpc:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
