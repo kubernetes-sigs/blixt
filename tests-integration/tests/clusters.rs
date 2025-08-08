@@ -14,17 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 use std::env;
-use std::net::ToSocketAddrs;
 use std::time::Duration;
 
 use k8s_openapi::api::apps::v1::Deployment;
 use kube::Api;
 use tests_integration::Result;
 use tests_integration::infrastructure::{
-    ContainerState, ImageTag, KindCluster, KustomizeDeployments, NamespacedName, Workload,
+    ImageTag, KindCluster, KustomizeDeployments, NamespacedName, Workload,
     WorkloadImageTag,
 };
-use tracing::log::warn;
 use tracing_subscriber::EnvFilter;
 
 async fn create_cluster() -> Result<KindCluster> {
@@ -119,7 +117,7 @@ async fn create_cluster() -> Result<KindCluster> {
         pod.containers
             .iter()
             .any(|c| if let Some(image) = &c.image {
-                return image == &format!("{controlplane_image}:{tag}");
+                image == &format!("{controlplane_image}:{tag}")
             } else {
                 false
             })

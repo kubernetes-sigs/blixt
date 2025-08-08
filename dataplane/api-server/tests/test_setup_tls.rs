@@ -12,7 +12,7 @@ async fn test_tls_self_signed_cert() -> Result<()> {
     let temp_dir = tempdir().unwrap();
 
     // Generate self-signed certificate
-    let CertifiedKey { cert, key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
+    let CertifiedKey { cert, signing_key: key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
     let cert_pem = cert.pem();
     let key_pem = key_pair.serialize_pem();
 
@@ -46,7 +46,7 @@ async fn test_tls_missing_cert() -> Result<()> {
     let temp_dir = tempdir().unwrap();
 
     // Generate private key but skip certificate generation
-    let CertifiedKey { cert: _, key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
+    let CertifiedKey { cert: _, signing_key: key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
     let key_pem = key_pair.serialize_pem();
 
     // Only write the key file, omit the certificate
@@ -76,7 +76,7 @@ async fn test_tls_missing_key() -> Result<()> {
     let temp_dir = tempdir().unwrap();
 
     // Generate certificate but skip private key generation
-    let CertifiedKey { cert, key_pair: _ } = generate_simple_self_signed(vec!["localhost".into()])?;
+    let CertifiedKey { cert, signing_key: _ } = generate_simple_self_signed(vec!["localhost".into()])?;
     let cert_pem = cert.pem();
 
     // Only write the certificate file, omit the private key
@@ -107,7 +107,7 @@ async fn test_mtls_self_signed_cert() -> Result<()> {
     let temp_dir = tempdir().unwrap();
 
     // Generate self-signed certificate
-    let CertifiedKey { cert, key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
+    let CertifiedKey { cert, signing_key: key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
     let cert_pem = cert.pem();
     let key_pem = key_pair.serialize_pem();
 
@@ -150,7 +150,7 @@ async fn test_mtls_invalid_ca_cert() -> Result<()> {
     let temp_dir = tempdir().unwrap();
 
     // Generate server cert and key
-    let CertifiedKey { cert, key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
+    let CertifiedKey { cert, signing_key: key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
     let cert_pem = cert.pem();
     let key_pem = key_pair.serialize_pem();
 
@@ -186,7 +186,7 @@ async fn test_mtls_missing_ca_cert() -> Result<()> {
     let temp_dir = tempdir().unwrap();
 
     // Generate server cert and key
-    let CertifiedKey { cert, key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
+    let CertifiedKey { cert, signing_key: key_pair } = generate_simple_self_signed(vec!["localhost".into()])?;
     let cert_pem = cert.pem();
     let key_pem = key_pair.serialize_pem();
 

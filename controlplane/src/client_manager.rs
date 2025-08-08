@@ -74,9 +74,9 @@ impl DataplaneClientManager {
                         info!("Connected to dataplane pod: {}", pod_ip);
                         new_clients.insert(pod_ip.to_string(), grpc_client);
                     }
-                    Err(err) => {
+                    Err(e) => {
                         return Err(crate::Error::DataplaneError(format!(
-                            "Failed to connect to dataplane pod {pod_ip}: {err}"
+                            "Failed to connect to dataplane pod {pod_ip}: {e}"
                         )));
                     }
                 }
@@ -102,9 +102,9 @@ impl DataplaneClientManager {
                 Ok(_) => {
                     info!("Successfully updated targets on dataplane pod: {}", pod_ip);
                 }
-                Err(err) => {
+                Err(e) => {
                     return Err(crate::Error::DataplaneError(format!(
-                        "Failed to update targets on dataplane pod {pod_ip}: {err}"
+                        "Failed to update targets on dataplane pod {pod_ip}: {e}"
                     )));
                 }
             }
@@ -126,8 +126,8 @@ impl DataplaneClientManager {
                 Ok(_) => {
                     info!("Successfully deleted VIP on dataplane pod: {}", pod_ip);
                 }
-                Err(err) => {
-                    warn!("Failed to delete VIP on dataplane pod {}: {}", pod_ip, err);
+                Err(e) => {
+                    warn!("Failed to delete VIP on dataplane pod {}: {}", pod_ip, e);
                 }
             }
         }
