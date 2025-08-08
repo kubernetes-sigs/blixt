@@ -63,14 +63,12 @@ pub fn if_index_for_routing_ip(ip_addr: Ipv4Addr) -> Result<u32, Error> {
     // extract returned RouteNetLinkMessage
     if let NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewRoute(message)) =
         recv_route_message.payload
-    {
-        if let Some(RouteAttribute::Oif(idex_if)) = message
+        && let Some(RouteAttribute::Oif(idex_if)) = message
             .attributes
             .iter()
             .find(|attr| matches!(attr, RouteAttribute::Oif(_)))
-        {
-            return Ok(*idex_if);
-        }
+    {
+        return Ok(*idex_if);
     }
     Err(Error::msg(format!("{ERR_NO_IFINDEX} {ip_addr}")))
 }

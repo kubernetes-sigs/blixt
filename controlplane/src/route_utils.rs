@@ -58,8 +58,8 @@ pub async fn is_route_managed(
             continue;
         }
 
-        if let Some(port) = parent_ref.port {
-            if !gateway
+        if let Some(port) = parent_ref.port
+            && !gateway
                 .spec
                 .listeners
                 .iter()
@@ -67,7 +67,6 @@ pub async fn is_route_managed(
             {
                 continue;
             }
-        }
 
         return Ok(Some(gateway));
     }
