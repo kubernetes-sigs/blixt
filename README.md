@@ -1,21 +1,14 @@
 ![blixt](https://github.com/kubernetes-sigs/blixt/assets/5332524/387ce94a-88fd-43a9-bde9-73fb9005564d)
 
-> **Warning**: The `main` branch is under heavy development as we are [rewriting
-> our control-plane][rewrite]. if you're interested in using or testing Blixt,
-> consider using the `archive/golang-control-plane` branch temporarily. If you
-> have any questions or issues, check in with us in the `#blixt` channel on
-> [Kubernetes Slack]!
-
-> **Warning**: Experimental. For the moment there is no intention to ever make
-> this viable for production use cases. **DO NOT USE IN PRODUCTION**.
+> **Warning**: The `main` branch is under heavy development due to a [rewrite].
+> **Warning**: Experimental. **DO NOT USE IN PRODUCTION**.
 
 [rewrite]:https://github.com/kubernetes-sigs/blixt/milestone/8
-[Kubernetes Slack]:https://kubernetes.slack.com
 
 # Blixt
 
-An experimental [layer 4][osi] load-balancer for [Kubernetes] written in [Rust]
-using [Kube-RS] for the control-plane and [eBPF] with [Aya] for the data-plane.
+A [layer 4][osi] load-balancer for [Kubernetes] written in [Rust] using
+[Kube-RS] for the control-plane and [eBPF] with [Aya] for the data-plane.
 
 > **Note**: The word "blixt" means "lightning" in Swedish.
 
@@ -44,12 +37,11 @@ After these goals are achieved, further goals may be decided.
 
 ## Usage
 
-> **Warning**: Currently our container images are under migration from a private
-> repository. At this moment, you **must** build and load images yourself locally.
+> **Note**: We don't host container images. You **must** build, load or host
+> images yourself.
 
 > **Warning**: Currently usage is only intended on [Kubernetes In Docker
-> (KIND)][kind] clusters. You can generate a new development cluster for testing
-> with `make build.cluster`.
+> (KIND)][kind] clusters.
 
 Deploy the [Gateway API] [CRDs]:
 
