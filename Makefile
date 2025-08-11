@@ -128,7 +128,7 @@ lint:
 
 .PHONY: test
 test:
-	cargo test -vv
+	cargo test -vv --workspace --exclude tests-integration
 
 .PHONY: test.gencert
 test.gencert: cfssl cfssljson
