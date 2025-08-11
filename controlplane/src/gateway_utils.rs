@@ -329,8 +329,8 @@ pub fn get_accepted_condition(gateway: &Gateway) -> metav1::Condition {
     if let Some(status) = &gateway.status
         && let Some(listeners) = &status.listeners {
             for listener in listeners {
-                for conditon in &listener.conditions {
-                    if conditon.status == "False" {
+                for condition in &listener.conditions {
+                    if condition.status == "False" {
                         accepted.status = String::from("False");
                         accepted.reason = GatewayConditionReason::ListenersNotValid.to_string();
                         accepted.message = format!("listener {} is invalid", listener.name);
@@ -346,7 +346,7 @@ pub fn get_accepted_condition(gateway: &Gateway) -> metav1::Condition {
                     accepted.status = String::from("False");
                     accepted.reason = GatewayConditionReason::UnsupportedAddress.to_string();
                     accepted.message = format!(
-                        "found an addres of type {addr_type}, only type IPAddress is supported"
+                        "found an address of type {addr_type}, only type IPAddress is supported"
                     );
                     break;
                 }
@@ -419,7 +419,7 @@ pub fn get_service_key(service: &Service) -> Result<NamespacedName> {
         "Loadbalancer service name not found".to_string(),
     ))?;
     let svc_ns = service.namespace().ok_or(Error::LoadBalancerError(
-        "Loadblancer service namespace not found".to_string(),
+        "LoadBalancer service namespace not found".to_string(),
     ))?;
     Ok(NamespacedName {
         name: svc_name,
