@@ -8,7 +8,7 @@
 # Blixt
 
 A [layer 4][osi] load-balancer for [Kubernetes] written in [Rust] using
-[Kube-RS] for the control-plane and [eBPF] with [Aya] for the data-plane.
+[kube-rs] for the control-plane and [eBPF] with [aya] for the data-plane.
 
 > **Note**: The word "blixt" means "lightning" in Swedish.
 
@@ -21,14 +21,15 @@ A [layer 4][osi] load-balancer for [Kubernetes] written in [Rust] using
 
 ## Current Status
 
-Current project goals are the following:
+We're currently focused on getting some of the core functionality in place. The
+immediate goals are to add:
 
-- [ ] support the [Kubernetes Service API][svc] ([upcoming])
-- [ ] support [Gateway]/[GatewayClass] + [UDPRoute] / [TCPRoute] (in progress, partially complete)
+- [ ] support for the [Kubernetes Service API] ([upcoming])
+- [ ] support for [Gateway], [GatewayClass], [UDPRoute], [TCPRoute] (in progress, partially complete)
 
 After these goals are achieved, further goals may be decided.
 
-[svc]:https://kubernetes.io/docs/concepts/services-networking/service/
+[Kubernetes Service API]:https://kubernetes.io/docs/concepts/services-networking/service/
 [upcoming]:https://github.com/kubernetes-sigs/blixt/issues/279
 [Gateway]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.Gateway
 [GatewayClass]:https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.GatewayClass
@@ -37,11 +38,10 @@ After these goals are achieved, further goals may be decided.
 
 ## Usage
 
-> **Note**: We don't host container images. You **must** build, load or host
-> images yourself.
+> **Note**: We don't host container images for this project. You **must** build,
+> load (or host) the images yourself.
 
-> **Warning**: Currently usage is only intended on [Kubernetes In Docker
-> (KIND)][kind] clusters.
+> **Warning**: We currently only support [Kubernetes In Docker (KIND)] clusters.
 
 Deploy the [Gateway API] [CRDs]:
 
@@ -80,7 +80,7 @@ blixt-dataplane-brsl9                1/1     Running   0          83s
 > **Note**: Check the `config/samples` directory for `Gateway` and `*Route`
 > examples you can now deploy.
 
-[kind]:https://github.com/kubernetes-sigs/kind
+[Kubernetes In Docker (KIND)]:https://github.com/kubernetes-sigs/kind
 [Gateway API]:https://github.com/kubernetes-sigs/gateway-api
 [CRDs]:https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
 
@@ -109,25 +109,10 @@ make build.image.controlplane
 make load.image.controlplane
 ```
 
-> **Warning**: The integration tests are currently written in Golang, which is
-> a little awkward, but it is a temporary situation as we rewrite them in Rust.
-> Run `make test.integration.deprecated` after deploying your custom images to
-> the cluster to run them.
-
-> **Note**: We use [Cargo workspaces] to manage the various crates spread across
-> the Rust parts of the repo. However, there is one exception. The
-> `dataplane/eBPF` crate must be kept as a standalone because it needs to
-> re-implement the `panic` handler. All new crates should be added to the
-> workspace, if possible.
-
-[Cargo Workspaces]:https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html
-
 ## Community
 
-You can reach out to the community by creating [issues] or [discussions]. You
-can also reach out on [Kubernetes Slack] on the `#blixt` channel. If desired, 
-an `#ebpf` channel on Kubernetes Slack for general eBPF related help is
-available as well.
+Reach by creating [issues] or [discussions]. We also have the `#blixt` channel
+on [Kubernetes Slack].
 
 [issues]:https://github.com/kubernetes-sigs/blixt/issues
 [discussions]:https://github.com/kubernetes-sigs/blixt/discussions
