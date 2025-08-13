@@ -14,4 +14,4 @@ default = []
 user = [ "aya" ]
 
 [dependencies]
-aya = { version = "0.13.1", optional=true }
+aya = { workspace = true, optional = true }

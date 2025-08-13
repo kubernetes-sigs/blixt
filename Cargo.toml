@@ -19,6 +19,9 @@ version = "0.3.0"
 
 [workspace.dependencies]
 anyhow = { version = "1", default-features = true }
+# WARN: aya versions need to match with versions in dataplane/ebpf/Cargo.toml which is not a workspace member
+aya = { version = "0.13.1" }
+aya-log = { version = "0.2.1" }
 chrono = { version = "0.4.41", default-features = false }
 clap = { version = "4.5", default-features = true }
 env_logger = { version = "0.11", default-features = false }
