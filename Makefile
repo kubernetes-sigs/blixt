@@ -115,7 +115,7 @@ fix.format.rust: ## Autofix Rust code formatting
 	cargo fmt --manifest-path Cargo.toml --all
 
 .PHONY: check.format
-check.format.rust: ## Check Rust code formatting
+check.format: ## Check Rust code formatting
 	cargo fmt --manifest-path Cargo.toml --all -- --check
 
 .PHONY: lint

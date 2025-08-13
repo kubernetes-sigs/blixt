@@ -20,8 +20,7 @@ use k8s_openapi::api::apps::v1::Deployment;
 use kube::Api;
 use tests_integration::Result;
 use tests_integration::infrastructure::{
-    ImageTag, KindCluster, KustomizeDeployments, NamespacedName, Workload,
-    WorkloadImageTag,
+    ImageTag, KindCluster, KustomizeDeployments, NamespacedName, Workload, WorkloadImageTag,
 };
 use tracing_subscriber::EnvFilter;
 

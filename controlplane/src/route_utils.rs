@@ -64,9 +64,9 @@ pub async fn is_route_managed(
                 .listeners
                 .iter()
                 .any(|listener| listener.port == port && listener.protocol == "TCP")
-            {
-                continue;
-            }
+        {
+            continue;
+        }
 
         return Ok(Some(gateway));
     }

@@ -56,7 +56,8 @@ pub fn set_gateway_status_addresses(gateway: &mut Gateway, svc_status: &ServiceS
     let mut gw_addrs: Vec<GatewayStatusAddresses> = vec![];
 
     if let Some(load_balancer) = &svc_status.load_balancer
-        && let Some(ingress) = &load_balancer.ingress {
+        && let Some(ingress) = &load_balancer.ingress
+    {
         for addr in ingress {
             if let Some(ip) = &addr.ip {
                 gw_addrs.push(GatewayStatusAddresses {
@@ -111,7 +112,8 @@ pub async fn create_endpoint_if_not_exists(
     let endpoints_api: Api<Endpoints> = Api::namespaced(ctx.client.clone(), &key.namespace);
 
     if let Some(err) = endpoints_api.get(&key.name).await.err()
-        && check_if_not_found_err(err) {
+        && check_if_not_found_err(err)
+    {
         let mut ep_ports: Vec<EndpointPort> = vec![];
         if let Some(ports) = &svc_spec.ports {
             for port in ports {
@@ -150,7 +152,8 @@ pub async fn create_endpoint_if_not_exists(
 // Returns true if the provided error is a not found error.
 pub fn check_if_not_found_err(error: kube::Error) -> bool {
     if let kube::Error::Api(response) = error
-        && response.code == 404 {
+        && response.code == 404
+    {
         return true;
     }
     false
@@ -159,7 +162,8 @@ pub fn check_if_not_found_err(error: kube::Error) -> bool {
 // Returns the number of ingresses set on the LoadBalancer Service.
 pub fn get_ingress_ip_len(svc_status: &ServiceStatus) -> usize {
     if let Some(lb) = &svc_status.load_balancer
-        && let Some(ingress) = &lb.ingress {
+        && let Some(ingress) = &lb.ingress
+    {
         return ingress.len();
     }
     0
@@ -220,8 +224,14 @@ pub fn update_service_for_gateway(gateway: &Gateway, svc: &mut Service) -> Resul
         if !addresses.is_empty() {
             let addr = addresses[0].clone();
             if let Some(t) = addr.r#type
-                && t != "IPAddress" {
-                return Err(Error::InvalidConfigError(format!("addresses of type {t} are not supported; only type IPAddress is supported").to_string()));
+                && t != "IPAddress"
+            {
+                return Err(Error::InvalidConfigError(
+                    format!(
+                        "addresses of type {t} are not supported; only type IPAddress is supported"
+                    )
+                    .to_string(),
+                ));
             }
             address = Some(addresses[0].clone());
         }
@@ -235,7 +245,8 @@ pub fn update_service_for_gateway(gateway: &Gateway, svc: &mut Service) -> Resul
 
     let lb_ip: Option<String> = svc_spec.load_balancer_ip.clone();
     if let Some((addr, ip)) = address.clone().zip(lb_ip.clone())
-        && ip != addr.value {
+        && ip != addr.value
+    {
         svc_spec.load_balancer_ip = Some(addr.value.clone());
         updated = true;
     }
@@ -327,29 +338,31 @@ pub fn get_accepted_condition(gateway: &Gateway) -> metav1::Condition {
     let gateway_spec: &GatewaySpec = &gateway.spec;
 
     if let Some(status) = &gateway.status
-        && let Some(listeners) = &status.listeners {
-            for listener in listeners {
-                for condition in &listener.conditions {
-                    if condition.status == "False" {
-                        accepted.status = String::from("False");
-                        accepted.reason = GatewayConditionReason::ListenersNotValid.to_string();
-                        accepted.message = format!("listener {} is invalid", listener.name);
-                    }
+        && let Some(listeners) = &status.listeners
+    {
+        for listener in listeners {
+            for condition in &listener.conditions {
+                if condition.status == "False" {
+                    accepted.status = String::from("False");
+                    accepted.reason = GatewayConditionReason::ListenersNotValid.to_string();
+                    accepted.message = format!("listener {} is invalid", listener.name);
                 }
             }
         }
+    }
 
     if let Some(addresses) = &gateway_spec.addresses {
         for addr in addresses {
             if let Some(addr_type) = &addr.r#type
-                && addr_type.as_str() != "IPAddress" {
-                    accepted.status = String::from("False");
-                    accepted.reason = GatewayConditionReason::UnsupportedAddress.to_string();
-                    accepted.message = format!(
-                        "found an address of type {addr_type}, only type IPAddress is supported"
-                    );
-                    break;
-                }
+                && addr_type.as_str() != "IPAddress"
+            {
+                accepted.status = String::from("False");
+                accepted.reason = GatewayConditionReason::UnsupportedAddress.to_string();
+                accepted.message = format!(
+                    "found an address of type {addr_type}, only type IPAddress is supported"
+                );
+                break;
+            }
         }
     }
     accepted
@@ -362,11 +375,12 @@ pub fn set_listener_status(gateway: &mut Gateway) -> Result<()> {
     let mut current_listener_statuses: HashMap<String, GatewayStatusListeners> = HashMap::new();
 
     if let Some(gw_status) = &gateway.status
-        && let Some(listeners) = &gw_status.listeners {
-            for listener in listeners {
-                current_listener_statuses.insert(listener.name.clone(), listener.clone());
-            }
+        && let Some(listeners) = &gw_status.listeners
+    {
+        for listener in listeners {
+            current_listener_statuses.insert(listener.name.clone(), listener.clone());
         }
+    }
 
     let generation = gateway
         .metadata
@@ -482,26 +496,27 @@ fn get_listener_status(
             });
             if let Some(routes) = &listener.allowed_routes
                 && let Some(rgks) = &routes.kinds
-                    && let Some(msg) = check_route_kinds(Some("TCPRoute"), rgks) {
-                        update_listener_condition(
-                            String::from("False"),
-                            ListenerConditionReason::InvalidRouteKinds.to_string(),
-                            msg.clone(),
-                            0,
-                        );
-                        update_listener_condition(
-                            String::from("False"),
-                            ListenerConditionReason::InvalidRouteKinds.to_string(),
-                            msg.clone(),
-                            1,
-                        );
-                        update_listener_condition(
-                            String::from("False"),
-                            ListenerConditionReason::Invalid.to_string(),
-                            msg.clone(),
-                            2,
-                        );
-                    }
+                && let Some(msg) = check_route_kinds(Some("TCPRoute"), rgks)
+            {
+                update_listener_condition(
+                    String::from("False"),
+                    ListenerConditionReason::InvalidRouteKinds.to_string(),
+                    msg.clone(),
+                    0,
+                );
+                update_listener_condition(
+                    String::from("False"),
+                    ListenerConditionReason::InvalidRouteKinds.to_string(),
+                    msg.clone(),
+                    1,
+                );
+                update_listener_condition(
+                    String::from("False"),
+                    ListenerConditionReason::Invalid.to_string(),
+                    msg.clone(),
+                    2,
+                );
+            }
         }
         "UDP" => {
             supported_kinds.push(GatewayStatusListenersSupportedKinds {
@@ -510,26 +525,27 @@ fn get_listener_status(
             });
             if let Some(routes) = &listener.allowed_routes
                 && let Some(rgks) = &routes.kinds
-                    && let Some(msg) = check_route_kinds(Some("UDPRoute"), rgks) {
-                        update_listener_condition(
-                            String::from("False"),
-                            ListenerConditionReason::InvalidRouteKinds.to_string(),
-                            msg.clone(),
-                            0,
-                        );
-                        update_listener_condition(
-                            String::from("False"),
-                            ListenerConditionReason::InvalidRouteKinds.to_string(),
-                            msg.clone(),
-                            1,
-                        );
-                        update_listener_condition(
-                            String::from("False"),
-                            ListenerConditionReason::Invalid.to_string(),
-                            msg.clone(),
-                            2,
-                        );
-                    }
+                && let Some(msg) = check_route_kinds(Some("UDPRoute"), rgks)
+            {
+                update_listener_condition(
+                    String::from("False"),
+                    ListenerConditionReason::InvalidRouteKinds.to_string(),
+                    msg.clone(),
+                    0,
+                );
+                update_listener_condition(
+                    String::from("False"),
+                    ListenerConditionReason::InvalidRouteKinds.to_string(),
+                    msg.clone(),
+                    1,
+                );
+                update_listener_condition(
+                    String::from("False"),
+                    ListenerConditionReason::Invalid.to_string(),
+                    msg.clone(),
+                    2,
+                );
+            }
         }
         _ => {
             update_listener_condition(
@@ -544,14 +560,15 @@ fn get_listener_status(
 
             if let Some(routes) = &listener.allowed_routes
                 && let Some(rgks) = &routes.kinds
-                    && let Some(msg) = check_route_kinds(Some("UDPRoute"), rgks) {
-                        update_listener_condition(
-                            String::from("False"),
-                            ListenerConditionReason::InvalidRouteKinds.to_string(),
-                            msg.clone(),
-                            0,
-                        );
-                    }
+                && let Some(msg) = check_route_kinds(Some("UDPRoute"), rgks)
+            {
+                update_listener_condition(
+                    String::from("False"),
+                    ListenerConditionReason::InvalidRouteKinds.to_string(),
+                    msg.clone(),
+                    0,
+                );
+            }
 
             update_listener_condition(
                 String::from("False"),
@@ -598,8 +615,9 @@ fn check_route_kinds(
     }
 
     if let Some(group) = &rgk.group
-        && group.as_str() != "gateway.networking.k8s.io" {
-            return Some(format!("Unsupported API group: {group}"));
-        }
+        && group.as_str() != "gateway.networking.k8s.io"
+    {
+        return Some(format!("Unsupported API group: {group}"));
+    }
     None
 }
