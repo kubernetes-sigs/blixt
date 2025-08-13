@@ -15,7 +15,9 @@ use aya::{include_bytes_aligned, Ebpf};
 use aya_log::EbpfLogger;
 use clap::Parser;
 use common::{BackendKey, BackendList, ClientKey, LoadBalancerMapping};
-use log::{info, warn};
+use tracing::{info, warn};
+use tracing_log::LogTracer;
+use tracing_subscriber::EnvFilter;
 
 /// Command-line options for the application.
 ///
@@ -64,6 +66,14 @@ struct Opt {
 /// ```
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_file(true)
+        .with_line_number(true)
+        .init();
+
+    LogTracer::init()?;
+
     let opt = Opt::parse();
 
     env_logger::init();

@@ -38,6 +38,11 @@ spec:
         - /controller
         args:
         - --leader-elect
+        env:
+          - name: RUST_LOG
+            value: "controlplane=trace"
+          - name: RUST_BACKTRACE
+            value: "1"
         image: ghcr.io/kubernetes-sigs/blixt-controlplane:latest
         imagePullPolicy: IfNotPresent
         name: manager
