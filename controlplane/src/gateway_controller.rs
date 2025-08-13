@@ -41,8 +41,7 @@ use kube::{
     api::{Api, ListParams, Patch, PatchParams},
     runtime::{Controller, controller::Action, watcher::Config},
 };
-use log::debug;
-use tracing::*;
+use tracing::{debug, error, info, warn};
 
 pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Action> {
     let start = Instant::now();

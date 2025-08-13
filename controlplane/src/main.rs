@@ -20,7 +20,8 @@ use kube::Client;
 use tokio::task::JoinHandle;
 use tokio::try_join;
 use tonic::transport::Server;
-use tracing::*;
+use tracing::{debug, error};
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -29,8 +30,11 @@ async fn main() -> anyhow::Result<()> {
 }
 
 pub async fn run() {
-    let subscriber = tracing_subscriber::FmtSubscriber::new();
-    tracing::subscriber::set_global_default(subscriber).unwrap();
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_file(true)
+        .with_line_number(true)
+        .init();
 
     let client = Client::try_default()
         .await

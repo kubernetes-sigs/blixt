@@ -27,8 +27,10 @@ spec:
         ports:
           - containerPort: 9874
         env:
-        - name: RUST_LOG
-          value: debug
+          - name: RUST_LOG
+            value: "aya=trace,aya_obj=trace,api_server=trace,ebpf=trace,loader=trace"
+          - name: RUST_BACKTRACE
+            value: "1"
         imagePullPolicy: IfNotPresent
         # The gRPC API has a slow startup time, so this probe helps to provide some
         # grace while starting up to avoid unnecessary kills.
