@@ -72,11 +72,10 @@ async fn main() -> Result<(), anyhow::Error> {
         .with_line_number(true)
         .init();
 
+    // aya-logs uses the log facade, the log tracer enables to log ebpf events through tracing
     LogTracer::init()?;
 
     let opt = Opt::parse();
-
-    env_logger::init();
 
     info!("loading ebpf programs");
 
