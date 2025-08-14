@@ -57,7 +57,7 @@ pub enum Workload {
 
 /// Fully qualified image name including tag.
 #[allow(missing_docs)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ImageTag {
     /// image fully qualified name
     pub image: String,
@@ -77,22 +77,11 @@ pub struct WorkloadImageTag {
     pub image_tag: Option<ImageTag>,
 }
 
-impl WorkloadImageTag {
-    fn image_tag(&self) -> Option<(&str, &str)> {
-        self.image_tag
-            .as_ref()
-            .map(|it| (it.image.as_str(), it.tag.as_str()))
-    }
-    fn workload_namespace_name(&self) -> (&str, &str, &str) {
-        self.id.workload_namespace_name()
-    }
-}
-
 impl Workload {
-    fn workload_namespace_name(&self) -> (&str, &str, &str) {
+    fn namespace_name(&self) -> (&str, &str) {
         match &self {
-            Workload::DaemonSet(id) => ("daemonset", id.namespace.as_str(), id.name.as_str()),
-            Workload::Deployment(id) => ("deployment", id.namespace.as_str(), id.name.as_str()),
+            Workload::DaemonSet(id) => (id.namespace.as_str(), id.name.as_str()),
+            Workload::Deployment(id) => (id.namespace.as_str(), id.name.as_str()),
         }
     }
 }
@@ -153,11 +142,11 @@ impl Display for Workload {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let id = match self {
             Workload::DaemonSet(id) => {
-                f.write_str("daemonset")?;
+                f.write_str("DaemonSet")?;
                 id
             }
             Workload::Deployment(id) => {
-                f.write_str("deployment")?;
+                f.write_str("Deployment")?;
                 id
             }
         };
