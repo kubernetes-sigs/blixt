@@ -86,14 +86,14 @@ TAG ?= integration-tests
 # Containerfile paths for each service
 CONTROLPLANE_CONTAINERFILE ?= build/Containerfile.controlplane
 DATAPLANE_CONTAINERFILE ?= build/Containerfile.dataplane
-UDP_SERVER_CONTAINERFILE ?= build/Containerfile.udp_test_server
+UDP_SERVER_CONTAINERFILE ?= build/Containerfile.udp-test-server
 
 .PHONY: build.image.controlplane
 build.image.controlplane:
 	$(CONTAINER_RUNTIME) build $(BUILD_ARGS) --file=$(CONTROLPLANE_CONTAINERFILE) -t $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) ./
 
-.PHONY: build.image.udp_test_server
-build.image.udp_test_server:
+.PHONY: build.image.udp-test-server
+build.image.udp-test-server:
 	$(CONTAINER_RUNTIME) build $(BUILD_ARGS) --file=$(UDP_SERVER_CONTAINERFILE) -t $(BLIXT_UDP_SERVER_IMAGE):$(TAG) ./
 
 .PHONY: build.image.dataplane
@@ -104,7 +104,7 @@ build.image.dataplane:
 build.all.images: 
 	$(MAKE) build.image.controlplane
 	$(MAKE) build.image.dataplane
-	$(MAKE) build.image.udp_test_server
+	$(MAKE) build.image.udp-test-server
 
 # ------------------------------------------------------------------------------
 # Development
@@ -129,6 +129,9 @@ lint:
 .PHONY: test
 test:
 	cargo test -vv --workspace --exclude tests-integration
+
+test.integration:
+	 cargo test --package tests-integration
 
 .PHONY: test.gencert
 test.gencert: cfssl cfssljson
