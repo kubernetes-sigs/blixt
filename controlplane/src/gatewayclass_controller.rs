@@ -34,6 +34,7 @@ use tracing::*;
 pub async fn reconcile(gateway_class: Arc<GatewayClass>, ctx: Arc<Context>) -> Result<Action> {
     let start = Instant::now();
     let client = ctx.client.clone();
+
     let name = gateway_class
         .metadata
         .name
@@ -68,7 +69,7 @@ pub async fn reconcile(gateway_class: Arc<GatewayClass>, ctx: Arc<Context>) -> R
 pub async fn controller(ctx: Context) -> Result<()> {
     let gwc_api = Api::<GatewayClass>::all(ctx.client.clone());
     gwc_api
-        .list(&ListParams::default().limit(1))
+        .list(&ListParams::default())
         .await
         .map_err(Error::CRDNotFoundError)?;
 

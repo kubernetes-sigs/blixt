@@ -46,6 +46,7 @@ use tracing::{debug, error, info, warn};
 pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Action> {
     let start = Instant::now();
     let client = ctx.client.clone();
+
     let name = gateway
         .metadata
         .name
@@ -222,7 +223,7 @@ pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Actio
 pub async fn controller(ctx: Context) -> Result<()> {
     let gateway = Api::<Gateway>::all(ctx.client.clone());
     gateway
-        .list(&ListParams::default().limit(1))
+        .list(&ListParams::default())
         .await
         .map_err(Error::CRDNotFoundError)?;
 

@@ -58,16 +58,6 @@ pub async fn is_route_managed(
             continue;
         }
 
-        if let Some(port) = parent_ref.port
-            && !gateway
-                .spec
-                .listeners
-                .iter()
-                .any(|listener| listener.port == port && listener.protocol == "TCP")
-        {
-            continue;
-        }
-
         return Ok(Some(gateway));
     }
 
