@@ -21,10 +21,14 @@ mod gateway_utils;
 mod gatewayclass_controller;
 mod gatewayclass_utils;
 mod route_utils;
+mod tcproute_controller;
 mod traits;
+mod udproute_controller;
 
 pub use gateway_controller::controller as gateway_controller;
 pub use gatewayclass_controller::controller as gatewayclass_controller;
+pub use tcproute_controller::controller as tcproute_controller;
+pub use udproute_controller::controller as udproute_controller;
 
 use kube::Client;
 use thiserror::Error;

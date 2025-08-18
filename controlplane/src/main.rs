@@ -52,7 +52,9 @@ pub async fn run() {
 
     if let Err(error) = try_join!(
         gateway_controller(ctx.clone()),
-        gatewayclass_controller(ctx),
+        gatewayclass_controller(ctx.clone()),
+        tcproute_controller(ctx.clone()),
+        udproute_controller(ctx),
         setup_health_checks(IpAddr::from(Ipv4Addr::new(0, 0, 0, 0)), 8080)
     ) {
         error!("failed to start controllers: {error:?}");
