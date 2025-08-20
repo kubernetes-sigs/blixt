@@ -44,7 +44,6 @@ pub struct KustomizeDeployments {
 
 enum KustomizeKind {
     Directory(PathBuf),
-    File(PathBuf),
     Https(String),
 }
 
@@ -70,25 +69,15 @@ impl KustomizeDeployments {
         let k8s_ctx = self.cluster.k8s_context();
         for deployment in &self.kustomizations {
             let inner = deployment.inner();
-            match deployment.needs_k() {
-                true => AsyncCommand::new(
-                    "kubectl",
-                    &[
-                        format!("--context={k8s_ctx}").as_str(),
-                        "apply",
-                        "-k",
-                        inner.as_str(),
-                    ],
-                ),
-                false => AsyncCommand::new(
-                    "kubectl",
-                    &[
-                        format!("--context={k8s_ctx}").as_str(),
-                        "apply",
-                        inner.as_str(),
-                    ],
-                ),
-            }
+            AsyncCommand::new(
+                "kubectl",
+                &[
+                    format!("--context={k8s_ctx}").as_str(),
+                    "apply",
+                    "--kustomize",
+                    inner.as_str(),
+                ],
+            )
             .run()
             .await
             .map_err(KustomizeError::Apply)?;
@@ -99,7 +88,7 @@ impl KustomizeDeployments {
 }
 
 impl KustomizeKind {
-    async fn try_from<D: AsRef<str>>(kustomization: D) -> Result<KustomizeKind> {
+    async fn try_from<K: AsRef<str>>(kustomization: K) -> Result<KustomizeKind> {
         let kustomization = kustomization.as_ref();
 
         let kind = match kustomization {
@@ -110,10 +99,10 @@ impl KustomizeKind {
                 let path = kustomization.to_string();
                 let fs_path = Path::new(&path);
 
-                let exists = fs_path
+                if !fs_path
                     .try_exists()
-                    .map_err(|e| KustomizeError::InvalidPath(path.to_string(), e.to_string()))?;
-                if !exists {
+                    .map_err(|e| KustomizeError::InvalidPath(path.to_string(), e.to_string()))?
+                {
                     return Err(KustomizeError::InvalidPath(
                         path.to_string(),
                         "does not exist".to_string(),
@@ -121,10 +110,15 @@ impl KustomizeKind {
                     .into());
                 }
 
-                match fs_path.is_dir() {
-                    true => KustomizeKind::Directory(fs_path.to_path_buf()),
-                    false => KustomizeKind::File(fs_path.to_path_buf()),
+                if !fs_path.is_dir() {
+                    return Err(KustomizeError::InvalidPath(
+                        path.to_string(),
+                        "is a file, not a directory".to_string(),
+                    )
+                    .into());
                 }
+
+                KustomizeKind::Directory(fs_path.to_path_buf())
             }
         };
 
@@ -133,7 +127,7 @@ impl KustomizeKind {
 
     async fn validate(self) -> Result<Self> {
         match &self {
-            KustomizeKind::Directory(_) | KustomizeKind::File(_) => {
+            KustomizeKind::Directory(_) => {
                 let inner = self.inner();
                 AsyncCommand::new("kubectl", &["kustomize", inner.as_str()])
                     .run()
@@ -147,18 +141,9 @@ impl KustomizeKind {
         Ok(self)
     }
 
-    fn needs_k(&self) -> bool {
-        match self {
-            KustomizeKind::Directory(_) => true,
-            KustomizeKind::File(_) => false,
-            KustomizeKind::Https(_) => true,
-        }
-    }
-
     fn inner(&self) -> String {
         match self {
             KustomizeKind::Directory(d) => d.as_os_str().to_string_lossy().to_string(),
-            KustomizeKind::File(d) => d.as_os_str().to_string_lossy().to_string(),
             KustomizeKind::Https(d) => d.clone(),
         }
     }

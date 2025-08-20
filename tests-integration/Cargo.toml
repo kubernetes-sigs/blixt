@@ -7,6 +7,7 @@ version.workspace = true
 publish = false
 
 [dependencies]
+chrono = { workspace = true, features = ["clock"] }
 k8s-openapi= { workspace = true, features = ["v1_32"] }
 kube = { workspace = true, features = ["client", "rustls-tls", "ring"] }
 thiserror.workspace = true
