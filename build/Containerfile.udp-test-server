@@ -2,35 +2,52 @@
 # Builder
 # ------------------------------------------------------------------------------
 
-FROM rust:alpine AS builder
+FROM debian:trixie-slim AS builder
 
-RUN apk add --no-cache musl-dev clang lld
+RUN apt update \
+    && apt install -y build-essential rustup
 
-WORKDIR /workspace
+ARG UID
+ARG GID
+ARG WORK_DIR
+RUN chown "${UID}:${GID}" ${WORK_DIR}
+USER ${UID}:${GID}
 
-ARG PROJECT_DIR=/workspace
+ENV RUSTUP_HOME=${WORK_DIR}/target
+# allow re-using of cargo downloads trough saving in target/
+ENV CARGO_HOME=${WORK_DIR}/target
 
-ARG BUILD_DIR=$PROJECT_DIR/build
+RUN rustup install stable \
+    && rustup default stable
 
-COPY Cargo.toml Cargo.lock ./
+ARG BUILD_TIMESTAMP
+WORKDIR ${WORK_DIR}
 
-COPY controlplane/ controlplane/
+# /workspace needs to be volume mounted
+# ${WORK_DIR}/target can be optionally volume mounted
+RUN echo "${BUILD_TIMESTAMP}" \
+    && date +%s \
+    && cp -a /workspace/Cargo.toml \
+    /workspace/Cargo.lock \
+    /workspace/.cargo/ \
+    /workspace/controlplane/ \
+    /workspace/dataplane/ \
+    /workspace/tests-integration/ \
+    /workspace/tools/ \
+    /workspace/xtask/ \
+    ${WORK_DIR}
 
-COPY dataplane/ dataplane/
-
-COPY tests-integration/ tests-integration/
-
-COPY tools/ tools/
-
-COPY xtask/ xtask/
-
-RUN cargo build -p udp-test-server --target x86_64-unknown-linux-musl
+RUN date +%s \
+    && cargo build --package udp-test-server \
+    && date +%s \
+    && mkdir -p results/ \
+    && cp target/debug/udp-test-server results/
 
 # ------------------------------------------------------------------------------
 # Image
 # ------------------------------------------------------------------------------
 
-FROM alpine
+FROM debian:trixie-slim
 
 LABEL org.opencontainers.image.source=https://github.com/kubernetes-sigs/blixt
 
@@ -38,7 +55,9 @@ WORKDIR /
 
 USER 1000:1000
 
-COPY --from=builder /workspace/target/x86_64-unknown-linux-musl/debug/udp-test-server /udp-test-server
+ARG WORK_DIR
+
+COPY --from=builder ${WORK_DIR}/results/udp-test-server /udp-test-server
 
 EXPOSE 9875
 

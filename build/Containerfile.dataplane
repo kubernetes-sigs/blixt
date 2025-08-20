@@ -2,73 +2,60 @@
 # Builder
 # ------------------------------------------------------------------------------
 
-FROM rust:slim-bookworm AS builder
+FROM debian:trixie-slim AS builder
 
-RUN apt-get update
+RUN apt update \
+    && apt install -y build-essential rustup
 
-RUN apt-get install --yes \
-    build-essential \
-    llvm-19 \
-    protobuf-compiler \
-    pkg-config \
-    musl-tools \
-    clang \
-    wget \
-    lsb-release \
-    software-properties-common \
-    gnupg
+ARG UID
+ARG GID
+ARG WORK_DIR
+RUN chown "${UID}:${GID}" ${WORK_DIR}
+USER ${UID}:${GID}
 
-RUN rustup default stable
+ENV RUSTUP_HOME=${WORK_DIR}/target
+# allow re-using of cargo downloads trough saving in target/
+ENV CARGO_HOME=${WORK_DIR}/target
 
-RUN rustup install nightly
+RUN rustup install stable \
+    && rustup default stable
 
-RUN rustup component add rust-src --toolchain nightly
+RUN rustup install nightly \
+    && rustup component add rust-src --toolchain nightly \
+    && cargo install bpf-linker
 
-RUN cargo install bpf-linker
+ARG BUILD_TIMESTAMP
+WORKDIR ${WORK_DIR}
 
-WORKDIR /workspace
+# /workspace needs to be volume mounted
+# ${WORK_DIR}/target can be optionally volume mounted
+RUN echo "${BUILD_TIMESTAMP}" \
+    && date +%s \
+    && cp -a /workspace/Cargo.toml \
+    /workspace/Cargo.lock \
+    /workspace/.cargo/ \
+    /workspace/controlplane/ \
+    /workspace/dataplane/ \
+    /workspace/tests-integration/ \
+    /workspace/tools/ \
+    /workspace/xtask/ \
+    ${WORK_DIR}
 
-RUN rustup target add x86_64-unknown-linux-musl
-
-ARG PROJECT_DIR=/workspace
-
-ARG BUILD_DIR=$PROJECT_DIR/build
-
-COPY Cargo.toml Cargo.lock ./
-
-COPY controlplane/ controlplane/
-
-COPY dataplane/ dataplane/
-
-COPY tests-integration/ tests-integration/
-
-COPY tools/ tools/
-
-COPY xtask/ xtask/
-
-COPY .cargo/config.toml .cargo/config.toml
-
-# We need to tell bpf-linker where it can find LLVM's shared library file.
-# Ref: https://github.com/aya-rs/rustc-llvm-proxy/blob/cbcb3c6/src/lib.rs#L48
-ENV LD_LIBRARY_PATH="/usr/lib/llvm-19/lib"
-
-ENV CC_x86_64_unknown_linux_musl="/usr/bin/clang"
-
-ENV AR_x86_64_unknown_linux_musl="/usr/lib/llvm-19/bin/llvm-ar"
-
-RUN cargo xtask build-ebpf
-
-RUN RUSTFLAGS=-Ctarget-feature=+crt-static cargo build \
-    --workspace \
-    --exclude ebpf \ 
-    --package loader \
-    --target=x86_64-unknown-linux-musl
+RUN date +%s \
+    && cargo xtask build-ebpf \
+    && date +%s \
+    && cargo build --package loader \
+    && date +%s \
+    && mkdir -p results/ \
+    && cp target/debug/loader results/ \
+    && cp dataplane/LICENSE.BSD-2-Clause results/ \
+    && cp dataplane/LICENSE.GPL-2.0 results/
 
 # ------------------------------------------------------------------------------
 # Image
 # ------------------------------------------------------------------------------
 
-FROM alpine
+FROM debian:trixie-slim
 
 LABEL org.opencontainers.image.source=https://github.com/kubernetes-sigs/blixt
 
@@ -76,10 +63,12 @@ LABEL org.opencontainers.image.licenses=GPL-2.0-only,BSD-2-Clause
 
 WORKDIR /
 
-COPY --from=builder /workspace/target/x86_64-unknown-linux-musl/debug/loader /dataplane
+ARG WORK_DIR
 
-COPY dataplane/LICENSE.GPL-2.0 /LICENSE.GPL-2.0
+COPY --from=builder ${WORK_DIR}/results/LICENSE.BSD-2-Clause /LICENSE.BSD-2-Clause
 
-COPY dataplane/LICENSE.BSD-2-Clause /LICENSE.BSD-2-Clause
+COPY --from=builder ${WORK_DIR}/results/LICENSE.GPL-2.0 /LICENSE.GPL-2.0
+
+COPY --from=builder ${WORK_DIR}/results/loader /dataplane
 
 ENTRYPOINT ["/dataplane"]
