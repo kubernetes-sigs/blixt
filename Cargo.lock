@@ -1304,6 +1304,7 @@ dependencies = [
  "aya-log",
  "clap",
  "common",
+ "thiserror 2.0.14",
  "tokio",
  "tracing",
  "tracing-log",
