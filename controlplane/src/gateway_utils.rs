@@ -48,6 +48,7 @@ use k8s_openapi::api::core::v1::{
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
 
 use chrono::Utc;
+use kube::api::DeleteParams;
 use serde_json::json;
 use tracing::*;
 
@@ -149,6 +150,19 @@ pub async fn create_endpoint_if_not_exists(
     Ok(())
 }
 
+// Deletes the Endpoint for the provided Gateway.
+pub(crate) async fn delete_endpoint(k8s_client: Client, gateway_id: &NamespacedName) -> Result<()> {
+    let endpoint_name = format!("service-for-gateway-{}", gateway_id.name.clone());
+    info!("Deleting Endpoint {endpoint_name} for gateway {gateway_id}.");
+
+    let endpoints_api: Api<Endpoints> = Api::namespaced(k8s_client.clone(), &gateway_id.namespace);
+    endpoints_api
+        .delete(&endpoint_name, &DeleteParams::default())
+        .await
+        .map_err(Error::KubeError)
+        .map(|_| ())
+}
+
 // Returns true if the provided error is a not found error.
 pub fn check_if_not_found_err(error: kube::Error) -> bool {
     if let kube::Error::Api(response) = error
@@ -170,11 +184,11 @@ pub fn get_ingress_ip_len(svc_status: &ServiceStatus) -> usize {
 }
 
 // Creates a LoadBalancer Service for the provided Gateway.
-pub async fn create_svc_for_gateway(ctx: Arc<Context>, gateway: &Gateway) -> Result<Service> {
+pub async fn create_loadbalancer_service(ctx: Arc<Context>, gateway: &Gateway) -> Result<Service> {
     let mut svc_meta = ObjectMeta::default();
-    let ns = gateway.namespace().unwrap_or("default".to_string());
-    svc_meta.namespace = Some(ns.clone());
-    svc_meta.generate_name = Some(format!("service-for-gateway-{}-", gateway.name_any()));
+    let gateway_id = gateway.metadata.namespaced_name()?;
+    svc_meta.namespace = Some(gateway_id.namespace.clone());
+    svc_meta.name = Some(format!("service-for-gateway-{}", gateway_id.name));
 
     let mut labels = BTreeMap::new();
     labels.insert(GATEWAY_SERVICE_LABEL.to_string(), gateway.name_any());
@@ -187,13 +201,29 @@ pub async fn create_svc_for_gateway(ctx: Arc<Context>, gateway: &Gateway) -> Res
     };
     update_service_for_gateway(gateway, &mut svc)?;
 
-    let svc_api: Api<Service> = Api::namespaced(ctx.client.clone(), ns.as_str());
+    let svc_api: Api<Service> = Api::namespaced(ctx.client.clone(), &gateway_id.namespace);
     let service = svc_api
         .create(&PostParams::default(), &svc)
         .await
         .map_err(Error::KubeError)?;
 
     Ok(service)
+}
+
+// Deletes a LoadBalancer Service for the provided Gateway.
+pub(crate) async fn delete_loadbalancer_service(
+    k8s_client: Client,
+    gateway_id: &NamespacedName,
+) -> Result<()> {
+    let service_name = format!("service-for-gateway-{}", &gateway_id.name);
+    info!("Deleting Service {service_name} of type LoadBalancer for Gateway {gateway_id}",);
+
+    let service_api: Api<Service> = Api::namespaced(k8s_client, &gateway_id.namespace);
+    service_api
+        .delete(&service_name, &DeleteParams::default())
+        .await
+        .map_err(Error::KubeError)
+        .map(|_| ())
 }
 
 // Updates the provided Service to match the desired state according to the provided Gateway.

@@ -20,13 +20,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{
-    consts::{GATEWAY_CLASS_CONTROLLER_NAME, GATEWAY_SERVICE_LABEL},
-    *,
-};
-use gateway_utils::*;
-use route_utils::set_condition;
-
 use chrono::Utc;
 use futures::StreamExt;
 use gateway_api::apis::standard::gateways::{Gateway, GatewayStatus};
@@ -39,33 +32,31 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
 use kube::{
     Resource, ResourceExt,
     api::{Api, ListParams, Patch, PatchParams},
-    runtime::{Controller, controller::Action, watcher::Config},
+    runtime::{
+        Controller, controller::Action, finalizer, finalizer::Error as FinalizerError,
+        finalizer::Event, watcher::Config,
+    },
 };
 use tracing::{debug, error, info, warn};
+
+use crate::{
+    Context, Error, NamespaceName, Result,
+    consts::{CONTROLPLANE_FINALIZER, GATEWAY_CLASS_CONTROLLER_NAME, GATEWAY_SERVICE_LABEL},
+    gateway_utils::{
+        create_endpoint_if_not_exists, create_loadbalancer_service, delete_endpoint,
+        delete_loadbalancer_service, get_accepted_condition, get_ingress_ip_len, get_service_key,
+        patch_status, set_gateway_status_addresses, set_listener_status,
+        update_service_for_gateway,
+    },
+    gatewayclass_utils,
+    route_utils::set_condition,
+};
 
 pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Action> {
     let start = Instant::now();
     let client = ctx.client.clone();
 
-    let name = gateway
-        .metadata
-        .name
-        .clone()
-        .ok_or(Error::InvalidConfigError("invalid name".to_string()))?;
-
-    let ns = gateway
-        .metadata
-        .namespace
-        .clone()
-        .ok_or(Error::InvalidConfigError("invalid namespace".to_string()))?;
-
-    let gateway_api: Api<Gateway> = Api::namespaced(client.clone(), &ns);
-    let mut gw = Gateway {
-        metadata: gateway.metadata.clone(),
-        spec: gateway.spec.clone(),
-        status: gateway.status.clone(),
-    };
-
+    // check gateway_class
     let gateway_class_api = Api::<GatewayClass>::all(client.clone());
     let gateway_class = gateway_class_api
         .get(gateway.spec.gateway_class_name.as_str())
@@ -89,6 +80,47 @@ pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Actio
         );
         return Ok(Action::await_change());
     }
+
+    let gateway_id = gateway.metadata.namespaced_name()?;
+    let gateway_api: Api<Gateway> = Api::namespaced(ctx.client.clone(), &gateway_id.namespace);
+    finalizer(
+        &gateway_api,
+        CONTROLPLANE_FINALIZER,
+        gateway,
+        |event| async {
+            match event {
+                Event::Apply(gateway) => configure_gateway(gateway, ctx.clone(), start).await,
+                Event::Cleanup(gateway) => cleanup_gateway(gateway, &ctx).await,
+            }
+        },
+    )
+    .await
+    .map_err(|e| match e {
+        FinalizerError::ApplyFailed(e) | FinalizerError::CleanupFailed(e) => e,
+        FinalizerError::AddFinalizer(e) | FinalizerError::RemoveFinalizer(e) => e.into(),
+        FinalizerError::UnnamedObject => Error::MissingResourceName,
+        FinalizerError::InvalidFinalizer => {
+            Error::InvalidConfigError("InvalidFinalizer".to_string())
+        }
+    })
+}
+
+pub async fn configure_gateway(
+    gateway: Arc<Gateway>,
+    ctx: Arc<Context>,
+    start: Instant,
+) -> Result<Action> {
+    let gateway_id = gateway.metadata.namespaced_name()?;
+    let ns = gateway_id.namespace.clone();
+    let name = gateway_id.name.clone();
+    let client = ctx.client.clone();
+
+    let gateway_api: Api<Gateway> = Api::namespaced(ctx.client.clone(), &gateway_id.namespace);
+    let mut gw = Gateway {
+        metadata: gateway.metadata.clone(),
+        spec: gateway.spec.clone(),
+        status: gateway.status.clone(),
+    };
 
     set_listener_status(&mut gw)?;
     let accepted_cond = get_accepted_condition(&gw);
@@ -154,7 +186,7 @@ pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Actio
         }
     } else {
         info!("creating loadbalancer service");
-        service = create_svc_for_gateway(ctx.clone(), gateway.as_ref()).await?;
+        service = create_loadbalancer_service(ctx.clone(), gateway.as_ref()).await?;
     }
 
     // invalid_lb_condition is a Condition that signifies that the Loadbalancer service is invalid.
@@ -218,6 +250,15 @@ pub async fn reconcile(gateway: Arc<Gateway>, ctx: Arc<Context>) -> Result<Actio
     let duration = Instant::now().sub(start);
     info!("finished reconciling in {:?} ms", duration.as_millis());
     Ok(Action::requeue(Duration::from_secs(60)))
+}
+
+async fn cleanup_gateway(gateway: Arc<Gateway>, ctx: &Context) -> Result<Action> {
+    let gateway_id = gateway.metadata.namespaced_name()?;
+
+    delete_endpoint(ctx.client.clone(), &gateway_id).await?;
+    delete_loadbalancer_service(ctx.client.clone(), &gateway_id).await?;
+
+    Ok(Action::await_change())
 }
 
 pub async fn controller(ctx: Context) -> Result<()> {
