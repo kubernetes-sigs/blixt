@@ -93,8 +93,9 @@ impl KindCluster {
                     format!("Failed to create kind cluster {}", self.name),
                     e,
                 )
-                .into()
-            })
+            })?;
+
+        self.host_mount_bpf_fs().await
     }
 
     /// delete the cluster
@@ -109,6 +110,29 @@ impl KindCluster {
                 )
                 .into()
             })
+    }
+
+    pub async fn host_mount_bpf_fs(&self) -> Result<()> {
+        let container_name = format!("{}-control-plane", self.name);
+        AsyncCommand::new(
+            "docker",
+            &[
+                "exec",
+                container_name.as_str(),
+                "/bin/sh",
+                "-c",
+                "mount -t bpf -o shared,rw,nosuid,nodev,noexec,realtime,mode=700 bpffs /sys/fs/bpf",
+            ],
+        )
+        .run()
+        .await
+        .map_err(|e| {
+            KindClusterError::Execution(
+                format!("Failed to mount bpf fs on host container {container_name}"),
+                e,
+            )
+            .into()
+        })
     }
 
     /// load a container image into the cluster
