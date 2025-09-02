@@ -36,7 +36,7 @@ regex = { version = "1", default-features = true }
 serde = { version = "1.0.219", default-features = false }
 serde_json = { version = "1.0.142", default-features = false }
 serde_yaml = { version = "0.9.34", default-features = false }
-thiserror = { version = "2.0.12", default-features = true }
+thiserror = { version = "2.0.16", default-features = true }
 tokio = { version = "1.47.1", default-features = false }
 tonic = { version = "0.13.1", default-features = false }
 tonic-build = { version = "0.13.1", default-features = false, features = ["prost"] }
