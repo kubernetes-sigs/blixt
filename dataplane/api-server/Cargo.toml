@@ -12,7 +12,7 @@ clap = { workspace = true, features = ["derive"] }
 common = { path = "../common", features = ["user"] }
 libc = { workspace = true }
 netlink-packet-core = { version = "0.7.0" }
-netlink-packet-route = { version = "0.24.0" }
+netlink-packet-route = { version = "0.25.1" }
 netlink-sys = { version = "0.8.7" }
 prost = { workspace = true }
 tokio = { workspace = true, features = [
