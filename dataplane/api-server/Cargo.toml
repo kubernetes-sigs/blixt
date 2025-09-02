@@ -30,5 +30,5 @@ tracing = { workspace = true }
 tonic-build = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.20.0"
+tempfile = "3.21.0"
 rcgen = "0.14.3"
