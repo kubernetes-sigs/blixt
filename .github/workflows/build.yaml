@@ -81,7 +81,7 @@ jobs:
           file: build/Containerfile.udp-test-server
           tags: localhost/blixt-udp-test-server:pr-${{ github.event.pull_request.number }}-${{ github.sha }}
       - name: Install kind and kubectl
-        uses: helm/kind-action@b72c923563e6e80ea66e8e8c810798cc73e97e5e # current main, includes cloud-provider-kind support
+        uses: helm/kind-action@50ea670a058121270d63a63b4f1e361d722932e4 # current main, includes cloud-provider-kind support
         if: steps.filter.outputs.sources
         with:
           install_only: true
