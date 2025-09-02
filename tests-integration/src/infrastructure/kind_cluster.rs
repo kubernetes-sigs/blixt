@@ -16,6 +16,7 @@ limitations under the License.
 
 use std::collections::BTreeMap;
 use std::ops::Add;
+use std::process::Stdio;
 use std::time::{Duration, Instant};
 
 use chrono::Utc;
@@ -111,6 +112,8 @@ impl KindCluster {
                     e,
                 )
             })
+
+        self.host_mount_bpf_fs().await
     }
 
     /// delete the cluster
@@ -126,23 +129,84 @@ impl KindCluster {
             })
     }
 
-    /// load a container image into the cluster
-    pub async fn load_image(&self, image: &str, tag: &str) -> Result<()> {
-        let kind_cluster = &self.name;
-        info!("Loading image {image} with {tag} to kind cluster {kind_cluster:?}.");
+    pub async fn host_mount_bpf_fs(&self) -> Result<()> {
+        let container_name = format!("{}-control-plane", self.name);
         AsyncCommand::new(
-            "kind",
+            "docker",
             &[
-                "load",
-                "docker-image",
-                format!("{image}:{tag}").as_str(),
-                "--name",
-                kind_cluster,
+                "exec",
+                container_name.as_str(),
+                "/bin/sh",
+                "-c",
+                "mount -t bpf -o shared,rw,nosuid,nodev,noexec,realtime,mode=700 bpffs /sys/fs/bpf",
             ],
         )
         .run()
         .await
         .map_err(|e| {
+            KindClusterError::Execution(
+                format!("Failed to mount bpf fs on host container {container_name}"),
+                e,
+            )
+            .into()
+        })
+    }
+
+    /// load a container image into the cluster
+    pub async fn load_image(&self, image: &str, tag: &str) -> Result<()> {
+        let kind_cluster = &self.name;
+        info!("Loading image {image} with {tag} to kind cluster {kind_cluster:?}.");
+        let mut image_save = AsyncCommand::new(
+            "podman",
+            &[
+                "image",
+                "save",
+                format!("{image}:{tag}").as_str(),
+                "-o",
+                "/dev/stdout",
+            ],
+        );
+        let mut kind_load = AsyncCommand::new(
+            "kind",
+            &[
+                "--name",
+                kind_cluster,
+                "load",
+                "image-archive",
+                "/dev/stdin",
+            ],
+        );
+
+        image_save.cmd.stdout(Stdio::piped());
+        let image_save = image_save.cmd.spawn().map_err(|e| {
+            KindClusterError::LoadImage(
+                kind_cluster.to_string(),
+                image.to_string(),
+                tag.to_string(),
+                AsyncCommandError::Spawn(e).to_string(),
+            )
+        })?;
+
+        let Some(stdout) = image_save.stdout else {
+            return Err(KindClusterError::LoadImage(
+                kind_cluster.to_string(),
+                image.to_string(),
+                tag.to_string(),
+                "Failed to get stdout from image_save process.".to_string(),
+            )
+            .into());
+        };
+        let fd = stdout.into_owned_fd().map_err(|e| {
+            KindClusterError::LoadImage(
+                kind_cluster.to_string(),
+                image.to_string(),
+                tag.to_string(),
+                AsyncCommandError::Output(e).to_string(),
+            )
+        })?;
+
+        kind_load.cmd.stdin(std::process::ChildStdout::from(fd));
+        kind_load.run().await.map_err(|e| {
             KindClusterError::LoadImage(
                 kind_cluster.to_string(),
                 image.to_string(),

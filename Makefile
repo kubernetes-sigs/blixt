@@ -60,9 +60,13 @@ clean: ## clean repo
 	rm $(TEST_CERTS_PATH)/{*.pem,*.csr}
 
 .PHONY: build
-build: ## Build dataplane
+build:
 	cargo xtask build-ebpf
 	cargo build
+
+build.reuse:
+	CARGO_HOME="$(WORK_DIR)/target" RUSTUP_HOME="$(WORK_DIR)/target" cargo xtask build-ebpf
+	CARGO_HOME="$(WORK_DIR)/target" RUSTUP_HOME="$(WORK_DIR)/target" cargo build
 
 .PHONY: build.release
 build.release: ## Build dataplane release
@@ -88,17 +92,26 @@ CONTROLPLANE_CONTAINERFILE ?= build/Containerfile.controlplane
 DATAPLANE_CONTAINERFILE ?= build/Containerfile.dataplane
 UDP_SERVER_CONTAINERFILE ?= build/Containerfile.udp-test-server
 
+UID = $(shell id -u)
+GID = $(shell id -g)
+WORK_DIR= $(shell pwd)
+BUILD_TIMESTAMP = $(shell date +%s%3N)
+CONTAINER_BUILD_ARGS = --userns=host --volume "$(WORK_DIR):/workspace" --volume "$(WORK_DIR)/target:$(WORK_DIR)/target/" \
+--build-arg BUILD_TIMESTAMP="$(BUILD_TIMESTAMP)" --build-arg UID="$(UID)" --build-arg GID="$(GID)" --build-arg WORK_DIR="$(WORK_DIR)" $(BUILD_ARGS)
+
 .PHONY: build.image.controlplane
 build.image.controlplane:
-	$(CONTAINER_RUNTIME) build $(BUILD_ARGS) --file=$(CONTROLPLANE_CONTAINERFILE) -t $(BLIXT_CONTROLPLANE_IMAGE):$(TAG) ./
-
+	mkdir -p target/
+	$(CONTAINER_RUNTIME) build $(CONTAINER_BUILD_ARGS) --file=$(CONTROLPLANE_CONTAINERFILE) --tag $(BLIXT_CONTROLPLANE_IMAGE):$(TAG)
 .PHONY: build.image.udp-test-server
 build.image.udp-test-server:
-	$(CONTAINER_RUNTIME) build $(BUILD_ARGS) --file=$(UDP_SERVER_CONTAINERFILE) -t $(BLIXT_UDP_SERVER_IMAGE):$(TAG) ./
+	mkdir -p target/
+	$(CONTAINER_RUNTIME) build $(CONTAINER_BUILD_ARGS) --file=$(UDP_SERVER_CONTAINERFILE) --tag $(BLIXT_UDP_SERVER_IMAGE):$(TAG)
 
 .PHONY: build.image.dataplane
 build.image.dataplane:
-	$(CONTAINER_RUNTIME) build $(BUILD_ARGS) --file=$(DATAPLANE_CONTAINERFILE) -t $(BLIXT_DATAPLANE_IMAGE):$(TAG) ./
+	mkdir -p target/
+	$(CONTAINER_RUNTIME) build $(CONTAINER_BUILD_ARGS) --file=$(DATAPLANE_CONTAINERFILE) --tag $(BLIXT_DATAPLANE_IMAGE):$(TAG)
 
 .PHONY: build.all.images
 build.all.images: 
@@ -131,7 +144,10 @@ test:
 	cargo test -vv --workspace --exclude tests-integration
 
 test.integration:
-	 cargo test --package tests-integration
+	cargo test --package tests-integration
+
+test.integration.reuse:
+	CARGO_HOME="$(WORK_DIR)/target" RUSTUP_HOME="$(WORK_DIR)/target" cargo test --package tests-integration
 
 .PHONY: test.gencert
 test.gencert: cfssl cfssljson

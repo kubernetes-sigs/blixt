@@ -17,13 +17,24 @@ spec:
         app: blixt
         component: dataplane
     spec:
+      volumes:
+        - name: epbf-fs
+          hostPath:
+            path: /sys/fs/bpf/
+            type: Directory
       hostNetwork: true
       containers:
       - name: dataplane
         image: ghcr.io/kubernetes-sigs/blixt-dataplane:latest
         securityContext:
           privileged: true
-        args: ["-i", "eth0"]
+        volumeMounts:
+          - name: epbf-fs
+            mountPath: /sys/fs/bpf/
+        args:
+          - "-i"
+          - "eth0"
+        # - "--load-ebpf"
         ports:
           - containerPort: 9874
         env:

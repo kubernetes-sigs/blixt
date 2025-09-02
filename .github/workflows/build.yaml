@@ -15,7 +15,7 @@ jobs:
   rust-build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2 # v4.1.7
+        uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493 # v4.1.7
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         id: filter
         with:
@@ -58,28 +58,42 @@ jobs:
               - 'build/Containerfile.*'
       - name: Build controlplane Container Image
         if: steps.filter.outputs.sources
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
-        with:
-          push: false
-          context: .
-          file: build/Containerfile.controlplane
-          tags: localhost/blixt-controlplane:pr-${{ github.event.pull_request.number }}-${{ github.sha }}
+        run: |
+          mkdir -p target/ &&
+          podman build \
+            --userns=host \
+            --file build/Containerfile.controlplane \
+            --volume "$(pwd):/workspace" \
+            --volume "$(pwd)/target:$(pwd)/target/" \
+            --build-arg BUILD_TIMESTAMP="$(date +%s%3N)" \
+            --build-arg UID="0" \
+            --build-arg GID="0" \
+            --build-arg WORK_DIR="$(pwd)" \
+            --tag localhost/blixt-controlplane:pr-${{ github.event.pull_request.number }}-${{ github.sha }}
       - name: Build dataplane Container Image
-        if: steps.filter.outputs.sources
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
-        with:
-          push: false
-          context: .
-          file: build/Containerfile.dataplane
-          tags: localhost/blixt-dataplane:pr-${{ github.event.pull_request.number }}-${{ github.sha }}
+        run: |
+          podman build \
+            --userns=host \
+            --file build/Containerfile.dataplane \
+            --volume "$(pwd):/workspace" \
+            --volume "$(pwd)/target:$(pwd)/target/" \
+            --build-arg BUILD_TIMESTAMP="$(date +%s%3N)" \
+            --build-arg UID="0" \
+            --build-arg GID="0" \
+            --build-arg WORK_DIR="$(pwd)" \
+            --tag localhost/blixt-dataplane:pr-${{ github.event.pull_request.number }}-${{ github.sha }}
       - name: Build udp-test-server Container Image
-        if: steps.filter.outputs.sources
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
-        with:
-          push: false
-          context: .
-          file: build/Containerfile.udp-test-server
-          tags: localhost/blixt-udp-test-server:pr-${{ github.event.pull_request.number }}-${{ github.sha }}
+        run: |
+          podman build \
+            --userns=host \
+            --file build/Containerfile.udp-test-server \
+            --volume "$(pwd):/workspace" \
+            --volume "$(pwd)/target:$(pwd)/target/" \
+            --build-arg BUILD_TIMESTAMP="$(date +%s%3N)" \
+            --build-arg UID="0" \
+            --build-arg GID="0" \
+            --build-arg WORK_DIR="$(pwd)" \
+            --tag localhost/blixt-udp-test-server:pr-${{ github.event.pull_request.number }}-${{ github.sha }}
       - name: Install kind and kubectl
         uses: helm/kind-action@b72c923563e6e80ea66e8e8c810798cc73e97e5e # current main, includes cloud-provider-kind support
         if: steps.filter.outputs.sources
@@ -89,12 +103,14 @@ jobs:
           kubectl_version: 'v1.33.3'
       - name: Install Rust
         if: steps.filter.outputs.sources
-        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # v1
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
           toolchain: stable
       - name: Run Integration Tests
         if: steps.filter.outputs.sources
         run: |
+          # kind load broken for podman https://github.com/kubernetes-sigs/kind/issues/3945
           export REGISTRY="localhost"
           export TAG="pr-${{ github.event.pull_request.number }}-${{ github.sha }}"
-          make test.integration
+          sudo chown -R "$(id -u):$(id -g)" target/
+          make test.integration.reuse
