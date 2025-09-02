@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
+use std::process::Stdio;
 use std::time::Duration;
 
 use kube::config::KubeConfigOptions;
@@ -115,19 +115,57 @@ impl KindCluster {
     pub async fn load_image(&self, image: &str, tag: &str) -> Result<()> {
         let kind_cluster = &self.name;
         info!("Loading image {image} with {tag} to kind cluster {kind_cluster:?}.");
-        AsyncCommand::new(
+        let mut image_save = AsyncCommand::new(
+            "podman",
+            &[
+                "image",
+                "save",
+                format!("{image}:{tag}").as_str(),
+                "-o",
+                "/dev/stdout",
+            ],
+        );
+        let mut kind_load = AsyncCommand::new(
             "kind",
             &[
-                "load",
-                "docker-image",
-                format!("{image}:{tag}").as_str(),
                 "--name",
                 kind_cluster,
+                "load",
+                "image-archive",
+                "/dev/stdin",
             ],
-        )
-        .run()
-        .await
-        .map_err(|e| {
+        );
+
+        image_save.cmd.stdout(Stdio::piped());
+        let image_save = image_save.cmd.spawn().map_err(|e| {
+            KindClusterError::LoadImage(
+                kind_cluster.to_string(),
+                image.to_string(),
+                tag.to_string(),
+                AsyncCommandError::Spawn(e).to_string(),
+            )
+        })?;
+
+        let Some(stdout) = image_save.stdout else {
+            return Err(KindClusterError::LoadImage(
+                kind_cluster.to_string(),
+                image.to_string(),
+                tag.to_string(),
+                "Failed to get stdout from image_save process.".to_string(),
+            )
+            .into());
+        };
+        let fd = stdout.into_owned_fd().map_err(|e| {
+            KindClusterError::LoadImage(
+                kind_cluster.to_string(),
+                image.to_string(),
+                tag.to_string(),
+                AsyncCommandError::Output(e).to_string(),
+            )
+        })?;
+
+        kind_load.cmd.stdin(std::process::ChildStdout::from(fd));
+        kind_load.run().await.map_err(|e| {
             KindClusterError::LoadImage(
                 kind_cluster.to_string(),
                 image.to_string(),
