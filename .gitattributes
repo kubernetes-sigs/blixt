@@ -3,3 +3,4 @@ bin/** linguist-detectable=false
 config/** linguist-detectable=false
 tools/** linguist-detectable=false
 Makefile linguist-detectable=false
+old-golang-control-plane/** linguist-detectable=false
